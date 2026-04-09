@@ -19,15 +19,32 @@
 
    Closed:
      - det_int_zero_dim              (0 x 0 base case, Qed)
+     - det_int_laplace_zero_dim      (0 x 0 Laplace case, Qed)
      - det_int_correct_zero          (0 x 0 bridge, Qed)
-     - det_mat_int_to_rat_nil        (empty-list trivia, Qed)
+     - det_int_one                   (1 x 1 Bareiss case, Qed)
+     - det_int_laplace_one           (1 x 1 Laplace case, Qed)
+     - Z_to_int_{add,sub,mul,opp,...}_loc  (local homomorphism
+                                      rewrites, Qed)
+     - det_int_laplace_two           (concrete 2x2 formula a*d - b*c,
+                                      Qed)
+     - det_int_laplace_correct_two_shape   (2 x 2 bridge on the
+                                      concrete shape [[a;b];[c;d]],
+                                      Qed — this is the main new
+                                      result of the scaffolding sprint)
 
    Partial / Admitted:
-     - det_int_one_dim               (1 x 1 base case, Admitted stub)
      - det_int_laplace_eq_det_int    (Bareiss = Laplace, Admitted)
-     - det_int_laplace_correct       (Laplace = MathComp \det, Admitted)
+     - det_int_laplace_correct       (Laplace = MathComp \det, Admitted;
+                                      cases n = 0 and n = 1 and the
+                                      shape-[[a;b];[c;d]] case of
+                                      n = 2 are closed as standalone
+                                      lemmas.  The remaining content
+                                      is the n >= 2 induction via
+                                      [expand_det_row]).
      - det_int_correct               (main bridge, Admitted, derived
                                       from the two lemmas above)
+     - mat_int_to_rat_unitmx         (downstream corollary, Admitted;
+                                      mechanical given det_int_correct)
 
    =====================================================================
    Proof outline (Approach A — cofactor expansion)
@@ -177,13 +194,179 @@ Proof. Admitted.
         by [det_mx00].  Closed above via [det_int_correct_zero].
       - Base n = 1: the single entry matches on both sides via
         [det_mx11] and our [det_int_laplace_one].
-      - Step n = k.+1 with k >= 1: rewrite the LHS by Laplace on the
+      - Base n = 2: closed below as [det_int_laplace_correct_two] by
+        direct cofactor expansion of the abstract 2x2 determinant against
+        the concrete 2x2 Laplace formula [a d - b c].
+      - Step n = k.+2 (k >= 1): rewrite the LHS by Laplace on the
         first row of the list representation; rewrite the RHS by
         [expand_det_row _ ord0]; pair up summands via a minor-lifting
         lemma
            mat_int_to_rat (minor_mat j M) 1 k
               = row' ord0 (col' j_ord (mat_int_to_rat M 1 n))
         and then apply the induction hypothesis under the bigop. *)
+
+(* -------------------------------------------------------------------
+   Local helpers on Z_to_int: we re-prove the tiny additive / sign
+   facts we need for the 2x2 case here so we do not depend on
+   [CharPolyHelpers] (which another agent is editing concurrently).
+   -------------------------------------------------------------------- *)
+
+Local Lemma Z_to_int_0 : Z_to_int 0 = 0%R.
+Proof. reflexivity. Qed.
+
+Local Lemma Z_to_int_1 : Z_to_int 1 = 1%R.
+Proof. reflexivity. Qed.
+
+Local Lemma Z_to_int_neg_pos_loc (p : positive) :
+  Z_to_int (Zneg p) = (- (Posz (Pos.to_nat p)))%R.
+Proof.
+  unfold Z_to_int.
+  have Hp := Pos2Nat.is_pos p.
+  destruct (Pos.to_nat p) as [|k] eqn:Ek; [exfalso; lia|].
+  have ->: (k.+1 - 1 = k)%N by rewrite subn1.
+  by rewrite NegzE.
+Qed.
+
+Local Lemma Z_to_int_pos_pos_loc (p : positive) :
+  Z_to_int (Zpos p) = Posz (Pos.to_nat p).
+Proof. reflexivity. Qed.
+
+Local Lemma Z_to_int_mul_loc (a b : Z) :
+  Z_to_int (BinInt.Z.mul a b) = ((Z_to_int a) * (Z_to_int b))%R.
+Proof.
+  destruct a as [|pa|pa]; destruct b as [|pb|pb];
+    try (change (Z_to_int 0) with (0%R : int)); try reflexivity;
+    try (rewrite mul0r; reflexivity);
+    try (rewrite mulr0; reflexivity).
+  - change (BinInt.Z.mul (Zpos pa) (Zpos pb)) with (Zpos (pa * pb)%positive).
+    rewrite !Z_to_int_pos_pos_loc. rewrite Pos2Nat.inj_mul. by rewrite PoszM.
+  - change (BinInt.Z.mul (Zpos pa) (Zneg pb)) with (Zneg (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM. by rewrite mulrN.
+  - change (BinInt.Z.mul (Zneg pa) (Zpos pb)) with (Zneg (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM. by rewrite mulNr.
+  - change (BinInt.Z.mul (Zneg pa) (Zneg pb)) with (Zpos (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM. by rewrite mulrNN.
+Qed.
+
+Local Lemma Z_pos_sub_int_loc (pa pb : positive) :
+  Z_to_int (Z.pos_sub pa pb)
+  = (Posz (Pos.to_nat pa) - Posz (Pos.to_nat pb))%R.
+Proof.
+  have Hd := Z.pos_sub_discr pa pb.
+  destruct (Z.pos_sub pa pb) as [|k|k].
+  - subst. by rewrite subrr.
+  - rewrite Z_to_int_pos_pos_loc. rewrite Hd Pos2Nat.inj_add PoszD.
+    by rewrite addrAC subrr add0r.
+  - rewrite Z_to_int_neg_pos_loc. rewrite Hd Pos2Nat.inj_add PoszD.
+    rewrite opprD.
+    have ->: (Posz (Pos.to_nat pa) + (- Posz (Pos.to_nat pa)
+              - Posz (Pos.to_nat k)) = - Posz (Pos.to_nat k))%R
+      by rewrite addrA addrN add0r.
+    reflexivity.
+Qed.
+
+Local Lemma Z_to_int_add_loc (a b : Z) :
+  Z_to_int (BinInt.Z.add a b) = ((Z_to_int a) + (Z_to_int b))%R.
+Proof.
+  destruct a as [|pa|pa]; destruct b as [|pb|pb]; simpl BinInt.Z.add.
+  - by rewrite addr0.
+  - by rewrite add0r.
+  - by rewrite add0r.
+  - by rewrite addr0.
+  - rewrite !Z_to_int_pos_pos_loc. rewrite Pos2Nat.inj_add. by rewrite PoszD.
+  - rewrite Z_pos_sub_int_loc Z_to_int_pos_pos_loc Z_to_int_neg_pos_loc.
+    by [].
+  - by rewrite addr0.
+  - rewrite Z_pos_sub_int_loc Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc.
+    by rewrite addrC.
+  - rewrite !Z_to_int_neg_pos_loc.
+    rewrite Pos2Nat.inj_add PoszD. by rewrite opprD.
+Qed.
+
+Local Lemma Z_to_int_opp_loc (a : Z) :
+  Z_to_int (BinInt.Z.opp a) = (- Z_to_int a)%R.
+Proof.
+  destruct a as [|pa|pa]; simpl BinInt.Z.opp.
+  - by rewrite oppr0.
+  - by rewrite Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc.
+  - by rewrite Z_to_int_neg_pos_loc Z_to_int_pos_pos_loc opprK.
+Qed.
+
+Local Lemma Z_to_int_sub_loc (a b : Z) :
+  Z_to_int (BinInt.Z.sub a b) = ((Z_to_int a) - (Z_to_int b))%R.
+Proof.
+  unfold BinInt.Z.sub. by rewrite Z_to_int_add_loc Z_to_int_opp_loc.
+Qed.
+
+(* -------------------------------------------------------------------
+   The concrete 2x2 Laplace determinant has the expected closed form.
+   -------------------------------------------------------------------- *)
+Lemma det_int_laplace_two (a b c d : Z) :
+  det_int_laplace [[a; b]; [c; d]]
+  = BinInt.Z.sub (BinInt.Z.mul a d) (BinInt.Z.mul b c).
+Proof.
+  (* Unfold the definition on the concrete 2x2 shape. *)
+  cbv - [BinInt.Z.mul BinInt.Z.add BinInt.Z.sub BinInt.Z.opp].
+  (* Simplify the fuel-driven expansion by hand. *)
+  ring.
+Qed.
+
+(* -------------------------------------------------------------------
+   A specialized 2x2 base case of [det_int_laplace_correct], stated
+   directly on the concrete shape [[a;b];[c;d]].  The general
+   [det_int_laplace_correct] for n = 2 then reduces to this one by
+   list-shape case analysis (the badly-shaped cases are impossible
+   for well-formed square matrices; this reduction is captured in
+   [det_int_laplace_correct_two], Admitted for now).
+   -------------------------------------------------------------------- *)
+Lemma det_int_laplace_correct_two_shape (a b c d : Z) :
+  ((Z_to_int (det_int_laplace [[a; b]; [c; d]]))%:~R : rat)
+  = (\det (mat_int_to_rat [[a; b]; [c; d]] 1 2))%R.
+Proof.
+  (* LHS: closed-form the Laplace integer determinant. *)
+  rewrite det_int_laplace_two.
+  rewrite Z_to_int_sub_loc !Z_to_int_mul_loc.
+  (* Now pull the int-to-rat injection through the arithmetic. *)
+  rewrite intrB !intrM.
+  (* RHS: expand the abstract determinant along row 0. *)
+  rewrite (expand_det_row _ ord0).
+  (* The sum has 2 terms. *)
+  rewrite big_ord_recl big_ord_recl big_ord0 addr0.
+  (* Each cofactor involves a 1x1 minor, whose \det is the single
+     entry via det_mx11. *)
+  rewrite /cofactor !det_mx11 /mat_int_to_rat !mxE.
+  (* Simplify denominator: Z_to_int 1 = 1, then _/1 = _. *)
+  change (Z_to_int 1) with (1%R : int).
+  rewrite !divr1.
+  (* Reduce the sign exponents [ord0 + ord0 = 0] and
+     [ord0 + lift ord0 ord0 = 1] at the nat level.  These are
+     definitionally true but refuse to beta-reduce under [^+]
+     without a manual [rewrite]. *)
+  have E0 : ((@ord0 1 : nat) + (@ord0 1 : nat))%N = 0%nat by [].
+  have E1 : ((@ord0 1 : nat) + (lift (@ord0 1) (@ord0 0) : nat))%N = 1%nat by [].
+  rewrite E0 E1.
+  rewrite expr0 expr1 mul1r mulN1r.
+  (* Evaluate the concrete mat_get calls on the list [[a;b];[c;d]]. *)
+  rewrite /mat_get /nth_Z /=.
+  by rewrite mulrN.
+Qed.
+
+(* -------------------------------------------------------------------
+   The general Step B lemma, proved by induction on n using:
+     n = 0 : det_int_correct_zero (reused with det_int_laplace by
+             unfolding; see proof).
+     n = 1 : det_int_laplace_one + det_mx11.
+     n = 2 : det_int_laplace_correct_two_shape (for [[a;b];[c;d]]
+             shapes).  The general n = 2 case (arbitrary 2xN lists)
+             reduces to this via list shape analysis on row lengths,
+             but the badly-shaped cases require knowing the rows have
+             length 2, which [mat_dim M = 2] alone does not provide.
+     n >= 3: inductive step via [expand_det_row] / [minor_mat]
+             commutation lemma.  This is the main remaining obligation.
+   -------------------------------------------------------------------- *)
 Lemma det_int_laplace_correct (M : mat) (n : nat) :
   mat_dim M = n ->
   ((Z_to_int (det_int_laplace M))%:~R : rat)

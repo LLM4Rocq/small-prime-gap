@@ -400,8 +400,337 @@ Qed.
 
 (* ------- (6) mmul ------------------------------------------- *)
 
+(* Bridge lemmas for `mmul`.  The proof strategy:
+   1. Reduce `mat_get (mmul A B) i j` to a `dot_int` over row_i(A) and a
+      column of `mtrans B`.
+   2. Show that under the well-formedness assumption `all_rows_len n B`,
+      for any `j < n`, the j-th column of `mtrans B` behaves like
+      `col_at j B := map (fun row => nth_Z row j) B` for indexing purposes.
+   3. Lift the `dot_int` to a `\sum_(k<n)` over rat via `Z_to_int_add`,
+      `Z_to_int_mul`, `intrD`, `intrM`.
+*)
+
+(* ---------- generic list helpers ---------- *)
+
+Lemma nth_Z_oob (xs : list Z) (i : nat) :
+  (List.length xs <= i)%coq_nat -> nth_Z xs i = Z0.
+Proof.
+  intros H. unfold nth_Z. apply List.nth_overflow. exact H.
+Qed.
+
+(* ---------- structural facts about mtrans ---------- *)
+
+(* Shape of `tails m`. *)
+Lemma length_tails (m : mat) : List.length (tails m) = List.length m.
+Proof.
+  induction m as [|row rest IH]; simpl; [reflexivity|].
+  destruct row; simpl; rewrite IH; reflexivity.
+Qed.
+
+Lemma nth_tails (m : mat) (k : nat) :
+  List.nth k (tails m) nil = List.tl (List.nth k m nil).
+Proof.
+  revert k. induction m as [|row rest IH]; intros k; simpl.
+  - destruct k; simpl; reflexivity.
+  - destruct row as [|x xs]; destruct k as [|k']; simpl.
+    + reflexivity.
+    + apply IH.
+    + reflexivity.
+    + apply IH.
+Qed.
+
+Lemma nth_heads (m : mat) (k : nat) :
+  List.nth k (heads m) Z0 = nth_Z (List.nth k m nil) 0.
+Proof.
+  revert k. induction m as [|row rest IH]; intros k; simpl.
+  - destruct k; reflexivity.
+  - destruct row as [|x xs]; destruct k as [|k']; simpl; try reflexivity.
+    + apply IH.
+    + apply IH.
+Qed.
+
+Lemma length_heads (m : mat) : List.length (heads m) = List.length m.
+Proof.
+  induction m as [|row rest IH]; simpl; [reflexivity|].
+  destruct row; simpl; rewrite IH; reflexivity.
+Qed.
+
+(* `mtrans_fuel` length: is at most the fuel. *)
+Lemma length_mtrans_fuel (f : nat) (m : mat) :
+  (List.length (mtrans_fuel f m) <= f)%coq_nat.
+Proof.
+  revert m. induction f as [|f IH]; intros m; simpl.
+  - apply Nat.le_refl.
+  - destruct (all_empty m); simpl.
+    + apply Nat.le_0_l.
+    + apply le_n_S. apply IH.
+Qed.
+
+(* Under "all rows have length >= f", `mtrans_fuel f m` has exactly f rows. *)
+Fixpoint all_rows_at_least (k : nat) (m : mat) : Prop :=
+  match m with
+  | nil => True
+  | r :: rest => (k <= List.length r)%coq_nat /\ all_rows_at_least k rest
+  end.
+
+Lemma all_rows_at_least_0 (m : mat) : all_rows_at_least 0 m.
+Proof. induction m as [|r rest IH]; simpl; [exact I|]. split; [lia|exact IH]. Qed.
+
+Lemma all_rows_at_least_tails (k : nat) (m : mat) :
+  all_rows_at_least (S k) m -> all_rows_at_least k (tails m).
+Proof.
+  induction m as [|r rest IH]; intros H; simpl; [exact I|].
+  destruct H as [Hr Hrest]. destruct r as [|x r']; simpl in *.
+  - lia.
+  - split; [lia|]. apply IH. exact Hrest.
+Qed.
+
+Lemma all_empty_false_of_Sk (k : nat) (m : mat) :
+  m <> nil -> all_rows_at_least (S k) m -> all_empty m = false.
+Proof.
+  intros Hne H. destruct m as [|r rest].
+  - exfalso; apply Hne; reflexivity.
+  - simpl. destruct H as [Hr _]. destruct r as [|x r']; simpl in *.
+    + lia.
+    + reflexivity.
+Qed.
+
+Lemma length_mtrans_fuel_exact (f : nat) (m : mat) :
+  m <> nil -> all_rows_at_least f m ->
+  List.length (mtrans_fuel f m) = f.
+Proof.
+  revert m. induction f as [|f IH]; intros m Hne Hall; simpl.
+  - reflexivity.
+  - rewrite (all_empty_false_of_Sk f m Hne Hall). simpl.
+    f_equal. apply IH.
+    + destruct m as [|r rest]; [exfalso; apply Hne; reflexivity|].
+      simpl. destruct r as [|x r']; simpl.
+      * destruct Hall as [Hr _]. simpl in Hr. lia.
+      * intros E; discriminate.
+    + apply all_rows_at_least_tails. exact Hall.
+Qed.
+
+(* The nth row of `mtrans_fuel f m` has length `length m`
+   (the number of rows of m). *)
+Lemma length_nth_mtrans_fuel (f : nat) (m : mat) (j : nat) :
+  (j < f)%coq_nat -> all_rows_at_least f m ->
+  List.length (List.nth j (mtrans_fuel f m) nil) = List.length m.
+Proof.
+  revert m j. induction f as [|f IH]; intros m j Hj Hall; simpl.
+  - lia.
+  - destruct m as [|r rest] eqn:Em.
+    + simpl. destruct j; reflexivity.
+    + have Hne: (r :: rest) <> nil by intros E; discriminate.
+      rewrite <- Em in *.
+      rewrite (all_empty_false_of_Sk f m Hne Hall).
+      destruct j as [|j']; simpl.
+      * apply length_heads.
+      * rewrite IH; [| lia | apply all_rows_at_least_tails; exact Hall].
+        apply length_tails.
+Qed.
+
+(* The entry at row j, column k of `mtrans_fuel f m` is `nth_Z (nth k m nil) j`
+   (i.e. transposed indexing).  Proved under the shape hypothesis. *)
+Lemma nth_nth_mtrans_fuel (f : nat) (m : mat) (j k : nat) :
+  (j < f)%coq_nat -> all_rows_at_least f m ->
+  List.nth k (List.nth j (mtrans_fuel f m) nil) Z0
+  = nth_Z (List.nth k m nil) j.
+Proof.
+  revert m j k. induction f as [|f IH]; intros m j k Hj Hall.
+  - lia.
+  - simpl.
+    destruct m as [|r rest] eqn:Em.
+    + simpl. unfold nth_Z. destruct j; destruct k; simpl; reflexivity.
+    + have Hne : (r :: rest) <> nil by intros E; discriminate.
+      rewrite <- Em in *.
+      rewrite (all_empty_false_of_Sk f m Hne Hall).
+      destruct j as [|j']; simpl.
+      * (* head row: heads m *)
+        rewrite nth_heads.
+        (* Goal: nth_Z (nth k m nil) 0 = nth_Z (nth k m nil) 0 *)
+        reflexivity.
+      * (* recursive: row j' of tails m *)
+        rewrite IH; [| lia | apply all_rows_at_least_tails; exact Hall].
+        rewrite nth_tails.
+        (* Goal: nth_Z (tl (nth k m nil)) j' = nth_Z (nth k m nil) (S j') *)
+        unfold nth_Z.
+        destruct (List.nth k m nil) as [|x xs]; simpl.
+        -- destruct j'; reflexivity.
+        -- reflexivity.
+Qed.
+
+(* Convert `all_rows_len n m` into `all_rows_at_least n m`. *)
+Lemma all_rows_len_to_at_least (n : nat) (m : mat) :
+  all_rows_len n m -> all_rows_at_least n m.
+Proof.
+  induction m as [|r rest IH]; simpl; [intros _; exact I|].
+  intros H. split.
+  - have H0 : List.length (List.nth 0 (r :: rest) nil) = n
+      by (apply H; simpl; lia).
+    simpl in H0. rewrite H0. apply Nat.le_refl.
+  - apply IH. intros i Hi.
+    have := H (S i). simpl. intros HH. apply HH. lia.
+Qed.
+
+(* `mtrans B` for an n x n square B.  Packaged forms. *)
+Lemma length_mtrans_sq (B : mat) (n : nat) :
+  List.length B = n -> all_rows_len n B ->
+  List.length (mtrans B) = n.
+Proof.
+  intros Hdim Hrow.
+  unfold mtrans. destruct B as [|r rest] eqn:EB.
+  - simpl in Hdim. subst. reflexivity.
+  - have Hrlen : List.length r = n.
+    { have H0 : List.length (List.nth 0 (r :: rest) nil) = n
+        by (apply Hrow; simpl; lia).
+      simpl in H0. exact H0. }
+    rewrite Hrlen.
+    apply length_mtrans_fuel_exact.
+    + intros E; discriminate.
+    + exact (all_rows_len_to_at_least n (r :: rest) Hrow).
+Qed.
+
+Lemma nth_mtrans_length_sq (B : mat) (n : nat) (j : nat) :
+  List.length B = n -> all_rows_len n B -> (j < n)%coq_nat ->
+  List.length (List.nth j (mtrans B) nil) = List.length B.
+Proof.
+  intros Hdim Hrow Hj.
+  unfold mtrans. destruct B as [|r rest] eqn:EB.
+  - simpl in Hdim. subst. lia.
+  - have Hrlen : List.length r = n.
+    { have H0 : List.length (List.nth 0 (r :: rest) nil) = n
+        by (apply Hrow; simpl; lia).
+      simpl in H0. exact H0. }
+    rewrite Hrlen.
+    apply length_nth_mtrans_fuel; [lia|].
+    exact (all_rows_len_to_at_least n (r :: rest) Hrow).
+Qed.
+
+Lemma nth_nth_mtrans_sq (B : mat) (n : nat) (j k : nat) :
+  List.length B = n -> all_rows_len n B -> (j < n)%coq_nat ->
+  List.nth k (List.nth j (mtrans B) nil) Z0
+  = nth_Z (List.nth k B nil) j.
+Proof.
+  intros Hdim Hrow Hj.
+  unfold mtrans. destruct B as [|r rest] eqn:EB.
+  - simpl in Hdim. subst. lia.
+  - have Hrlen : List.length r = n.
+    { have H0 : List.length (List.nth 0 (r :: rest) nil) = n
+        by (apply Hrow; simpl; lia).
+      simpl in H0. exact H0. }
+    rewrite Hrlen.
+    rewrite nth_nth_mtrans_fuel; [reflexivity| lia|].
+    exact (all_rows_len_to_at_least n (r :: rest) Hrow).
+Qed.
+
+(* ---------- dot_int as a mathcomp big-sum over rat ---------- *)
+
+(* `dot_int xs ys` lifted to rat equals a big-sum over nat of the
+   product of entries.  We lift through `Z_to_int` + `intrM` + `intrD`. *)
+Lemma Z_to_int_dot_int_sum (xs ys : list Z) (n : nat) :
+  (List.length xs <= n)%coq_nat ->
+  ((Z_to_int (dot_int xs ys))%:~R : rat)
+  = (\sum_(k < n)
+       ((Z_to_int (nth_Z xs k))%:~R * (Z_to_int (nth_Z ys k))%:~R))%R.
+Proof.
+  revert ys n. induction xs as [|x xs IH]; intros ys n Hlen; simpl.
+  - (* dot_int nil _ = 0; all terms vanish since nth_Z nil k = 0. *)
+    rewrite /=.
+    change (Z_to_int Z0) with (0%R : int).
+    rewrite /=.
+    have -> : ((0%R : int)%:~R : rat) = 0%R by rewrite /= mulr0z.
+    symmetry.
+    rewrite big1; [reflexivity|].
+    intros k _.
+    have -> : nth_Z nil (nat_of_ord k) = Z0
+      by (unfold nth_Z; destruct (nat_of_ord k); reflexivity).
+    change (Z_to_int Z0) with (0%R : int).
+    have -> : ((0%R : int)%:~R : rat) = 0%R by rewrite /= mulr0z.
+    by rewrite mul0r.
+  - (* xs = x :: xs'; ys = nil or y :: ys' *)
+    destruct ys as [|y ys']; simpl.
+    + (* dot_int _ nil = 0 *)
+      change (Z_to_int Z0) with (0%R : int).
+      have -> : ((0%R : int)%:~R : rat) = 0%R by rewrite /= mulr0z.
+      symmetry.
+      rewrite big1; [reflexivity|].
+      intros k _.
+      have -> : nth_Z nil (nat_of_ord k) = Z0
+        by (unfold nth_Z; destruct (nat_of_ord k); reflexivity).
+      change (Z_to_int Z0) with (0%R : int).
+      have -> : ((0%R : int)%:~R : rat) = 0%R by rewrite /= mulr0z.
+      by rewrite mulr0.
+    + (* x * y + dot_int xs' ys' *)
+      rewrite Z_to_int_add Z_to_int_mul intrD intrM.
+      destruct n as [|n']; simpl in Hlen; [lia|].
+      rewrite big_ord_recl /=.
+      rewrite (IH ys' n'); [| lia].
+      by [].
+Qed.
+
+(* ---------- main mmul bridge ---------- *)
+
+Lemma mat_get_mmul_sq (A B : mat) (n : nat) (i j : nat) :
+  List.length A = n -> List.length B = n ->
+  all_rows_len n A -> all_rows_len n B ->
+  (i < n)%coq_nat -> (j < n)%coq_nat ->
+  mat_get (mmul A B) i j
+  = dot_int (List.nth i A nil) (List.nth j (mtrans B) nil).
+Proof.
+  intros HdimA HdimB HrowA HrowB Hi Hj.
+  unfold mat_get, mmul.
+  set Bt := mtrans B.
+  have HBt_len : List.length Bt = n by apply length_mtrans_sq.
+  have Hi' : (i < List.length A)%coq_nat by lia.
+  (* Switch default for outer map via nth_indep then apply map_nth. *)
+  rewrite (List.nth_indep _ nil (map (fun col => dot_int nil col) Bt));
+    [| rewrite length_map; exact Hi'].
+  rewrite (List.map_nth (fun row => map (fun col => dot_int row col) Bt) A nil i).
+  set row := List.nth i A nil.
+  unfold nth_Z.
+  have Hjlt : (j < List.length Bt)%coq_nat by lia.
+  rewrite (List.nth_indep _ Z0 (dot_int row nil));
+    [| rewrite length_map; exact Hjlt].
+  rewrite (List.map_nth (fun col => dot_int row col) Bt nil j).
+  reflexivity.
+Qed.
+
+(* Main bridge lemma.  NOTE (signature change): we added the two
+   well-formedness hypotheses `all_rows_len n A` and `all_rows_len n B`.
+   These are the structural invariants that A and B are honest n x n
+   grids; our `madd` bridge lemma above already carries the same extra
+   hypotheses, so callers downstream (who hold square-matrix invariants
+   anyway) can supply them. *)
 Lemma mat_int_to_rat_mmul (A B : mat) (n : nat) :
   mat_dim A = n -> mat_dim B = n ->
+  all_rows_len n A -> all_rows_len n B ->
   mat_int_to_rat (mmul A B) 1 n
   = (mat_int_to_rat A 1 n *m mat_int_to_rat B 1 n)%R.
-Proof. Admitted.
+Proof.
+  intros HdimA HdimB HrowA HrowB.
+  unfold mat_dim in HdimA, HdimB.
+  apply/matrixP => i j.
+  rewrite /mat_int_to_rat !mxE.
+  have Hi : (nat_of_ord i < n)%coq_nat by apply/ltP; apply: ltn_ord.
+  have Hj : (nat_of_ord j < n)%coq_nat by apply/ltP; apply: ltn_ord.
+  rewrite (mat_get_mmul_sq A B n i j HdimA HdimB HrowA HrowB Hi Hj).
+  change (Z_to_int 1) with (1%R : int).
+  rewrite /= divr1.
+  (* Rewrite mxE inside the big-sum on RHS.  We have to manually clear
+     the (Z_to_int 1)%:~R = 1 factors inside the `under` body. *)
+  have E1 : ((Z_to_int 1)%:~R : rat) = 1%R by [].
+  under eq_bigr => k _ do (rewrite !mxE; rewrite E1; rewrite !divr1).
+  have Hrowi_len : List.length (List.nth (nat_of_ord i) A nil) = n
+    by apply HrowA; lia.
+  rewrite (Z_to_int_dot_int_sum _ _ n); [| lia].
+  apply: eq_bigr => k _.
+  have Hk : (nat_of_ord k < n)%coq_nat by apply/ltP; apply: ltn_ord.
+  have HBkj : nth_Z (List.nth (nat_of_ord j) (mtrans B) nil) (nat_of_ord k)
+            = mat_get B (nat_of_ord k) (nat_of_ord j).
+  { unfold nth_Z.
+    rewrite (nth_nth_mtrans_sq B n (nat_of_ord j) (nat_of_ord k) HdimB HrowB Hj).
+    reflexivity. }
+  rewrite HBkj.
+  (* Remaining: nth_Z (nth i A nil) k = mat_get A i k is definitional. *)
+  reflexivity.
+Qed.
