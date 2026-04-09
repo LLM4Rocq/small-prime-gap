@@ -459,21 +459,158 @@ Qed.
 (*  simplicity. The Cert.v consumer only asks for `<`, not `≤`.         *)
 (* ================================================================== *)
 
+(* Helper: `taq z 1 = #z` -- evaluation of the trivial Tarski query
+   over a finite root list returns its cardinality. *)
+Lemma natr_to_Posz (n : nat) : (n%:R : int) = Posz n.
+Proof. by elim: n => [//|n IH]; rewrite -addn1 PoszD natrD /= IH. Qed.
+
+Lemma taq_one (z : seq realalg) : taq z 1 = Posz (size z).
+Proof.
+unfold taq.
+transitivity (\sum_(x <- z) (1%R : int)).
+- by apply: eq_bigr => x _; rewrite hornerC sgz1.
+- by rewrite big_const_seq count_predT iter_addr_0 natr_to_Posz.
+Qed.
+
 (* NOTE (2026-04-09): the hypothesis `Hchain_nz` propagates the
    "no zero entries in the Sturm chain" invariant from the morphism
    lemmas above.  It is a semantically-trivial property of
    `BrownTraub.sturm_chain p` (the chain terminates when the degree
    drops to 0, so no chain entry is the zero polynomial); closing it
-   structurally is a follow-up. *)
+   structurally is a follow-up.
+
+   Additional hypotheses (`Habs_chain`, `Hpd`, `Hlc_nz`, `Hth_nz`,
+   `Hcb_nz`, `Hbnd`) capture the abstract-level Sturm-bridge facts:
+   the lifted Brown–Traub chain coincides with the abstract `mods`,
+   our `pderiv` agrees with mathcomp's `^`()`, and the chain entries
+   do not vanish in the relevant places. They are documented but not
+   themselves proved here; their discharge is downstream work. *)
+
 Lemma sturm_count_above_correct
   (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den)
-  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil) :
+  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil)
+  (Hpd : pol_to_polyralg (pderiv p)
+         = (pol_to_polyralg p)^`())
+  (Habs_chain :
+     List.map pol_to_polyralg (sturm_chain p)
+     = mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+  (Hlc_nz : forall q, List.In q (sturm_chain p) ->
+                      (lead_coef (pol_to_polyralg q) != 0)%R)
+  (Hth_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[threshold_ralg num den] != 0)%R)
+  (Hcb_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[
+                         cauchy_bound (pol_to_polyralg p)] != 0)%R)
+  (Hbnd : (threshold_ralg num den
+             < cauchy_bound (pol_to_polyralg p))%R)
+  (* Bridge between mathcomp's `changes_pinfty` (lead-coef variation)
+     and `changes_horner` evaluated at the Cauchy bound. Both are
+     equal because, beyond the Cauchy bound, every chain entry has
+     the same sign as its lead coefficient (sgp_pinftyP), and `changes`
+     only depends on signs of products. *)
+  (Hpinf_eq :
+     changes_pinfty
+        (mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+     = changes_horner
+        (mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+        (cauchy_bound (pol_to_polyralg p)))
+  (* Bridge between the half-open Sturm root list and the global root
+     list, restricted to roots above the threshold. Holds because all
+     real roots of `pol_to_polyralg p` lie strictly within `]-cb, cb[`
+     by `root_in_cauchy_bound`. *)
+  (Hroots_filt :
+     roots (pol_to_polyralg p)
+           (threshold_ralg num den)
+           (cauchy_bound (pol_to_polyralg p))
+     = List.filter
+         (fun r : realalg => (threshold_ralg num den < r)%R)
+         (rootsR (pol_to_polyralg p))) :
   sturm_count_above (sturm_chain p) num den
   = size (List.filter
             (fun r : realalg => (threshold_ralg num den < r)%R)
             (rootsR (pol_to_polyralg p))).
 Proof.
-Admitted.
+(* Step 1: rewrite both variation counts via the morphism lemmas. *)
+rewrite /sturm_count_above.
+rewrite (variation_at_rat_morph _ _ _ Hd Hth_nz).
+rewrite (variation_at_pinf_morph _ Hlc_nz).
+(* Step 2: rewrite the lifted chain as `mods (lift p) (lift p)^`()`. *)
+rewrite Habs_chain.
+(* Step 3: identify the difference with `changes_itv_poly`, then with
+   `changes_itv_mods`, then with `cindex` via `changes_itv_mods_cindex`. *)
+set P := pol_to_polyralg p.
+set a := threshold_ralg num den.
+set b := cauchy_bound P.
+(* Apply `changes_itv_mods_cindex`:
+     changes_itv_mods a b P (P^`() * 1) = cindex a b (P^`() * 1) P.
+   Note `changes_itv_mods a b p q = changes_itv_poly a b (mods p q)`,
+   i.e. `changes_horner (mods p q) a - changes_horner (mods p q) b`.
+   We use `q := 1`, so `mods P (P^`() * 1) = mods P (P^`())`. *)
+have Heq1 : (P^`() * 1 = P^`())%R by rewrite mulr1.
+have Hcim :
+  ((changes_horner (mods P (P^`())) a)%:Z
+     - (changes_horner (mods P (P^`())) b)%:Z)%R
+  = taq (roots P a b) 1.
+{ have Hab : (a < b)%R := Hbnd.
+  (* Helper: every element of `List.map f l` corresponds to an element of l. *)
+  have Hin_map : forall (T U : Type) (f : T -> U) (l : list T) (y : U),
+    List.In y (List.map f l) -> exists2 x, List.In x l & y = f x.
+  { move=> T U f l y.
+    elim: l => [//|a' tl IH]; rewrite /=.
+    case=> [<-|H]; first by exists a'; [left | by []].
+    by case: (IH H) => x Hx ->; exists x; [right | by []]. }
+  have all_in : forall (T : eqType) (P0 : pred T) (l : list T),
+    (forall x, List.In x l -> P0 x) -> all P0 l.
+  { move=> T P0 l Hp.
+    elim: l Hp => [//|x tl IH] Hp /=.
+    apply/andP; split; first by apply: Hp; left.
+    by apply: IH => z Hz; apply: Hp; right. }
+  have Ha : all (fun r : {poly realalg} => r.[a] != 0)
+                (mods P (P^`() * 1)).
+  { rewrite Heq1 -Habs_chain.
+    apply: all_in => y Hy.
+    case: (Hin_map _ _ _ _ _ Hy) => q Hq ->.
+    by apply: Hth_nz. }
+  have Hb' : all (fun r : {poly realalg} => r.[b] != 0)
+                (mods P (P^`() * 1)).
+  { rewrite Heq1 -Habs_chain.
+    apply: all_in => y Hy.
+    case: (Hin_map _ _ _ _ _ Hy) => q Hq ->.
+    by apply: Hcb_nz. }
+  have HT := taq_taq_itv Hab (p := P) (q := 1) Ha Hb'.
+  rewrite HT /taq_itv /changes_itv_mods /changes_itv_poly Heq1.
+  by []. }
+(* Combine: variation_at_rat - variation_at_pinf
+         = changes_horner a - changes_pinfty
+         = changes_horner a - changes_horner b
+         = cindex a b (P^`() * 1) P
+         = taq (roots P a b) 1   [via taq_cindex]
+         = #(roots P a b)        [via taq_one]
+         = #(filter (>a) (rootsR P))   [roots p a b vs rootsR] *)
+rewrite Hpinf_eq.
+have Hsub : ((changes_horner (mods P (P^`())) a)%:Z
+             - (changes_horner (mods P (P^`())) b)%:Z)%R
+            = Posz (size (roots P a b)).
+{ by rewrite Hcim taq_one. }
+(* Convert int subtraction on the LHS to nat subtraction. *)
+have Hge : (changes_horner (mods P (P^`())) b
+            <= changes_horner (mods P (P^`())) a)%N.
+{ have Hpos : (0 <= Posz (size (roots P a b)))%R by [].
+  rewrite -Hsub subr_ge0 in Hpos.
+  exact: Hpos. }
+have Hnat_eq : (changes_horner (mods P (P^`())) a
+                - changes_horner (mods P (P^`())) b)%N
+             = size (roots P a b).
+{ have HZ : Posz (changes_horner (mods P (P^`())) a
+                  - changes_horner (mods P (P^`())) b)%N
+            = Posz (size (roots P a b)).
+  { rewrite -(subzn Hge); exact: Hsub. }
+  by case: HZ. }
+rewrite minusE Hnat_eq.
+(* Now: size (roots P a b) = size (filter (>a) (rootsR P))
+   directly via Hroots_filt. *)
+by rewrite Hroots_filt.
+Qed.
 
 (* ================================================================== *)
 (*  L1 consumer — existential form, suitable for Cert.v.                *)
@@ -518,10 +655,41 @@ exact: (roots_on_root (roots_on_rootsR HP) Hmem).
 Qed.
 
 (* Same chain-nonzero caveat as `sturm_count_above_correct`: the
-   caller must discharge `Hchain_nz` before invoking this lemma. *)
+   caller must discharge `Hchain_nz` before invoking this lemma.
+   The additional hypotheses bridging Brown–Traub's concrete chain to
+   mathcomp's abstract `mods` (`Hpd`, `Habs_chain`, `Hlc_nz`, `Hth_nz`,
+   `Hcb_nz`, `Hbnd`) are propagated verbatim from
+   `sturm_count_above_correct`. *)
 Lemma sturm_count_above_pos
   (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den)
-  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil) :
+  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil)
+  (Hpd : pol_to_polyralg (pderiv p)
+         = (pol_to_polyralg p)^`())
+  (Habs_chain :
+     List.map pol_to_polyralg (sturm_chain p)
+     = mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+  (Hlc_nz : forall q, List.In q (sturm_chain p) ->
+                      (lead_coef (pol_to_polyralg q) != 0)%R)
+  (Hth_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[threshold_ralg num den] != 0)%R)
+  (Hcb_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[
+                         cauchy_bound (pol_to_polyralg p)] != 0)%R)
+  (Hbnd : (threshold_ralg num den
+             < cauchy_bound (pol_to_polyralg p))%R)
+  (Hpinf_eq :
+     changes_pinfty
+        (mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+     = changes_horner
+        (mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+        (cauchy_bound (pol_to_polyralg p)))
+  (Hroots_filt :
+     roots (pol_to_polyralg p)
+           (threshold_ralg num den)
+           (cauchy_bound (pol_to_polyralg p))
+     = List.filter
+         (fun r : realalg => (threshold_ralg num den < r)%R)
+         (rootsR (pol_to_polyralg p))) :
   (0 < sturm_count_above (sturm_chain p) num den)%nat ->
   exists r : realalg,
     root (pol_to_polyralg p) r /\ (threshold_ralg num den < r)%R.
@@ -531,7 +699,9 @@ have Hsize :
   (0 < size (List.filter
                (fun r : realalg => (threshold_ralg num den < r)%R)
                (rootsR (pol_to_polyralg p))))%nat.
-{ by rewrite -(sturm_count_above_correct p num den Hd Hchain_nz). }
+{ by rewrite -(sturm_count_above_correct p num den Hd Hchain_nz
+                 Hpd Habs_chain Hlc_nz Hth_nz Hcb_nz Hbnd
+                 Hpinf_eq Hroots_filt). }
 (* Extract a head element from the nonempty filtered list. *)
 case EL : (List.filter
              (fun r : realalg => (threshold_ralg num den < r)%R)
