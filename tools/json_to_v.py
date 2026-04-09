@@ -87,7 +87,9 @@ def emit_witness(meta: dict) -> str:
         (* ============================================================== *)
 
         From Stdlib Require Import ZArith List.
+        From Bignums Require Import BigZ.
         Import ListNotations.
+        From PrimeGapS1 Require Import Recompose.
         Open Scope Z_scope.
 
     """))
@@ -123,6 +125,40 @@ def emit_witness(meta: dict) -> str:
     out.append("(* M2[i,j] = M2_int[i][j] / D_M2.  Symmetric. *)\n")
     out.append(f"Definition D_M2 : Z := {z_lit(meta['D_M2'])}.\n\n")
     out.append(emit_definition("M2_int", "list (list Z)", list_list_z(meta["M2_int"])))
+    out.append("\n")
+
+    # Integer-cleared A = M1^{-1} M2 itself.  Entries are at most
+    # a few hundred bits so stdlib Z literals are fine.
+    out.append("(* A[i,j] = A_int[i][j] / D_A, where A = M1^{-1} M2 in fmpq_mat. *)\n")
+    out.append(f"Definition D_A : Z := {z_lit(meta['D_A'])}.\n\n")
+    out.append(emit_definition("A_int", "list (list Z)", list_list_z(meta["A_int"])))
+    out.append("\n")
+
+    # det(lambda*I - A_int) as a list Z, computed by FLINT's
+    # fmpz_mat.charpoly().  Used by CharPolyAgree.v to cross-validate
+    # our hand-rolled Faddeev-LeVerrier `char_poly_int`.
+    #
+    # Coefficients can be very large (~20 kbit here), so we ship them as
+    # `bigZ` (stdlib Z literals stack-overflow coqc above ~10 kbit) and
+    # lift to stdlib `list Z` via `Recompose.lift_bigZ`.
+    cp_A = meta["charpoly_of_A_int"]
+    out.append(textwrap.dedent(f"""\
+        (* det(lambda*I - A_int) as an integer polynomial, low-to-high.
+           Computed by FLINT fmpz_mat.charpoly().  Degree {cp_A['deg']}.
+           Coefficients up to ~{cp_A['max_coef_bits']} bits — shipped via
+           bigZ and lifted to stdlib Z with Recompose.lift_bigZ.         *)
+    """))
+    out.append(emit_definition(
+        "charpoly_of_A_int_bigZ",
+        "list BigZ.t_",
+        list_bigz(cp_A["coefs_low_to_high"]),
+    ))
+    out.append("\n")
+    out.append(emit_definition(
+        "charpoly_of_A_int",
+        "list Z",
+        "lift_bigZ charpoly_of_A_int_bigZ",
+    ))
     out.append("\n")
 
     # Characteristic polynomial of A = M1^{-1} M2.
