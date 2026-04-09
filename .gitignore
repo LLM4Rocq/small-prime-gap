@@ -30,3 +30,4 @@ spike/
 rocq_mcp_cache_*.v
 .tmp*.aux
 .claude/
+prime_gap.tar.gz
