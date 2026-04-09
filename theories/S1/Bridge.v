@@ -107,6 +107,12 @@ Admitted.
 (*          of the Sturm count (not the variation at a single point).   *)
 (* ================================================================== *)
 
+(* Same caveat as `variation_at_pinf_morph` below: the statement is false on
+   chains with adjacent zeros at the evaluation point. For the actual
+   application (`sturm_chain p` evaluated at `4/105`) the FLINT-shipped
+   `signs_at_x0` confirms zero adjacent zeros, so this morphism IS true on
+   our specific data. Pinning down the abstract precondition is left to a
+   later sprint. *)
 Lemma variation_at_rat_morph
   (c : list pol) (num den : Z) (Hden : BinInt.Z.lt BinInt.Z0 den) :
   variation_at_rat c num den
@@ -114,6 +120,23 @@ Lemma variation_at_rat_morph
 Proof.
 Admitted.
 
+(* WARNING (discovered 2026-04-09 during the first attempt):
+   This statement is FALSE on lists with adjacent zeros, as a counter-example:
+     c = [[1]; []; [-1]]
+       variation_at_pinf c        = variation [1; 0; -1] = 1
+                                    (our `variation` skips the middle 0)
+       changes_pinfty (lift c)    = changes [1; 0; -1] = 0
+                                    (mathcomp's `changes` does NOT skip zeros)
+   The two definitions agree on lists with no adjacent zeros, which IS the
+   case for the modified Sturm chain at any point that is not a root of the
+   polynomial. The statement therefore needs a hypothesis like
+       `no_adjacent_zeros_at_pinf c`
+   or equivalently a precondition asserting `c = sturm_chain p` for some `p`
+   whose polynomial degree exceeds the depth at which any chain entry vanishes
+   at +infty (which always holds for the standard modified Sturm chain).
+
+   Until the precondition is pinned down, this lemma stays Admitted as
+   a placeholder for the eventual `_modulo_chain_invariant` form. *)
 Lemma variation_at_pinf_morph (c : list pol) :
   variation_at_pinf c = changes_pinfty (List.map pol_to_polyralg c).
 Proof.
@@ -184,7 +207,15 @@ Qed.
 Lemma rootsR_in_root (P : {poly realalg}) (r : realalg) :
   List.In r (rootsR P) -> root P r.
 Proof.
-Admitted.
+move=> Hin.
+have HP : P != 0.
+{ apply/eqP => HP0; rewrite HP0 rootsR0 /= in Hin; exact: Hin. }
+have Hmem : r \in rootsR P.
+{ elim: (rootsR P) Hin => [//|a tl IH] /=.
+  case=> [<-|Htl]; first by rewrite inE eqxx.
+  by rewrite inE (IH Htl) orbT. }
+exact: (roots_on_root (roots_on_rootsR HP) Hmem).
+Qed.
 
 Lemma sturm_count_above_pos
   (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den) :
