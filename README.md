@@ -268,13 +268,13 @@ done
 
 (or use `coq_makefile -f _CoqProject -o Makefile && make`).
 
-Expected runtime on a modest laptop:
+Expected runtime on a modest laptop (approximate, varies with hardware):
 
 | File              | Build time |
 |-------------------|-----------:|
 | `Recompose.v`     | < 1 s       |
-| `Witness.v`       | ~3 s        |
-| `WitnessChain.v`  | ~21 s       |
+| `Witness.v`       | ~50 s       |
+| `WitnessChain.v`  | ~25 s       |
 | `Smoke.v`         | ~2 m 10 s   |
 | `IntPoly.v`       | ~3 s        |
 | `IntMat.v`        | ~1 s        |
@@ -284,12 +284,14 @@ Expected runtime on a modest laptop:
 | `Cert.v`          | ~5 s        |
 | `CharPolyAgree.v` | ~2 s        |
 | `Bridge.v`        | ~5 s        |
-| **Total**         | **~3 m**    |
+| **Total**         | **~5 m**    |
 
+`Witness.v` is dominated by parsing the integer matrices `M1_int`,
+`M2_int`, `A_int`, the char poly `charpoly_int`, and the bigZ-encoded
+`charpoly_of_A_int_bigZ` (43 coefs of ~20 kbit each).
 `Smoke.v`'s runtime is dominated by the single `lift_bigZ chain_42`
 `vm_compute` that converts the 100 000-bit terminal Sturm chain entry
-from `bigZ` to stdlib `Z`. All other smoke checks complete in
-sub-second time.
+from `bigZ` to stdlib `Z`.
 
 ### 4. Inspect what was machine-checked
 
