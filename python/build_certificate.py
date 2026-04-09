@@ -171,7 +171,7 @@ print(f"  M2_int max entry bits = {max_M2}")
 # 4. Char poly via fmpq_mat.charpoly().
 # ----------------------------------------------------------------------
 print("[4/10] Computing A = M1^{-1} M2 and q(x) = char_poly(A)…", flush=True)
-from flint import fmpq, fmpz, fmpq_mat, fmpq_poly, fmpz_poly, arb_mat, ctx as flint_ctx
+from flint import fmpq, fmpz, fmpq_mat, fmpq_poly, fmpz_mat, fmpz_poly, arb_mat, ctx as flint_ctx
 
 def to_fmpq_mat(G):
     return fmpq_mat(DIM, DIM, [fmpq(x.numerator, x.denominator)
@@ -198,6 +198,50 @@ print(f"  Q max coef bit-length = {max_Q}")
 Q_poly = fmpz_poly(Q_low_to_high)
 Qprime_poly = Q_poly.derivative()
 Qprime_low_to_high = [int(Qprime_poly[i]) for i in range(Qprime_poly.degree() + 1)]
+
+# ----------------------------------------------------------------------
+# 5b. Integer-clear A itself so the Rocq side can cross-validate
+#     `char_poly_int A_int` (Faddeev-LeVerrier on a `list (list Z)`)
+#     against a FLINT-shipped polynomial `charpoly_of_A_int` that is
+#     literally `det(lambda*I - A_int)` computed by `fmpz_mat.charpoly`.
+#
+#     Relation to Q / D_q (documented only, not used by Rocq):
+#       if A_int = D_A · A, then
+#         det(lambda*I - A_int) = D_A^n · det((lambda/D_A)·I - A)
+#                               = D_A^n · char_poly(A)(lambda/D_A).
+#     The Rocq lemma just compares two `list Z` polynomials byte-for-byte.
+# ----------------------------------------------------------------------
+print("[5b/10] Integer-clearing A = M1^{-1} M2 and computing "
+      "det(lambda*I - A_int)…", flush=True)
+A_entries_fq = [[fmpq(A[i, j]) for j in range(DIM)] for i in range(DIM)]
+A_dens = [int(e.q) for row in A_entries_fq for e in row]
+D_A = reduce(lcm, A_dens, 1)
+A_int = [[int(e.p) * (D_A // int(e.q)) for e in row]
+         for row in A_entries_fq]
+# Sanity: reconstructing A from (A_int, D_A) reproduces A exactly.
+A_check = fmpq_mat(DIM, DIM,
+                   [fmpq(A_int[i][j], D_A)
+                    for i in range(DIM) for j in range(DIM)])
+assert A_check == A, "A_int / D_A does not reconstruct A"
+max_A_int = max(abs(x).bit_length() for row in A_int for x in row)
+print(f"  D_A bit-length              = {D_A.bit_length()}")
+print(f"  A_int max entry bits        = {max_A_int}")
+
+# Compute det(lambda*I - A_int) via FLINT's fmpz_mat.charpoly().
+A_int_fmpz = fmpz_mat(DIM, DIM, [x for row in A_int for x in row])
+cp_A_int = A_int_fmpz.charpoly()  # fmpz_poly
+assert cp_A_int.degree() == DIM
+charpoly_of_A_int = [int(cp_A_int[i]) for i in range(cp_A_int.degree() + 1)]
+assert charpoly_of_A_int[-1] == 1, "char poly should be monic"
+max_cp_A_int = max(abs(c).bit_length() for c in charpoly_of_A_int)
+print(f"  charpoly_of_A_int max bits  = {max_cp_A_int}")
+
+# Python-side cross-check: D_q · c_i = Q_low_to_high[i] · D_A^(n - i).
+for i, ci in enumerate(charpoly_of_A_int):
+    lhs = D_q * ci
+    rhs = Q_low_to_high[i] * (D_A ** (DIM - i))
+    assert lhs == rhs, f"charpoly_of_A_int coef mismatch at i={i}"
+print("  ✓ charpoly_of_A_int consistent with D_q · q via D_A^(n-i)")
 
 # ----------------------------------------------------------------------
 # 6. Brown-Traub subresultant PRS, with audit trail.
@@ -398,6 +442,13 @@ out_meta = {
     "D_M2": str(D_M2),
     "M1_int": [[str(x) for x in row] for row in M1_int],
     "M2_int": [[str(x) for x in row] for row in M2_int],
+    "D_A": str(D_A),
+    "A_int": [[str(x) for x in row] for row in A_int],
+    "charpoly_of_A_int": {
+        "deg": cp_A_int.degree(),
+        "coefs_low_to_high": [str(c) for c in charpoly_of_A_int],
+        "max_coef_bits": max_cp_A_int,
+    },
     "charpoly": {
         "common_den": str(D_q),
         "deg": q.degree(),
