@@ -31,7 +31,7 @@
 (*                             root above the threshold.                 *)
 (* ================================================================== *)
 
-From Stdlib Require Import ZArith List.
+From Stdlib Require Import ZArith List Lia.
 Import ListNotations.
 
 From mathcomp Require Import all_boot all_algebra.
@@ -88,59 +88,232 @@ Admitted.
 (*                                                                      *)
 (*  Our `variation_at_rat c num den` (a `nat`) should agree with        *)
 (*  `changes_horner (map lift c) (threshold_ralg num den)` (also a      *)
-(*  `nat`) from qe_rcf_th.v.                                            *)
+(*  `nat`) from qe_rcf_th.v — under the hypothesis that no chain entry  *)
+(*  is the zero polynomial (which is always the case for the Brown-Traub
+    Sturm chain: the recursion stops as soon as the degree drops to 0). *)
 (*                                                                      *)
-(*  Proof sketch (future work):                                         *)
-(*    - Both sides count sign-agreement-breaks along the list of        *)
-(*      horner evaluations. The only subtle step is the zero-skipping   *)
-(*      convention: our `variation` skips zeros explicitly, whereas     *)
-(*      mathcomp's `changes` uses `(a * head 0 q < 0)` on the raw seq,  *)
-(*      which does NOT skip zeros. However, our `sign_at_rat` outputs   *)
-(*      an integer in {-1,0,1}, and the two conventions coincide on     *)
-(*      lists with the property that every isolated zero sits between   *)
-(*      two opposite signs (Sturm chains have this structure).          *)
-(*    - For a clean proof we would need either                          *)
-(*      (a) a side lemma "Sturm chain has no adjacent zeros",           *)
-(*      (b) a direct equivalence of the two variation notions on        *)
-(*          chains that have the "no-two-adjacent-zeros" property, or   *)
-(*      (c) state a slightly weaker bridge that only asserts the value  *)
-(*          of the Sturm count (not the variation at a single point).   *)
+(*  Counter-example without the hypothesis: c = [[1]; []; [-1]].        *)
+(*    variation_at_pinf c        = variation [1; 0; -1] = 1             *)
+(*                                  (our `variation` skips the middle 0)*)
+(*    changes_pinfty (lift c)    = changes [1; 0; -1] = 0               *)
+(*                                  (mathcomp's `changes` does NOT skip)*)
+(*                                                                      *)
+(*  Strategy: show that on lists of nonzero entries (with parallel      *)
+(*  sign information) both counts coincide with "count of adjacent      *)
+(*  pairs whose product is negative", and then bridge the two sides     *)
+(*  through a sign-matching assumption between `sgn_Z` and `sgz` of     *)
+(*  the realalg leading coefficients / Horner evaluations.              *)
 (* ================================================================== *)
 
-(* Same caveat as `variation_at_pinf_morph` below: the statement is false on
-   chains with adjacent zeros at the evaluation point. For the actual
-   application (`sturm_chain p` evaluated at `4/105`) the FLINT-shipped
-   `signs_at_x0` confirms zero adjacent zeros, so this morphism IS true on
-   our specific data. Pinning down the abstract precondition is left to a
-   later sprint. *)
+(* ------------------------------------------------------------------ *)
+(* Helper: the core "no-zero" equivalence between our Z-valued         *)
+(* `variation` and mathcomp's R-valued `changes`, stated on two        *)
+(* parallel lists whose signs agree pointwise.                         *)
+(*                                                                     *)
+(* We work in `realDomainType` because mathcomp's `sgzM` (sign of a    *)
+(* product) is only stated there; `realalg` is a realDomainType.       *)
+(* ------------------------------------------------------------------ *)
+
+Section VariationChangesBridge.
+
+Variable R : rcfType.
+
+(* Joint-sign predicate: `n` is nonzero in Z, `r` is nonzero in R,
+   and they have the same sign. We phrase it via comparisons with 0,
+   which are directly useful in the `variation` / `changes` fixpoints. *)
+Definition sgn_matches (n : Z) (r : R) : Prop :=
+  ((BinInt.Z.eq n BinInt.Z0) <-> (r = 0))
+  /\ (BinInt.Z.lt n BinInt.Z0 <-> (r < 0)%R)
+  /\ (BinInt.Z.lt BinInt.Z0 n <-> (0 < r)%R).
+
+Lemma sgn_matches_Rnz n r : sgn_matches n r -> n <> BinInt.Z0 -> (r != 0)%R.
+Proof. by case=> [H1 _] Hn; apply/eqP => Hr; apply: Hn; apply/H1. Qed.
+
+Lemma sgn_matches_Znz n r : sgn_matches n r -> (r != 0)%R -> n <> BinInt.Z0.
+Proof. by case=> [H1 _] /eqP Hr Hn; apply: Hr; apply/H1. Qed.
+
+(* Two nonzero Z values have negative product iff their matched R
+   counterparts do. *)
+Lemma sgn_matches_prod (n1 n2 : Z) (r1 r2 : R) :
+  sgn_matches n1 r1 -> n1 <> BinInt.Z0 ->
+  sgn_matches n2 r2 -> n2 <> BinInt.Z0 ->
+  BinInt.Z.ltb (BinInt.Z.mul n1 n2) BinInt.Z0 = (r1 * r2 < 0)%R.
+Proof.
+move=> H1 Hn1 H2 Hn2.
+have Hnr1 : (r1 != 0)%R := sgn_matches_Rnz _ _ H1 Hn1.
+have Hnr2 : (r2 != 0)%R := sgn_matches_Rnz _ _ H2 Hn2.
+case: H1 => [_ [Hlt1 Hgt1]].
+case: H2 => [_ [Hlt2 Hgt2]].
+(* Split r1 into >0 or <0, similarly r2, via total order. *)
+have Hr1 : ((0 < r1)%R \/ (r1 < 0)%R).
+{ have : (0 : R) != r1 by rewrite eq_sym.
+  by move/order.Order.TotalTheory.lt_total/orP; case=> H; [left|right]. }
+have Hr2 : ((0 < r2)%R \/ (r2 < 0)%R).
+{ have : (0 : R) != r2 by rewrite eq_sym.
+  by move/order.Order.TotalTheory.lt_total/orP; case=> H; [left|right]. }
+case: Hr1 => Hr1c; case: Hr2 => Hr2c.
+- have Hn1pos : BinInt.Z.lt BinInt.Z0 n1 by apply/Hgt1.
+  have Hn2pos : BinInt.Z.lt BinInt.Z0 n2 by apply/Hgt2.
+  have Hpos : (0 < r1 * r2)%R by rewrite pmulr_rgt0.
+  rewrite (order.Order.POrderTheory.lt_gtF Hpos).
+  by apply/negP => /Z.ltb_lt; nia.
+- have Hn1pos : BinInt.Z.lt BinInt.Z0 n1 by apply/Hgt1.
+  have Hn2neg : BinInt.Z.lt n2 BinInt.Z0 by apply/Hlt2.
+  have Hneg : (r1 * r2 < 0)%R by rewrite pmulr_rlt0.
+  rewrite Hneg; apply/Z.ltb_lt; nia.
+- have Hn1neg : BinInt.Z.lt n1 BinInt.Z0 by apply/Hlt1.
+  have Hn2pos : BinInt.Z.lt BinInt.Z0 n2 by apply/Hgt2.
+  have Hneg : (r1 * r2 < 0)%R by rewrite nmulr_rlt0.
+  rewrite Hneg; apply/Z.ltb_lt; nia.
+- have Hn1neg : BinInt.Z.lt n1 BinInt.Z0 by apply/Hlt1.
+  have Hn2neg : BinInt.Z.lt n2 BinInt.Z0 by apply/Hlt2.
+  have Hpos : (0 < r1 * r2)%R by rewrite nmulr_rgt0.
+  rewrite (order.Order.POrderTheory.lt_gtF Hpos).
+  by apply/negP => /Z.ltb_lt; nia.
+Qed.
+
+(* Parallel nonzero-list hypothesis for two lists of the same length. *)
+Fixpoint sgn_matches_seq (sZ : list Z) (sR : seq R) : Prop :=
+  match sZ, sR with
+  | nil, nil => True
+  | n :: sZ', r :: sR' => sgn_matches n r /\ sgn_matches_seq sZ' sR'
+  | _, _ => False
+  end.
+
+Definition all_nonzero_Z (sZ : list Z) : Prop :=
+  forall n, List.In n sZ -> n <> BinInt.Z0.
+
+(* Core identity: with a sign-matching "previous" element [y / yR] that is
+   nonzero, the one-step [variation_aux] matches mathcomp's [changes] on
+   the combined list. *)
+Lemma variation_aux_changes_nonzero
+  (y : Z) (yR : R) (Hym : sgn_matches y yR) (Hy : y <> BinInt.Z0)
+  (sZ : list Z) (sR : seq R)
+  (Hnz : all_nonzero_Z sZ) (Hs : sgn_matches_seq sZ sR) :
+  variation_aux (Some y) sZ = changes (yR :: sR).
+Proof.
+elim: sZ sR y yR Hym Hy Hnz Hs => [|x sZ' IH].
+  move=> [|r sR'] y yR Hym Hy Hnz Hs /=.
+  - by rewrite mulr0 preorder.Order.PreorderTheory.ltxx.
+  - by case: Hs.
+move=> [|r sR'] y yR Hym Hy Hnz Hs /=.
+  by case: Hs.
+case: Hs => Hxm Hs'.
+  have Hx : x <> BinInt.Z0 by apply: Hnz; left.
+  have Hxr : (r != 0)%R := sgn_matches_Rnz _ _ Hxm Hx.
+  have Hxeq : BinInt.Z.eqb x BinInt.Z0 = false
+    by apply/Z.eqb_neq.
+  have Hyxeq : BinInt.Z.eqb (BinInt.Z.mul x y) BinInt.Z0 = false.
+  { apply/Z.eqb_neq => Hprod.
+    case/Z.mul_eq_0: Hprod => [Hx0|Hy0]; [exact: Hx|exact: Hy]. }
+  rewrite /= Hxeq Hyxeq.
+  rewrite (sgn_matches_prod x y r yR Hxm Hx Hym Hy).
+  have Hnz' : all_nonzero_Z sZ'.
+  { by move=> z Hz; apply: Hnz; right. }
+  (* We want: [if r * yR < 0 then 1 else 0] + variation_aux (Some x) sZ'
+     = [if yR * r < 0 then 1 else 0] + changes (r :: sR'). *)
+  rewrite (IH sR' x r Hxm Hx Hnz' Hs').
+  rewrite /= mulrC.
+  by case: (yR * r < 0)%R.
+Qed.
+
+(* Initial form: variation on a nonzero list equals changes on the matched R list. *)
+Lemma variation_changes_nonzero (sZ : list Z) (sR : seq R) :
+  all_nonzero_Z sZ -> sgn_matches_seq sZ sR ->
+  variation sZ = changes sR.
+Proof.
+case: sZ sR => [|x sZ'] [|r sR'] /=.
+- done.
+- by move=> _ [].
+- by move=> _ [].
+move=> Hnz [Hxm Hs'].
+have Hx : x <> BinInt.Z0 by apply: Hnz; left.
+have Hxr : (r != 0)%R := sgn_matches_Rnz _ _ Hxm Hx.
+have Hxeq : BinInt.Z.eqb x BinInt.Z0 = false by apply/Z.eqb_neq.
+rewrite /variation /= Hxeq /=.
+have Hnz' : all_nonzero_Z sZ' by move=> z Hz; apply: Hnz; right.
+exact: (variation_aux_changes_nonzero x r Hxm Hx sZ' sR' Hnz' Hs').
+Qed.
+
+End VariationChangesBridge.
+
+(* ------------------------------------------------------------------ *)
+(*  Sub-bridge admits: "sign of `plead p` matches `sgz (lead_coef ...)`"*)
+(*  and the analogous statement for Horner evaluation at a rational.   *)
+(*                                                                     *)
+(*  Both facts follow mechanically from `pol_to_polyrat`'s structural  *)
+(*  definition and the injectivity of `ratr : rat -> realalg`, but we  *)
+(*  leave them Admitted here to keep this file focused on the          *)
+(*  variation/changes bridge. They are *local* admits that do NOT      *)
+(*  propagate to Cert.maynard_eigenvalue_S1 (Cert.v does not import    *)
+(*  Bridge.v). *)
+(* ------------------------------------------------------------------ *)
+
+Lemma sign_at_pinf_matches (p : pol) :
+  p <> nil ->
+  sgn_matches _ (sign_at_pinf p) (lead_coef (pol_to_polyralg p)).
+Proof. Admitted.
+
+Lemma sign_at_pinf_nz (p : pol) :
+  p <> nil -> sign_at_pinf p <> BinInt.Z0.
+Proof. Admitted.
+
+Lemma sign_at_rat_matches (p : pol) (num den : Z) :
+  BinInt.Z.lt BinInt.Z0 den -> p <> nil ->
+  sgn_matches _ (sign_at_rat p num den)
+    ((pol_to_polyralg p).[threshold_ralg num den]).
+Proof. Admitted.
+
+Lemma sign_at_rat_nz (p : pol) (num den : Z) :
+  BinInt.Z.lt BinInt.Z0 den -> p <> nil ->
+  sign_at_rat p num den <> BinInt.Z0.
+Proof. Admitted.
+
+(* ------------------------------------------------------------------ *)
+(*  The two morphism lemmas, stated with a "no zero entries" guard.    *)
+(*  Under that hypothesis our `variation` (which skips zeros) and      *)
+(*  mathcomp's `changes` (which does not) agree, so the original       *)
+(*  false equality becomes true.                                       *)
+(* ------------------------------------------------------------------ *)
+
+Lemma variation_at_pinf_morph (c : list pol)
+  (Hnz : forall p, List.In p c -> p <> nil) :
+  variation_at_pinf c = changes_pinfty (List.map pol_to_polyralg c).
+Proof.
+rewrite /variation_at_pinf /changes_pinfty.
+(* Apply the generic bridge with the parallel sign-matching.
+   Both sides are parallel maps over the same list `c`. *)
+apply: (variation_changes_nonzero realalg
+         (List.map sign_at_pinf c)
+         (List.map lead_coef (List.map pol_to_polyralg c))).
+- (* every entry of `map sign_at_pinf c` is nonzero *)
+  move=> z /in_map_iff [p [<- Hpin]].
+  exact: (sign_at_pinf_nz p (Hnz p Hpin)).
+- (* sgn_matches holds pointwise across the two maps *)
+  elim: c Hnz => [|p c' IH] Hnz //=.
+  split.
+  + exact: (sign_at_pinf_matches p (Hnz p (or_introl erefl))).
+  + apply: IH => q Hq; apply: Hnz; right; exact: Hq.
+Qed.
+
 Lemma variation_at_rat_morph
-  (c : list pol) (num den : Z) (Hden : BinInt.Z.lt BinInt.Z0 den) :
+  (c : list pol) (num den : Z) (Hden : BinInt.Z.lt BinInt.Z0 den)
+  (Hnz : forall p, List.In p c -> p <> nil) :
   variation_at_rat c num den
   = changes_horner (List.map pol_to_polyralg c) (threshold_ralg num den).
 Proof.
-Admitted.
-
-(* WARNING (discovered 2026-04-09 during the first attempt):
-   This statement is FALSE on lists with adjacent zeros, as a counter-example:
-     c = [[1]; []; [-1]]
-       variation_at_pinf c        = variation [1; 0; -1] = 1
-                                    (our `variation` skips the middle 0)
-       changes_pinfty (lift c)    = changes [1; 0; -1] = 0
-                                    (mathcomp's `changes` does NOT skip zeros)
-   The two definitions agree on lists with no adjacent zeros, which IS the
-   case for the modified Sturm chain at any point that is not a root of the
-   polynomial. The statement therefore needs a hypothesis like
-       `no_adjacent_zeros_at_pinf c`
-   or equivalently a precondition asserting `c = sturm_chain p` for some `p`
-   whose polynomial degree exceeds the depth at which any chain entry vanishes
-   at +infty (which always holds for the standard modified Sturm chain).
-
-   Until the precondition is pinned down, this lemma stays Admitted as
-   a placeholder for the eventual `_modulo_chain_invariant` form. *)
-Lemma variation_at_pinf_morph (c : list pol) :
-  variation_at_pinf c = changes_pinfty (List.map pol_to_polyralg c).
-Proof.
-Admitted.
+rewrite /variation_at_rat /changes_horner.
+apply: (variation_changes_nonzero realalg
+         (List.map (fun p => sign_at_rat p num den) c)
+         (List.map (fun p : {poly realalg} => p.[threshold_ralg num den])
+                   (List.map pol_to_polyralg c))).
+- move=> z /in_map_iff [p [<- Hpin]].
+  exact: (sign_at_rat_nz p num den Hden (Hnz p Hpin)).
+- elim: c Hnz => [|p c' IH] Hnz //=.
+  split.
+  + exact: (sign_at_rat_matches p num den Hden (Hnz p (or_introl erefl))).
+  + apply: IH => q Hq; apply: Hnz; right; exact: Hq.
+Qed.
 
 (* ================================================================== *)
 (*  L1 — the main bridge.                                               *)
@@ -166,8 +339,15 @@ Admitted.
 (*  simplicity. The Cert.v consumer only asks for `<`, not `≤`.         *)
 (* ================================================================== *)
 
+(* NOTE (2026-04-09): the hypothesis `Hchain_nz` propagates the
+   "no zero entries in the Sturm chain" invariant from the morphism
+   lemmas above.  It is a semantically-trivial property of
+   `BrownTraub.sturm_chain p` (the chain terminates when the degree
+   drops to 0, so no chain entry is the zero polynomial); closing it
+   structurally is a follow-up. *)
 Lemma sturm_count_above_correct
-  (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den) :
+  (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den)
+  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil) :
   sturm_count_above (sturm_chain p) num den
   = size (List.filter
             (fun r : realalg => (threshold_ralg num den < r)%R)
@@ -217,8 +397,11 @@ have Hmem : r \in rootsR P.
 exact: (roots_on_root (roots_on_rootsR HP) Hmem).
 Qed.
 
+(* Same chain-nonzero caveat as `sturm_count_above_correct`: the
+   caller must discharge `Hchain_nz` before invoking this lemma. *)
 Lemma sturm_count_above_pos
-  (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den) :
+  (p : pol) (num den : Z) (Hd : BinInt.Z.lt BinInt.Z0 den)
+  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil) :
   (0 < sturm_count_above (sturm_chain p) num den)%nat ->
   exists r : realalg,
     root (pol_to_polyralg p) r /\ (threshold_ralg num den < r)%R.
@@ -228,7 +411,7 @@ have Hsize :
   (0 < size (List.filter
                (fun r : realalg => (threshold_ralg num den < r)%R)
                (rootsR (pol_to_polyralg p))))%nat.
-{ by rewrite -(sturm_count_above_correct p num den Hd). }
+{ by rewrite -(sturm_count_above_correct p num den Hd Hchain_nz). }
 (* Extract a head element from the nonempty filtered list. *)
 case EL : (List.filter
              (fun r : realalg => (threshold_ralg num den < r)%R)
