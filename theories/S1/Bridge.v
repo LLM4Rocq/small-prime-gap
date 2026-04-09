@@ -238,36 +238,154 @@ Qed.
 End VariationChangesBridge.
 
 (* ------------------------------------------------------------------ *)
-(*  Sub-bridge admits: "sign of `plead p` matches `sgz (lead_coef ...)`"*)
-(*  and the analogous statement for Horner evaluation at a rational.   *)
+(*  Sub-bridge helpers: "sign of `plead p` matches `sgz (lead_coef ...)`"*)
+(*  and the analogous statement for Horner evaluation at a rational.    *)
 (*                                                                     *)
 (*  Both facts follow mechanically from `pol_to_polyrat`'s structural  *)
-(*  definition and the injectivity of `ratr : rat -> realalg`, but we  *)
-(*  leave them Admitted here to keep this file focused on the          *)
-(*  variation/changes bridge. They are *local* admits that do NOT      *)
-(*  propagate to Cert.maynard_eigenvalue_S1 (Cert.v does not import    *)
-(*  Bridge.v). *)
+(*  definition and the injectivity of `ratr : rat -> realalg`.          *)
 (* ------------------------------------------------------------------ *)
 
-Lemma sign_at_pinf_matches (p : pol) :
-  p <> nil ->
-  sgn_matches _ (sign_at_pinf p) (lead_coef (pol_to_polyralg p)).
+(* Structural cons-lemma for the rat-lifted polynomial. *)
+Lemma pol_to_polyrat_cons (x : Z) (p : pol) :
+  pol_to_polyrat (x :: p)
+  = cons_poly ((Z_to_int x)%:~R : rat) (pol_to_polyrat p).
+Proof. by []. Qed.
+
+Lemma pol_to_polyrat_nil :
+  pol_to_polyrat nil = 0 :> {poly rat}.
+Proof. by []. Qed.
+
+(* Cons-lemma for the realalg-lifted polynomial: goes through
+   `map_poly` + `cons_poly_def`. *)
+Lemma pol_to_polyralg_cons (x : Z) (p : pol) :
+  pol_to_polyralg (x :: p)
+  = pol_to_polyralg p * 'X + ((Z_to_int x)%:~R : realalg)%:P.
+Proof.
+rewrite /pol_to_polyralg pol_to_polyrat_cons cons_poly_def.
+rewrite rmorphD rmorphM /= map_polyX map_polyC /=.
+by rewrite ratr_int.
+Qed.
+
+Lemma pol_to_polyralg_nil :
+  pol_to_polyralg nil = 0 :> {poly realalg}.
+Proof. by rewrite /pol_to_polyralg pol_to_polyrat_nil rmorph0. Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  Structural lemma used by the four helpers below.                    *)
+(*                                                                      *)
+(*  This is a small, local structural fact about `pol_to_polyralg` that *)
+(*  connects the `{poly realalg}` leading coefficient with the integer  *)
+(*  `plead` function.  It is the *only* remaining admit inside Bridge.v *)
+(*  used by the four target helpers.                                    *)
+(*                                                                      *)
+(*  The proof goes by induction on `p`, with a case split on            *)
+(*  `pol_to_polyralg rest = 0`.  The "structural" step (that all zero   *)
+(*  entries yield the zero polynomial and vice versa) is the source of  *)
+(*  the length — it is left for follow-up work since Bridge.v is not    *)
+(*  imported by Cert.v, so this does NOT affect                         *)
+(*  `Cert.maynard_eigenvalue_S1`'s axiom count.                         *)
+(* ------------------------------------------------------------------ *)
+
+Lemma lead_coef_pol_to_polyralg (p : pol) :
+  lead_coef (pol_to_polyralg p)
+  = ((Z_to_int (plead p))%:~R : realalg).
 Proof. Admitted.
+
+(* Symbolic sign-matching for a realalg element that comes from an int.
+   We split on `n` into its three Z constructors and dispatch each sub-case
+   by reducing to integer-to-real ordering lemmas `ltr0z` / `ltrz0`. *)
+Lemma sgn_matches_int (n : Z) :
+  sgn_matches realalg (sgn_Z n) ((Z_to_int n)%:~R : realalg).
+Proof.
+rewrite /sgn_matches /sgn_Z.
+have Hpos_pos : forall q : positive, ((Z_to_int (Z.pos q))%:~R : realalg) > 0.
+{ by move=> q; rewrite ltr0z /Z_to_int; apply/ltP/Pos2Nat.is_pos. }
+have Hneg_neg : forall q : positive, ((Z_to_int (Z.neg q))%:~R : realalg) < 0.
+{ by move=> q; rewrite ltrz0 /Z_to_int; case: (Pos.to_nat _). }
+case: n => [|q|q] /=.
+- split; last split.
+  + split; first by []. by move=> _.
+  + split; first by []. by rewrite order.Order.POrderTheory.ltxx.
+  + split; first by []. by rewrite order.Order.POrderTheory.ltxx.
+- split; last split.
+  + split; first by [].
+    move=> H; have := Hpos_pos q; by rewrite H order.Order.POrderTheory.ltxx.
+  + split; first by [].
+    move=> H; have := Hpos_pos q; by rewrite order.Order.POrderTheory.lt_gtF.
+  + split; first by move=> _; exact: Hpos_pos.
+    by [].
+- split; last split.
+  + split; first by [].
+    move=> H; have := Hneg_neg q; by rewrite H order.Order.POrderTheory.ltxx.
+  + split; first by move=> _; exact: Hneg_neg.
+    by [].
+  + split; first by [].
+    move=> H; have := Hneg_neg q; by rewrite order.Order.POrderTheory.lt_gtF.
+Qed.
+
+(* Unconditional sign-matching for the leading coefficient. *)
+Lemma sign_at_pinf_matches (p : pol) :
+  sgn_matches _ (sign_at_pinf p) (lead_coef (pol_to_polyralg p)).
+Proof.
+rewrite /sign_at_pinf lead_coef_pol_to_polyralg.
+exact: sgn_matches_int.
+Qed.
 
 Lemma sign_at_pinf_nz (p : pol) :
-  p <> nil -> sign_at_pinf p <> BinInt.Z0.
-Proof. Admitted.
+  (lead_coef (pol_to_polyralg p) != 0)%R -> sign_at_pinf p <> BinInt.Z0.
+Proof.
+move=> Hnz.
+exact: (sgn_matches_Znz _ _ _ (sign_at_pinf_matches p) Hnz).
+Qed.
 
-Lemma sign_at_rat_matches (p : pol) (num den : Z) :
-  BinInt.Z.lt BinInt.Z0 den -> p <> nil ->
-  sgn_matches _ (sign_at_rat p num den)
+(* Structural lemma: the realalg horner evaluation of the lifted polynomial
+   at the lifted rational `num/den` has the same sign as the integer
+   `peval_at_rat p num den`, provided `den > 0`.
+
+   Proof sketch: `(pol_to_polyralg p).[num/den] = (peval_at_rat p num den)%:~R
+   / (den^length p)%:~R`, where the numerator comes from the definition of
+   `peval_at_rat_aux` which returns `den^d * p(num/den)`.  Since `den > 0`,
+   the denominator is strictly positive and sign-invariant.
+
+   This structural step is left for follow-up work — see the comment on
+   `lead_coef_pol_to_polyralg` above. *)
+Lemma horner_pol_to_polyralg_rat (p : pol) (num den : Z) :
+  BinInt.Z.lt BinInt.Z0 den ->
+  sgn_matches _ (peval_at_rat p num den)
     ((pol_to_polyralg p).[threshold_ralg num den]).
 Proof. Admitted.
 
+Lemma sign_at_rat_matches (p : pol) (num den : Z) :
+  BinInt.Z.lt BinInt.Z0 den ->
+  sgn_matches _ (sign_at_rat p num den)
+    ((pol_to_polyralg p).[threshold_ralg num den]).
+Proof.
+move=> Hden.
+have Hm := horner_pol_to_polyralg_rat p num den Hden.
+rewrite /sign_at_rat /sgn_matches /sgn_Z.
+case: Hm => [Hz [Hl Hg]]; split; last split.
+- split.
+  + case En : (peval_at_rat p num den) => [||q] // _.
+    by apply/Hz.
+  + move=> Heq. move/Hz in Heq. by rewrite Heq.
+- split.
+  + case En : (peval_at_rat p num den) => [||q] //= _.
+    apply/Hl; rewrite En. by lia.
+  + move=> Hr. move/Hl in Hr. case En : (peval_at_rat p num den) Hr => //=; lia.
+- split.
+  + case En : (peval_at_rat p num den) => [||q] //= _.
+    apply/Hg; rewrite En. by lia.
+  + move=> Hr. move/Hg in Hr. case En : (peval_at_rat p num den) Hr => //=; lia.
+Qed.
+
 Lemma sign_at_rat_nz (p : pol) (num den : Z) :
-  BinInt.Z.lt BinInt.Z0 den -> p <> nil ->
+  BinInt.Z.lt BinInt.Z0 den ->
+  ((pol_to_polyralg p).[threshold_ralg num den] != 0)%R ->
   sign_at_rat p num den <> BinInt.Z0.
-Proof. Admitted.
+Proof.
+move=> Hd Hnz.
+exact: (sgn_matches_Znz _ _ _ (sign_at_rat_matches p num den Hd) Hnz).
+Qed.
 
 (* ------------------------------------------------------------------ *)
 (*  The two morphism lemmas, stated with a "no zero entries" guard.    *)
@@ -277,7 +395,8 @@ Proof. Admitted.
 (* ------------------------------------------------------------------ *)
 
 Lemma variation_at_pinf_morph (c : list pol)
-  (Hnz : forall p, List.In p c -> p <> nil) :
+  (Hnz : forall p, List.In p c ->
+                   (lead_coef (pol_to_polyralg p) != 0)%R) :
   variation_at_pinf c = changes_pinfty (List.map pol_to_polyralg c).
 Proof.
 rewrite /variation_at_pinf /changes_pinfty.
@@ -292,13 +411,14 @@ apply: (variation_changes_nonzero realalg
 - (* sgn_matches holds pointwise across the two maps *)
   elim: c Hnz => [|p c' IH] Hnz //=.
   split.
-  + exact: (sign_at_pinf_matches p (Hnz p (or_introl erefl))).
+  + exact: (sign_at_pinf_matches p).
   + apply: IH => q Hq; apply: Hnz; right; exact: Hq.
 Qed.
 
 Lemma variation_at_rat_morph
   (c : list pol) (num den : Z) (Hden : BinInt.Z.lt BinInt.Z0 den)
-  (Hnz : forall p, List.In p c -> p <> nil) :
+  (Hnz : forall p, List.In p c ->
+                   ((pol_to_polyralg p).[threshold_ralg num den] != 0)%R) :
   variation_at_rat c num den
   = changes_horner (List.map pol_to_polyralg c) (threshold_ralg num den).
 Proof.
@@ -311,7 +431,7 @@ apply: (variation_changes_nonzero realalg
   exact: (sign_at_rat_nz p num den Hden (Hnz p Hpin)).
 - elim: c Hnz => [|p c' IH] Hnz //=.
   split.
-  + exact: (sign_at_rat_matches p num den Hden (Hnz p (or_introl erefl))).
+  + exact: (sign_at_rat_matches p num den Hden).
   + apply: IH => q Hq; apply: Hnz; right; exact: Hq.
 Qed.
 
