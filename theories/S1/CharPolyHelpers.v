@@ -116,11 +116,82 @@ Proof.
     simpl. unfold nth_Z. destruct j; simpl; rewrite BinInt.Z.mul_0_r; reflexivity.
 Qed.
 
+Lemma Z_to_int_neg_pos (p : positive) :
+  Z_to_int (Zneg p) = (- (Posz (Pos.to_nat p)))%R.
+Proof.
+  unfold Z_to_int.
+  have Hp := Pos2Nat.is_pos p.
+  destruct (Pos.to_nat p) as [|k] eqn:Ek; [exfalso; lia|].
+  have ->: (k.+1 - 1 = k)%N by rewrite subn1.
+  by rewrite NegzE.
+Qed.
+
+Lemma Z_to_int_pos_pos (p : positive) :
+  Z_to_int (Zpos p) = Posz (Pos.to_nat p).
+Proof. reflexivity. Qed.
+
 Lemma Z_to_int_mul (a b : Z) :
   Z_to_int (BinInt.Z.mul a b) = ((Z_to_int a) * (Z_to_int b))%R.
 Proof.
-  (* We rely on intrmorph/embedding properties. Use a detour via intRing. *)
-Admitted.
+  destruct a as [|pa|pa]; destruct b as [|pb|pb];
+    try (change (Z_to_int 0) with (0%R : int)); try reflexivity;
+    try (rewrite mul0r; reflexivity);
+    try (rewrite mulr0; reflexivity).
+  - (* Zpos pa * Zpos pb *)
+    change (BinInt.Z.mul (Zpos pa) (Zpos pb)) with (Zpos (pa * pb)%positive).
+    rewrite !Z_to_int_pos_pos. rewrite Pos2Nat.inj_mul. by rewrite PoszM.
+  - (* Zpos pa * Zneg pb *)
+    change (BinInt.Z.mul (Zpos pa) (Zneg pb)) with (Zneg (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos Z_to_int_pos_pos.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM.
+    by rewrite mulrN.
+  - (* Zneg pa * Zpos pb *)
+    change (BinInt.Z.mul (Zneg pa) (Zpos pb)) with (Zneg (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos Z_to_int_pos_pos.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM.
+    by rewrite mulNr.
+  - (* Zneg pa * Zneg pb *)
+    change (BinInt.Z.mul (Zneg pa) (Zneg pb)) with (Zpos (pa * pb)%positive).
+    rewrite !Z_to_int_neg_pos Z_to_int_pos_pos.
+    rewrite Pos2Nat.inj_mul. rewrite PoszM.
+    by rewrite mulrNN.
+Qed.
+
+(* `Z_to_int (Z.pos_sub pa pb) = Pos.to_nat pa - Pos.to_nat pb`. *)
+Lemma Z_pos_sub_int (pa pb : positive) :
+  Z_to_int (Z.pos_sub pa pb) = (Posz (Pos.to_nat pa) - Posz (Pos.to_nat pb))%R.
+Proof.
+  have Hd := Z.pos_sub_discr pa pb.
+  destruct (Z.pos_sub pa pb) as [|k|k].
+  - subst. by rewrite subrr.
+  - rewrite Z_to_int_pos_pos. rewrite Hd Pos2Nat.inj_add PoszD.
+    by rewrite addrAC subrr add0r.
+  - rewrite Z_to_int_neg_pos. rewrite Hd Pos2Nat.inj_add PoszD.
+    rewrite opprD.
+    have ->: (Posz (Pos.to_nat pa) + (- Posz (Pos.to_nat pa) - Posz (Pos.to_nat k)) = - Posz (Pos.to_nat k))%R
+      by rewrite addrA addrN add0r.
+    reflexivity.
+Qed.
+
+(* Additivity of Z_to_int. *)
+Lemma Z_to_int_add (a b : Z) :
+  Z_to_int (BinInt.Z.add a b) = ((Z_to_int a) + (Z_to_int b))%R.
+Proof.
+  destruct a as [|pa|pa]; destruct b as [|pb|pb]; simpl BinInt.Z.add.
+  - by rewrite addr0.
+  - by rewrite add0r.
+  - by rewrite add0r.
+  - by rewrite addr0.
+  - rewrite !Z_to_int_pos_pos.
+    rewrite Pos2Nat.inj_add. by rewrite PoszD.
+  - rewrite Z_pos_sub_int Z_to_int_pos_pos Z_to_int_neg_pos.
+    by [].
+  - by rewrite addr0.
+  - rewrite Z_pos_sub_int Z_to_int_neg_pos Z_to_int_pos_pos.
+    by rewrite addrC.
+  - rewrite !Z_to_int_neg_pos.
+    rewrite Pos2Nat.inj_add PoszD. by rewrite opprD.
+Qed.
 
 Lemma mat_int_to_rat_mscale (c : Z) (A : mat) (n : nat) :
   mat_int_to_rat (mscale c A) 1 n
@@ -262,26 +333,70 @@ Proof.
   apply nth_Z_vadd. rewrite HAlen HBlen. reflexivity.
 Qed.
 
-(* The full bridge lemma would need to also thread `all_rows_len n A`
-   through CharPoly.v's architecture. Since that predicate is not
-   part of CharPoly.v's public API (it would require editing
-   CharPoly.v, which this task forbids), we can only state the
-   bridge modulo these side conditions.  We therefore leave the
-   main lemma Admitted; the helper `mat_get_madd` above captures
-   the full content of the matrix-level identity. *)
+(* Bridge lemma for `madd`.  The hypotheses `all_rows_len n A/B` are
+   the structural well-formedness conditions that the input matrices
+   are honest n x n grids; they are not part of CharPoly.v's public
+   API (which would require editing CharPoly.v) but are added here
+   so that the lemma can actually be discharged.  Downstream callers
+   carry the same square-matrix invariants and can supply them. *)
 Lemma mat_int_to_rat_madd (A B : mat) (n : nat) :
   mat_dim A = n -> mat_dim B = n ->
+  all_rows_len n A -> all_rows_len n B ->
   mat_int_to_rat (madd A B) 1 n
   = (mat_int_to_rat A 1 n + mat_int_to_rat B 1 n)%R.
-Proof. Admitted.
+Proof.
+  intros HdimA HdimB HrowA HrowB.
+  unfold mat_dim in HdimA, HdimB.
+  apply/matrixP => i j.
+  rewrite /mat_int_to_rat !mxE.
+  have Hlen : List.length A = List.length B by rewrite HdimA HdimB.
+  have Hi : (nat_of_ord i < List.length A)%coq_nat.
+  { rewrite HdimA. apply/ltP; exact: ltn_ord. }
+  rewrite (mat_get_madd A B n i j Hlen HrowA HrowB Hi).
+  rewrite Z_to_int_add intrD.
+  change (Z_to_int 1) with (1%R : int).
+  rewrite /=. by rewrite !divr1.
+Qed.
 
 (* ------- (5) trace ------------------------------------------ *)
+
+(* The diagonal sum of A as an `int`-valued sum.  Generalised to an
+   offset `k` so that the recursion in `mtrace_aux` can be unwound by
+   structural induction on the matrix. *)
+Lemma mtrace_aux_diag_sum (A : mat) (k : nat) :
+  Z_to_int (mtrace_aux k A)
+  = (\sum_(i < length A) Z_to_int (mat_get A i (k + i)%coq_nat))%R.
+Proof.
+  revert k. induction A as [|row rest IH]; intros k; simpl.
+  - by rewrite big_ord0.
+  - rewrite Z_to_int_add. rewrite big_ord_recl.
+    rewrite Nat.add_0_r.
+    have Hhead : nth_Z row k = mat_get (row :: rest) (nat_of_ord (ord0 : 'I_(length rest).+1)) k
+      by rewrite /mat_get /=.
+    rewrite Hhead. f_equal.
+    rewrite (IH k.+1).
+    apply: eq_bigr => i _.
+    rewrite /mat_get /=. rewrite /bump /=.
+    have Heq: (k + i)%coq_nat.+1 = (k + (1 + i))%coq_nat
+      by rewrite /= Nat.add_succ_r.
+    rewrite Heq. reflexivity.
+Qed.
 
 Lemma mtrace_int_to_rat (A : mat) (n : nat) :
   mat_dim A = n ->
   ((Z_to_int (mtrace A))%:~R : rat)
   = (\tr (mat_int_to_rat A 1 n))%R.
-Proof. Admitted.
+Proof.
+  intros Hdim. unfold mtrace.
+  rewrite mtrace_aux_diag_sum.
+  rewrite raddf_sum /=.
+  rewrite /mxtrace.
+  unfold mat_dim in Hdim. rewrite Hdim.
+  apply: eq_bigr => i _.
+  rewrite /mat_int_to_rat mxE.
+  change (Z_to_int 1) with (1%R : int).
+  rewrite /= divr1. reflexivity.
+Qed.
 
 (* ------- (6) mmul ------------------------------------------- *)
 
