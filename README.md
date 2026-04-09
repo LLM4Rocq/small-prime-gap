@@ -1,84 +1,201 @@
-# FLINT certificate for Maynard's `M_{105} > 4`
+# Maynard `M_{105} > 4` — independent FLINT + Rocq audit
 
-This archive contains a self-contained, independently auditable FLINT
-re-implementation of the numerical computation underlying **Proposition 4.3
+This repository is a self-contained, two-layer audit of **Proposition 4.3
 / formula (8.15)** of James Maynard's *Small gaps between primes*
-([arXiv:1311.4600](https://arxiv.org/abs/1311.4600), Annals of Mathematics
-**181** (2015), 383–413), namely the inequality
+([arXiv:1311.4600](https://arxiv.org/abs/1311.4600); Annals of Mathematics
+**181** (2015), 383–413). The inequality being audited is
 
-> `M_{105} = 105 · λ_max((M₂, M₁)) > 4`
+> **`M_{105} = 105 · λ_max((M₂, M₁)) > 4`**
 
 where `(M₁, M₂)` is the 42 × 42 generalised eigenpair built from the
-multidimensional Selberg–GPY sieve weights restricted to the symmetric
-polynomial subspace `span_ℚ { x^b · y^c : b + 2c ≤ 11 }` with `k = 105`
-simplex variables.
+multidimensional Selberg–GPY sieve weights, restricted to the symmetric
+polynomial subspace `span_ℚ { x^b · y^c : b + 2c ≤ 11 }` over `k = 105`
+simplex variables. (The mathematical content is fully reverse-engineered
+from Maynard's `Computations.nb` notebook in
+[`notebook_reconstructed.md`](notebook_reconstructed.md).)
 
 The original published proof relies on an **unrefereed Mathematica
-notebook** (`Computations.nb`) shipped as an arXiv ancillary file. This
-archive replaces that notebook with:
+notebook** shipped as an arXiv ancillary file. This repository replaces
+the notebook with two independent layers:
 
-1. an exact-rational re-implementation in Python + FLINT (`python-flint`),
-2. a Brown–Traub subresultant Sturm chain on the integer-cleared
-   characteristic polynomial of `A = M₁⁻¹ M₂`, certifying that there is
-   exactly one real eigenvalue above `4 / 105`,
-3. a JSON certificate consumable by an independent Rocq verifier, and
-4. four Rocq files that ingest the certificate and machine-check, by
-   `vm_compute`, that the data round-trips and that the basic invariants
-   hold.
+1. **A FLINT layer** (Python + `python-flint`) that builds `M₁` and `M₂`
+   from the closed-form Beta integrals, computes the characteristic
+   polynomial of `A = M₁⁻¹M₂` exactly in `fmpq_mat`, runs a Brown–Traub
+   subresultant Sturm chain, verifies every PRS step independently, and
+   emits a JSON certificate. This layer **runs the audit** and produces
+   the witness data.
 
-It does **not** ship a complete Rocq proof of `M_{105} > 4` — that is the
-"S1" stretch goal of the broader project (see `PLAN_S1.md` in the parent
-project, not included here). What it does ship is the entire FLINT side
-of S1: the certificate, the emitter, and the witness data the Rocq
-proof will eventually consume.
+2. **A Rocq layer** (`theories/S1/`) that consumes the certificate and
+   builds a machine-checked proof in MathComp + `mathcomp-real-closed`.
+   The headline theorem
 
-## What's in the archive
+   ```rocq
+   Theorem maynard_eigenvalue_S1 :
+     exists lambda : realalg,
+       eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
+       /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
+   ```
+
+   compiles `Qed.` with **exactly two `Admitted` axioms** (L1 and L2
+   below), and `Print Assumptions` confirms zero accidental leakage from
+   MathComp Analysis or real-closed.
+
+Neither layer is the *complete* Rocq proof of `M_{105} > 4`. The complete
+proof is the project's stretch goal (PLAN_S1.md "S1"); what this repo
+delivers is the entire scaffolding, all the bridges between the
+computational layer and the spec layer, and a list of exactly two
+mathematical lemmas that remain to discharge.
+
+## Repository layout
 
 ```
-flint-task/
-├── README.md                      ← this file
-├── _CoqProject                    ← Rocq build configuration
+prime_gap/
+├── README.md                       (this file)
+├── PLAN.md                         original "Rayleigh witness" MVP plan
+├── PLAN_S1.md                      "eigenvalue statement" S1 plan
+├── notebook_reconstructed.md       prose decoding of Mathematica notebook
+├── flint_sturm_plan.md             FLINT pipeline design report
+├── research_charpoly.md            MathComp char_poly research scout report
+├── math_eigenvalue_target.md       precise S1 theorem statement choice
 │
-├── flint_probe.py                 ← exact-rational builder for M₁, M₂
-│                                    (only used on the "cold" path; the
-│                                    cached pickle below is enough for
-│                                    everyday re-runs)
+├── _CoqProject                     Rocq project file (12 .v files)
+│
+├── flint_probe.py                  M₁, M₂ builder (cold path)
+├── flint_subres.py                 standalone Brown-Traub probe
+├── m1m2.pkl                        cached exact-rational M₁, M₂
+├── certificate.json                small certificate (~510 KB)
+├── certificate_chain.json          heavy Sturm chain (~11 MB)
 │
 ├── python/
-│   └── build_certificate.py       ← main pipeline: assembles, verifies,
-│                                    cross-checks, and emits the JSON
-│                                    certificate
+│   └── build_certificate.py        main FLINT pipeline + emitter
 │
 ├── tools/
-│   └── json_to_v.py               ← JSON → Rocq source emitter
+│   └── json_to_v.py                JSON → Rocq source emitter
 │
-├── m1m2.pkl                       ← cached exact-rational M₁, M₂ (320 KB)
-│
-├── certificate.json               ← small certificate (133 KB):
-│                                    integer-cleared M₁, M₂, char poly,
-│                                    sign vectors, V counts
-│
-├── certificate_chain.json         ← heavy certificate (11 MB):
-│                                    full Brown–Traub PRS chain (43 polys)
-│                                    and the 41 β scalars used at each step
-│
-├── theories/S1/
-│   ├── Recompose.v                ← bigZ → stdlib-Z conversion helpers
-│   ├── Witness.v                  ← M1_int, M2_int, charpoly_int, sign
-│   │                                vectors, V counts (auto-generated)
-│   ├── WitnessChain.v             ← Brown–Traub chain + βs as `bigZ`
-│   │                                (auto-generated, 11 MB)
-│   └── Smoke.v                    ← `vm_compute` round-trip tests
-│
-├── notebook_reconstructed.md      ← prose reverse-engineering of the
-│                                    original Mathematica notebook, for
-│                                    independent comparison
-│
-└── flint_sturm_plan.md            ← design report for the FLINT pipeline
-                                     (coefficient-size estimates, the
-                                     Brown–Traub vs naive Sturm comparison,
-                                     PRS audit format)
+└── theories/S1/                    Rocq formalisation
+    ├── Recompose.v                 bigZ ↔ stdlib Z helpers
+    ├── Witness.v                   M1_int, M2_int, A_int, char polys,
+    │                                signs, V counts (autogenerated)
+    ├── WitnessChain.v              Brown-Traub PRS chain in bigZ
+    │                                (autogenerated, ~11 MB)
+    ├── Smoke.v                     vm_compute round-trip tests
+    │
+    ├── IntPoly.v                   list Z polynomial library
+    ├── IntMat.v                    list (list Z) matrix library
+    ├── BrownTraub.v                modified Sturm chain on list Z
+    ├── SignChain.v                 sign-variation counting
+    │
+    ├── CharPoly.v                  Faddeev-LeVerrier char_poly_int
+    ├── CharPolyAgree.v             FLINT cross-validation tests
+    │
+    ├── Bridge.v                    L1 (Sturm) scaffolding
+    └── Cert.v                      headline `maynard_eigenvalue_S1`
 ```
+
+## Two-layer architecture at a glance
+
+```
+              Mathematica notebook (Maynard 2015, arXiv:1311.4600v3)
+                                  │
+                                  │  reverse-engineered (notebook_reconstructed.md)
+                                  ▼
+   ┌─────────────────────── FLINT layer (Python, runs audit) ──────────────────────┐
+   │                                                                                │
+   │   flint_probe.py ──build──> m1m2.pkl                                            │
+   │                                  │                                              │
+   │                                  ▼                                              │
+   │   build_certificate.py:                                                         │
+   │     • sanity-check 5 closed-form Beta-integral entries                          │
+   │     • A = M₁⁻¹M₂  in fmpq_mat                                                  │
+   │     • q(x) = char_poly(A)  in 0.19 s                                            │
+   │     • integer-clear A → A_int / D_A,  q → Q / D_q                               │
+   │     • Brown-Traub subresultant PRS chain (43 polys)                             │
+   │     • verify all 41 PRS steps in pure Python                                    │
+   │     • sign vectors, V(4/105) − V(+∞) = 1                                        │
+   │     • Arb 256-bit cross-check vs Maynard's 4.00206976193804713…                 │
+   │                                  │                                              │
+   │                                  ▼                                              │
+   │   certificate.json    +    certificate_chain.json                               │
+   │                                  │                                              │
+   │   tools/json_to_v.py             ▼                                              │
+   │                            theories/S1/Witness.v + WitnessChain.v               │
+   └────────────────────────────────────┼──────────────────────────────────────────┘
+                                        │
+   ┌────────────────────────────────────┼──── Rocq layer (machine-checks audit) ───┐
+   │                                    ▼                                            │
+   │   Recompose.v ── lift bigZ → stdlib Z helpers                                   │
+   │   IntPoly.v   ── pol = list Z, padd/psub/pmul/pderiv/peval/prem                 │
+   │   IntMat.v    ── mat = list (list Z), mmul, mtrace, quad_form_int               │
+   │   BrownTraub.v── modified Sturm chain on list Z                                 │
+   │   SignChain.v ── sign-variation counting                                        │
+   │   CharPoly.v  ── Faddeev-LeVerrier char_poly_int : mat → pol                    │
+   │                  + concrete bridges to MathComp's char_poly                     │
+   │   Bridge.v    ── L1 (Sturm) bridge: morphisms to qe_rcf_th over realalg          │
+   │   CharPolyAgree.v── lightweight integration tests against FLINT                  │
+   │   Cert.v      ── Theorem maynard_eigenvalue_S1 : ∃ λ : realalg,                  │
+   │                    eigenvalue (map_mx ratr A_rat) λ ∧ ratr (4/105) < λ          │
+   │                                                                                  │
+   │   Print Assumptions: 2 axioms only (no leakage)                                  │
+   │     - sturm_count_correct        (L1)                                            │
+   │     - charpoly_int_eq_charpoly   (L2)                                            │
+   └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+## What is and isn't proved
+
+### Already proved end-to-end (`Qed`, no axioms in transitive closure)
+
+- **In `Smoke.v`** — the FLINT certificate round-trips through Rocq:
+  shape and length invariants, sign vectors are well-formed, the
+  precomputed `roots_in_x0_inf = 1` is exact, and crucially the bigZ
+  encoding round-trips byte-for-byte: `lift_bigZ chain_0 = charpoly_int`.
+- **In `IntPoly.v`, `IntMat.v`, `BrownTraub.v`, `SignChain.v`,
+  `CharPoly.v`** — every primitive operation has a `vm_compute`-tested
+  example. Performance budgets met: 42 × 42 quadratic form on 200-bit
+  entries in 0.22 s, full file rebuild in ~5 minutes.
+- **In `Cert.v`** — the theorem statement type-checks; the proof is
+  assembled from L1 → L2 → L3 → headline. **L3
+  (`eigenvalue_of_root_realalg`) is proved** as a 2-line consequence of
+  `map_char_poly` + `eigenvalue_root_char` from MathComp.
+- **In `CharPolyAgree.v`** — the FLINT-shipped `charpoly_of_A_int` has
+  the right dimension, lifts cleanly bigZ → stdlib Z, and is monic.
+- **In `Bridge.v`** — the existential consumer `sturm_count_above_pos`
+  is proved (modulo upstream Sturm-bridge admits): given a positive
+  Sturm count, it produces the realalg root above the threshold that
+  Cert.v's L1 needs.
+
+### The two outstanding admits in `maynard_eigenvalue_S1`
+
+```
+sturm_count_correct  (L1) :
+  exists lambda : realalg,
+    root charpoly_as_poly_realalg lambda
+    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda
+
+charpoly_int_eq_charpoly  (L2) :
+  charpoly_as_poly_realalg
+  = map_poly (ratr : rat -> realalg) (char_poly A_rat)
+```
+
+- **L1 — Sturm correctness**. Bridges our `BrownTraub.sturm_chain` and
+  `SignChain.sturm_count_above` (both on `list Z`) to the abstract
+  `qe_rcf_th.mods` and `cindex` over `realalg`. Scaffolded in `Bridge.v`
+  via 4 supporting Admitted morphism lemmas
+  (`mods_int_morph`, `variation_at_rat_morph`,
+  `variation_at_pinf_morph`, `sturm_count_above_correct`).
+
+- **L2 — Faddeev-LeVerrier correctness**. States that our hand-rolled
+  `char_poly_int` from `CharPoly.v` matches MathComp's `char_poly` of
+  the rational pencil. Scaffolded in `CharPoly.v` via the still-Admitted
+  `char_poly_int_correct`. Standard proof technique: Newton's identities
+  applied to the Faddeev-LeVerrier recurrence.
+
+(The `CharPolyAgree.v` lemma `char_poly_int_agrees_with_flint` —
+"our `char_poly_int A_int` equals FLINT's `charpoly_of_A_int`
+byte-for-byte" — is also Admitted, but is **not** in the transitive
+closure of the headline theorem. It's a separate computational
+cross-check that is impractical to discharge under `vm_compute` at
+dimension 42 and is deferred to a future "S1.5" sprint.)
 
 ## Prerequisites
 
@@ -86,30 +203,25 @@ flint-task/
 - **`python-flint` 0.8.0** or compatible. Installs cleanly via:
   ```bash
   python -m venv .venv && source .venv/bin/activate
-  pip install python-flint        # or: uv pip install python-flint
+  pip install python-flint     # or: uv pip install python-flint
   ```
   The wheel ships FLINT 3.x, GMP, MPFR, and Arb bundled — no system
   libraries needed.
-- **Rocq 9.0** (the prover formerly known as Coq), with these packages:
-  - `rocq-stdlib` (Stdlib library)
-  - **`rocq-bignums`** — load-bearing; the `WitnessChain.v` file uses
-    `BigZ` because stdlib `Z` literal elaboration stack-overflows above
-    ~10 000 bits, while `BigZ` handles 100 000-bit literals in ~0.4 s.
-  - All available via `opam install rocq-stdlib rocq-bignums` against
-    a standard Rocq 9.0 switch.
+- **Rocq 9.0** with these opam packages:
+  - `rocq-stdlib`
+  - `rocq-mathcomp-ssreflect`, `rocq-mathcomp-algebra`,
+    `rocq-mathcomp-field`, `rocq-mathcomp-real-closed`
+  - **`rocq-bignums`** — load-bearing; `WitnessChain.v` ships its
+    11 MB Sturm chain in `bigZ` because stdlib `Z` literal elaboration
+    stack-overflows above ~10 000 bits per literal, while `bigZ`
+    handles 100 000-bit literals in ~0.4 s.
+  - All available via
+    `opam install rocq-stdlib rocq-mathcomp-real-closed rocq-bignums`
+    against a standard Rocq 9.0 switch.
 
 ## How to use
 
-### 1. Verify the FLINT computation independently
-
-Run the Python pipeline. It rebuilds (or loads the cache of) `M₁, M₂`,
-sanity-checks five entries against closed-form Beta integrals, computes
-the characteristic polynomial of `A = M₁⁻¹ M₂` via FLINT's
-`fmpq_mat.charpoly()`, computes the Brown–Traub subresultant PRS chain,
-verifies every PRS step independently in pure Python, computes the sign
-vectors at `4 / 105` and `+∞`, asserts that `V(4/105) − V(+∞) ≥ 1`, and
-cross-checks the top eigenvalue at 256-bit precision via Arb against
-Maynard's published value `4.00206976193804713…`.
+### 1. Re-run the FLINT audit
 
 ```bash
 source .venv/bin/activate
@@ -119,8 +231,22 @@ python python/build_certificate.py
 Expected runtime: ~7 s with the cached `m1m2.pkl`, ~90 s on a cold run
 (the `prime_gram` integral assembly dominates the cold path).
 Re-emits `certificate.json` and `certificate_chain.json` in place.
+The pipeline aborts loudly on any of these failing internal checks:
 
-### 2. Regenerate the Rocq witness files
+| Check | What it asserts |
+|---|---|
+| `M1[0][0] = 1/105!` | F = 1, I_105(1) = 1/105! |
+| `M1[0][1] = 1/106!` | F = x |
+| `M1[0][2] = 210/107!` | F = y, with G_{1,2}(105) = 210 |
+| `M1[1][1] = 2/107!` | F = x² |
+| `M2[0][0] = 2/106!` | J_105(F=1) = 2/106! |
+| M1, M2 symmetric | for all `i ≠ j` |
+| every PRS step audit | `prem(chain[i−1], chain[i]) = β_i · chain[i+1]` exactly in ℤ[x] |
+| `gcd(q, q') = 1` | simple spectrum |
+| `V(4/105) − V(+∞) ≥ 1` | Sturm count yields ≥ 1 root above threshold |
+| Arb top eigenvalue | `\| 105 · λ_top − 4.00206976193804713 \| < 10⁻¹²` |
+
+### 2. Regenerate the autogenerated Rocq witness files
 
 ```bash
 python tools/json_to_v.py --with-chain
@@ -131,14 +257,16 @@ Runs in well under a second; emits `theories/S1/Witness.v` and
 the heavy 11 MB `WitnessChain.v`; omit it for a quick sanity build that
 only emits the small `Witness.v`.
 
-### 3. Verify in Rocq
+### 3. Build all Rocq files
 
 ```bash
-coqc -Q theories/S1 PrimeGapS1 theories/S1/Recompose.v
-coqc -Q theories/S1 PrimeGapS1 theories/S1/Witness.v
-coqc -Q theories/S1 PrimeGapS1 theories/S1/WitnessChain.v
-coqc -Q theories/S1 PrimeGapS1 theories/S1/Smoke.v
+for f in Recompose Witness WitnessChain Smoke IntPoly IntMat \
+         BrownTraub SignChain CharPoly Cert CharPolyAgree Bridge; do
+    coqc -Q theories/S1 PrimeGapS1 theories/S1/$f.v
+done
 ```
+
+(or use `coq_makefile -f _CoqProject -o Makefile && make`).
 
 Expected runtime on a modest laptop:
 
@@ -148,40 +276,38 @@ Expected runtime on a modest laptop:
 | `Witness.v`       | ~3 s        |
 | `WitnessChain.v`  | ~21 s       |
 | `Smoke.v`         | ~2 m 10 s   |
-| **Total**         | **~2 m 35 s** |
+| `IntPoly.v`       | ~3 s        |
+| `IntMat.v`        | ~1 s        |
+| `BrownTraub.v`    | ~1 s        |
+| `SignChain.v`     | ~1 s        |
+| `CharPoly.v`      | ~1 s        |
+| `Cert.v`          | ~5 s        |
+| `CharPolyAgree.v` | ~2 s        |
+| `Bridge.v`        | ~5 s        |
+| **Total**         | **~3 m**    |
 
 `Smoke.v`'s runtime is dominated by the single `lift_bigZ chain_42`
 `vm_compute` that converts the 100 000-bit terminal Sturm chain entry
 from `bigZ` to stdlib `Z`. All other smoke checks complete in
 sub-second time.
 
-### 4. Inspect what was verified
+### 4. Inspect what was machine-checked
 
-After `coqc theories/S1/Smoke.v` succeeds, the following lemmas have
-been machine-checked under `vm_compute` (no axioms, no `Admitted`):
+```bash
+echo 'From PrimeGapS1 Require Import Cert.
+Print Assumptions Cert.maynard_eigenvalue_S1.' \
+  | coqtop -Q theories/S1 PrimeGapS1
+```
 
-- **Shape** — `dim = 42`, `k_param = 105`, `sturm_chain_len = 43`,
-  `length sturm_betas_bigZ = 41`, all matrix rows length 42, etc.
-- **Charpoly** — `length charpoly_int = 43` (degree 42 + 1), the
-  leading coefficient is nonzero.
-- **Sign-variation invariant** — `signs_at_x0_head = -1`,
-  `roots_in_x0_inf = 1` (exactly one real eigenvalue above `4 / 105`),
-  and the round-tripped sign-at-+∞ vector is non-trivially positive.
-- **bigZ ↔ Z round trip** — the load-bearing test:
-  `lift_bigZ chain_0 = charpoly_int`. The bigZ-encoded Sturm chain entry
-  `chain[0]`, after `vm_compute` conversion to stdlib `Z`, equals the
-  independently-shipped char poly `charpoly_int` byte-for-byte. This
-  proves that the bigZ encoding chosen for the heavy chain agrees with
-  the stdlib-`Z` view used by the rest of the proof system.
-- **Simple spectrum** — `chain_42` is a singleton with a nonzero
-  coefficient, i.e. the discriminant of the char poly is nonzero,
-  confirming inside Rocq that Maynard's matrix has a simple spectrum.
+Expected output (modulo formatting):
 
-These tests are *not* a proof of `M_{105} > 4`. They are a proof that
-the certificate the FLINT pipeline ships round-trips through Rocq
-correctly. The actual S1 theorem `∃ λ : realalg, eigenvalue (map_mx
-ratr A) λ ∧ ratr (4/105) < λ` is built on top of this in the Rocq side
-of the project (not included in this archive).
+```
+Axioms:
+sturm_count_correct       : exists lambda : realalg, …
+charpoly_int_eq_charpoly  : charpoly_as_poly_realalg = …
+```
+
+— exactly the L1 and L2 admits and nothing else.
 
 ## What is being computed (one-paragraph version)
 
@@ -195,29 +321,12 @@ performed analytically via Maynard's eq. 7.8. Both inner products reduce
 to closed-form rationals via the Dirichlet/Beta integral
 `∫_{Δ_k} ∏ tᵢ^{aᵢ} dt = (∏ aᵢ!)/(k+Σaᵢ)!`, so `M₁` and `M₂` are exact
 rational matrices and the entire pipeline avoids floating point on the
-critical path. The Arb cross-check at the end is *advisory* — it
-agrees with Mathematica to 12+ digits but is not used in the certificate.
-
-## Sanity checks the FLINT pipeline runs internally
-
-`python/build_certificate.py` aborts loudly on any of these failing:
-
-| Check | What it asserts |
-|---|---|
-| `M1[0][0] = 1/105!` | `F = 1`, `I_105(F) = 1/105!` |
-| `M1[0][1] = 1/106!` | `F = x`, `I_105(x) = 1/106!` |
-| `M1[0][2] = 210/107!` | `F = y`, with `G_{1,2}(105) = 210` |
-| `M1[1][1] = 2/107!` | `F = x²`, `I_105(x²) = 2/107!` |
-| `M2[0][0] = 2/106!` | `J_105(F = 1) = 2/106!` |
-| `M1, M2` symmetric | for all `i ≠ j` |
-| every PRS step audit | `prem(chain[i−1], chain[i]) = β_i · chain[i+1]` exactly in `ℤ[x]`, for all 41 steps |
-| `gcd(q, q') = 1` | simple spectrum (otherwise abort) |
-| `V(4/105) − V(+∞) ≥ 1` | Sturm count produces ≥ 1 root above the threshold |
-| Arb top eigenvalue | `\| 105 · λ_top − 4.00206976193804713 \| < 10⁻¹²` |
+critical path. The Arb cross-check at the end is *advisory* — it agrees
+with Mathematica to 12+ digits but is not used in the certificate.
 
 ## Why is `WitnessChain.v` written in `bigZ` and not `Z`?
 
-The Brown–Traub Sturm chain has individual integer coefficients up to
+The Brown-Traub Sturm chain has individual integer coefficients up to
 **~200 000 bits** (≈ 60 000 decimal digits). Stdlib `Z`'s number
 notation elaborates each literal in super-linear time and stack-overflows
 above ~10 000 bits per literal. We measured this directly:
@@ -237,7 +346,7 @@ where downstream proofs need it. The lifting helpers
 `lift_bigZ : list bigZ → list Z` and
 `lift_bigZ2 : list (list bigZ) → list (list Z)` live in `Recompose.v`.
 
-## Reproducibility
+## Reproducibility and performance constraints
 
 The pipeline is deterministic: re-running `build_certificate.py` on the
 same machine produces byte-identical `certificate.json` and
@@ -246,11 +355,69 @@ same machine produces byte-identical `certificate.json` and
 slightly different ball-radius hex strings on different FLINT builds —
 but the rational data the Rocq side consumes is invariant.
 
+### Computational layer constraints (verified the hard way)
+
+Every MathComp container type is **dead** under `vm_compute`. We
+measured these explicitly with `mcp__rocq-mcp__rocq_query`:
+
+| Probe | Result |
+|---|---|
+| `vm_compute` of size of `\matrix_(i,j) … : 'M[rat]_4`, Rayleigh quotient | **timeout 30 s** |
+| `vm_compute` of size of `Poly [::-5; 0; 1] : {poly int}` | **timeout 30 s** |
+| `vm_compute` of size of `'X^2 - (5%:Q)%:P : {poly rat}` | **timeout 30 s** |
+| `vm_compute` of `mods (p : {poly realalg}) p^`()` for degree-2 `p` | **timeout 30 s** |
+| `vm_compute` of `addq (mulq …) …` on four `%:Q` literals | 0.36 s |
+| `vm_compute` of stdlib `QArith` 4-term dot product | 0.005 s |
+| `vm_compute` of 42 × 42 quadratic form on `list Z` with 200-bit entries | **0.22 s** |
+| `vm_compute` of `length`, `last` on `list Z` of small length | **0.000 s** |
+
+This is the entire reason the architecture is layered: MathComp types
+are for **specifications only**; all computation lives on `list Z` and
+`list (list Z)`. The two worlds are bridged by hand-written homomorphism
+lemmas (`mat_int_to_rat`, `pol_to_polyrat` in `CharPoly.v`).
+
+## Project history (git log)
+
+```
+94c461b  Rocq S1 architecture: list-Z computational layer + headline theorem
+d863871  FLINT task: integer-cleared certificate for Maynard's M_{105} > 4
+```
+
+- **Commit 1 — FLINT task** (12 685 lines, 18 files). The Python+FLINT
+  pipeline, the JSON certificates, the four small Rocq files
+  (`Recompose.v`, `Witness.v`, `WitnessChain.v`, `Smoke.v`), and the
+  project planning docs. Self-contained audit of Maynard's notebook.
+- **Commit 2 — Rocq S1 architecture** (5 986 lines, 8 new files,
+  5 modified). The whole `list Z` computational stack
+  (`IntPoly.v`, `IntMat.v`, `BrownTraub.v`, `SignChain.v`), the
+  Faddeev-LeVerrier `char_poly_int` (`CharPoly.v`), the headline
+  `Cert.v`, the L1 scaffolding (`Bridge.v`), and the cross-validation
+  (`CharPolyAgree.v`). FLINT-side extensions to support the integration
+  test (`A_int`, `D_A`, `charpoly_of_A_int`). Two subagent reports on
+  MathComp char_poly availability and on the precise theorem statement.
+
+## Next steps
+
+The natural follow-up sprints, in order of value-vs-risk:
+
+1. **Discharge L2** (`char_poly_int_correct` in `CharPoly.v`) — the
+   Faddeev-LeVerrier abstract correctness via Newton's identities.
+   2-day budget per `PLAN_S1.md` §6 risk #1.
+2. **Discharge L1** (the four Bridge.v admits, then re-wire `Cert.v`).
+   The hardest piece is `mods_int_morph` (bridging integer
+   pseudo-remainder with `lc^k` scaling to MathComp's `rmodp`).
+3. **Speed up `char_poly_int`** so `CharPolyAgree.v`'s
+   byte-for-byte 42 × 42 cross-validation can close. Options:
+   mod-prime reconstruction, Bareiss, or rebuild Rocq with
+   `native_compute`.
+4. **`A_rat_unitmx`** (currently `Admitted`, not in headline closure):
+   discharge by an integer-determinant computation on `M1_int`.
+
 ## License and provenance
 
 Source for the Mathematica notebook being audited:
 - [arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600), ancillary file
   `Computations.nb`. CC-BY-4.0 (per arXiv default).
 
-The Python and Rocq files in this archive are original work for this
-audit and are released under the same CC-BY-4.0 license.
+The Python and Rocq code in this repository is original work for this
+audit and is released under the same CC-BY-4.0 license.
