@@ -1,0 +1,5 @@
+-Q theories/S1 PrimeGapS1
+theories/S1/Recompose.v
+theories/S1/Witness.v
+theories/S1/WitnessChain.v
+theories/S1/Smoke.v
