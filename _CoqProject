@@ -11,3 +11,4 @@ theories/S1/CharPoly.v
 theories/S1/Cert.v
 theories/S1/CharPolyAgree.v
 theories/S1/Bridge.v
+theories/S1/IntMatProof.v
