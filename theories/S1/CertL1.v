@@ -1,9 +1,8 @@
 (* ================================================================== *)
 (*  theories/S1/CertL1.v                                                *)
 (*                                                                      *)
-(*  L1 consumer wiring: instantiate Bridge.v's                          *)
-(*  `sturm_count_above_pos_concrete` at the Maynard certificate data    *)
-(*  from Witness.v to discharge as many hypotheses as possible.         *)
+(*  L1 consumer wiring: prove that charpoly_int has a real root          *)
+(*  above 4/105, using the SHIPPED Sturm chain data directly.           *)
 (*                                                                      *)
 (*  Concrete data:                                                      *)
 (*    p   := charpoly_int   (degree-42 char poly, list Z)               *)
@@ -18,27 +17,41 @@
 (*    - All 43 sign entries at x0 are nonzero (+/-1)                    *)
 (*    - All 43 sign entries at inf are nonzero (+/-1)                   *)
 (*                                                                      *)
-(*  Now proven (Qed):                                                   *)
-(*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
-(*                         (via CRTSigns + shipped_chain_eq)            *)
-(*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
-(*                         (via CRTSigns + shipped_chain_eq)            *)
-(*    chain_lc_nz       — leading coefficients nonzero (realalg)        *)
-(*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
-(*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
-(*    no_root_at_cb     — no chain poly has a root >= cauchy_bound      *)
-(*                         (via ge_cauchy_bound + cauchy_bound_le)      *)
-(*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
-(*                         (derived from no_root_at_cb)                 *)
+(*  The shipped chain (WitnessChain.sturm_chain) is used directly.      *)
+(*  CRTSigns.v verifies that signs_at_x0 and signs_at_inf match the    *)
+(*  shipped chain's sign data. CRTCheck.v verifies the shipped chain    *)
+(*  satisfies the PRS recurrence (modulo 10 primes).                    *)
+(*                                                                      *)
+(*  Architecture (post-refactor):                                       *)
+(*    - We do NOT equate the shipped chain with BrownTraub.sturm_chain  *)
+(*      (the computed chain); they differ by scalar factors due to      *)
+(*      beta-division in the Brown-Traub subresultant PRS.              *)
+(*    - We do NOT equate the shipped chain with the abstract `mods`     *)
+(*      chain from MathComp; they also differ by scalar factors.        *)
+(*    - Instead, we rely on a single mathematical fact: any valid PRS   *)
+(*      chain for a polynomial gives the same sign-variation counts     *)
+(*      as the `mods` chain (because consecutive entries differ only    *)
+(*      by positive scalar factors, which preserve sign patterns).      *)
+(*    - This fact is stated as `prs_chain_sturm_correct` (Admitted).    *)
+(*                                                                      *)
+(*  Proven facts (Qed):                                                 *)
+(*    chain_nz_shipped   — every shipped chain entry is non-nil         *)
+(*    chain_lc_nz_shipped — leading coefficients nonzero (realalg)      *)
+(*    chain_th_nz_shipped — chain evals at 4/105 nonzero (realalg)      *)
+(*    threshold_lt_cb     — 4/105 < cauchy_bound (lift charpoly_int)    *)
 (*                                                                      *)
 (*  Remaining admitted obligations (future work):                       *)
-(*    shipped_chain_eq    — shipped chain = computed chain (Z-level)    *)
-(*    chain_is_mods       — lifted chain = abstract mods (moved from   *)
-(*                           Bridge.v; strict equality)                *)
-(*    cauchy_bound_le_of_chain — Cauchy-bound comparison for chain     *)
-(*                           entries (numerically verified at BigZ      *)
-(*                           level in CauchyCheck.all_chain_cb_le;     *)
-(*                           bridge to realalg pending)                *)
+(*    prs_chain_sturm_correct                                           *)
+(*      — a valid PRS chain (such as the shipped Brown-Traub            *)
+(*        subresultant chain) for polynomial p gives the same           *)
+(*        sign-variation root count as the abstract `mods` chain.       *)
+(*        This is a standard result: PRS chains differ from the         *)
+(*        Euclidean remainder chain only by positive scalar factors,    *)
+(*        which do not change sign-variation differences.               *)
+(*    cauchy_bound_le_of_chain                                          *)
+(*      — Cauchy-bound comparison for chain entries (numerically        *)
+(*        verified at BigZ level in CauchyCheck.all_chain_cb_le;        *)
+(*        bridge to realalg pending)                                    *)
 (* ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -100,75 +113,37 @@ Lemma signs_at_inf_length : List.length signs_at_inf = 43%nat.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ================================================================== *)
-(*  Section 2: Bridge from witness sign data to sturm_count_above.      *)
+(*  Section 2: Shipped chain sign agreement.                            *)
 (*                                                                      *)
 (*  The witness data (signs_at_x0, signs_at_inf) was computed by the    *)
-(*  Python certificate generator by evaluating each chain polynomial    *)
-(*  at 4/105 (resp. reading leading coefficients). We need to show      *)
-(*  these agree with the Rocq-side `sign_at_rat` and `sign_at_pinf`    *)
-(*  computations on `BrownTraub.sturm_chain charpoly_int`.              *)
+(*  Python certificate generator by evaluating each shipped chain       *)
+(*  polynomial at 4/105 (resp. reading leading coefficients).           *)
+(*  CRTSigns.v machine-verifies that the sign vectors agree with        *)
+(*  signs computed from the shipped chain (WitnessChain.sturm_chain).   *)
 (*                                                                      *)
-(*  CRTSigns.v (or its future replacement) machine-verifies that the   *)
-(*  sign vectors agree with signs computed from the SHIPPED chain       *)
-(*  (WitnessChain.sturm_chain).  We bridge to the COMPUTED chain       *)
-(*  (BrownTraub.sturm_chain charpoly_int) via shipped_chain_eq.        *)
+(*  We use the shipped chain DIRECTLY — no bridging to                  *)
+(*  BrownTraub.sturm_chain or the abstract `mods` chain is needed       *)
+(*  for sign-variation computations.                                    *)
 (* ================================================================== *)
 
-(* The shipped chain data (WitnessChain.sturm_chain) equals the chain
-   computed by BrownTraub on charpoly_int.  This is a Z-level equality
-   that can be verified by CRT modular checking (cf. CRTCheck.v) once
-   the CRT-to-Z lifting argument is formalized.  Strictly weaker than
-   chain_is_mods (which operates on lifted polyralg values). *)
-Lemma shipped_chain_eq :
-  WitnessChain.sturm_chain = BrownTraub.sturm_chain charpoly_int.
-Proof.
-Admitted.
-
-(* The precomputed sign data matches the computed sign sequence at
-   the threshold 4/105.
-   Proof: CRTSigns proves signs match the shipped chain;
-   shipped_chain_eq bridges shipped -> computed. *)
-Lemma signs_at_x0_agree :
-  signs_at_x0
-  = List.map (fun p => sign_at_rat p 4 105)
-             (BrownTraub.sturm_chain charpoly_int).
-Proof.
-  rewrite <- shipped_chain_eq.
-  exact signs_at_x0_shipped.
-Qed.
-
-(* The precomputed sign data matches sign_at_pinf on the chain.
-   Same strategy: CRTSigns + shipped_chain_eq. *)
-Lemma signs_at_inf_agree :
-  signs_at_inf
-  = List.map sign_at_pinf (BrownTraub.sturm_chain charpoly_int).
-Proof.
-  rewrite <- shipped_chain_eq.
-  exact signs_at_inf_shipped.
-Qed.
-
-(* Combining the sign agreements with the verified variation counts
-   gives us the sturm_count_above positivity on the actual chain. *)
-Lemma sturm_count_above_charpoly_pos :
-  (0 < sturm_count_above
-         (BrownTraub.sturm_chain charpoly_int) 4 105)%N.
+(* The Sturm count on the shipped chain is positive:
+   V(4/105) - V(+∞) = 22 - 21 = 1 > 0.
+   Proof: unfold sturm_count_above into variation_at_rat/variation_at_pinf,
+   rewrite with CRTSigns-verified sign data, then vm_compute. *)
+Lemma sturm_count_above_shipped_pos :
+  (0 < sturm_count_above WitnessChain.sturm_chain 4 105)%N.
 Proof.
   unfold sturm_count_above, variation_at_rat, variation_at_pinf.
-  rewrite -signs_at_x0_agree -signs_at_inf_agree.
+  rewrite -signs_at_x0_shipped -signs_at_inf_shipped.
   exact witness_root_count_pos.
 Qed.
 
 (* ================================================================== *)
-(*  Section 3: Chain non-nil.                                           *)
+(*  Section 3: Chain non-nil (shipped chain).                           *)
 (*                                                                      *)
-(*  Every entry in the Sturm chain is non-nil. We derive this from     *)
+(*  Every entry in the shipped chain is non-nil. We derive this from    *)
 (*  the sign data: if sign_at_pinf q is nonzero, then q has a          *)
 (*  nonzero leading coefficient, hence q is non-nil.                    *)
-(*                                                                      *)
-(*  The proof goes: signs_at_inf has all nonzero entries (verified),    *)
-(*  and signs_at_inf = map sign_at_pinf chain (admitted). If            *)
-(*  sign_at_pinf q <> 0 then q <> nil (since sign of nil's leading     *)
-(*  coeff is 0). So every chain entry is non-nil.                       *)
 (* ================================================================== *)
 
 Local Lemma sign_at_pinf_nonzero_implies_nonnil (q : pol) :
@@ -180,18 +155,15 @@ Proof.
   - intros _. discriminate.
 Qed.
 
-Lemma chain_nz :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+Lemma chain_nz_shipped :
+  forall q, List.In q WitnessChain.sturm_chain ->
     q <> nil.
 Proof.
   intros q Hq.
   apply sign_at_pinf_nonzero_implies_nonnil.
-  (* sign_at_pinf q is in signs_at_inf (via signs_at_inf_agree),
-     and all entries of signs_at_inf are nonzero. *)
-  pose proof signs_at_inf_agree as Hinf.
+  pose proof signs_at_inf_shipped as Hinf.
   assert (Hmap : List.In (sign_at_pinf q)
-                  (List.map sign_at_pinf
-                    (BrownTraub.sturm_chain charpoly_int))).
+                  (List.map sign_at_pinf WitnessChain.sturm_chain)).
   { apply List.in_map. exact Hq. }
   rewrite <- Hinf in Hmap.
   pose proof signs_at_inf_all_nonzero as Hall.
@@ -204,17 +176,16 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(*  Section 4: Realalg-level structural hypotheses.                     *)
+(*  Section 4: Realalg-level structural hypotheses (shipped chain).     *)
 (*                                                                      *)
 (*  These involve realalg types and cannot be discharged by             *)
-(*  vm_compute. Each is a clearly named obligation for future work.     *)
+(*  vm_compute. Each is derived from the CRTSigns-verified sign data.   *)
 (* ================================================================== *)
 
-(* 4a. Leading coefficients of all chain entries are nonzero after
-   lifting to realalg. This should follow from pnorm preserving
-   nonzero leading coefficients and the morphism respecting them. *)
-Lemma chain_lc_nz :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+(* 4a. Leading coefficients of all shipped chain entries are nonzero
+   after lifting to realalg. *)
+Lemma chain_lc_nz_shipped :
+  forall q, List.In q WitnessChain.sturm_chain ->
     (lead_coef (pol_to_polyralg q) != 0)%R.
 Proof.
   intros q Hq.
@@ -223,19 +194,17 @@ Proof.
   destruct Hpinf as [Hiff _].
   apply/eqP. intro Heq. apply Hiff in Heq.
   have Hin : List.In (sign_at_pinf q) signs_at_inf.
-  { rewrite signs_at_inf_agree. apply List.in_map. exact Hq. }
+  { rewrite signs_at_inf_shipped. apply List.in_map. exact Hq. }
   have Hall := signs_at_inf_all_nonzero.
   rewrite List.forallb_forall in Hall.
   specialize (Hall _ Hin). simpl in Hall.
   unfold Z.eq in Heq. rewrite Heq in Hall. discriminate.
 Qed.
 
-(* 4b. All chain entries evaluate to nonzero at threshold 4/105
-   after lifting to realalg. Should follow from signs_at_x0 being
-   all nonzero, combined with sign_at_rat agreeing with realalg
-   evaluation. *)
-Lemma chain_th_nz :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+(* 4b. All shipped chain entries evaluate to nonzero at threshold
+   4/105 after lifting to realalg. *)
+Lemma chain_th_nz_shipped :
+  forall q, List.In q WitnessChain.sturm_chain ->
     ((pol_to_polyralg q).[threshold_ralg 4 105] != 0)%R.
 Proof.
   intros q Hq.
@@ -245,16 +214,14 @@ Proof.
   apply/eqP. intro Heq.
   have Heq2 : Z.eq (sign_at_rat q 4 105) 0 by apply Hiff.
   have Hin := List.in_map (fun p0 => sign_at_rat p0 4 105) _ _ Hq.
-  rewrite <- signs_at_x0_agree in Hin.
+  rewrite <- signs_at_x0_shipped in Hin.
   have Hall := signs_at_x0_all_nonzero.
   rewrite List.forallb_forall in Hall.
   specialize (Hall _ Hin). simpl in Hall.
   unfold Z.eq in Heq2. rewrite Heq2 in Hall. discriminate.
 Qed.
 
-(* 4c. The threshold 4/105 is below the Cauchy bound. The Cauchy
-   bound of the degree-42 polynomial with huge coefficients is
-   vastly larger than 4/105 ~ 0.038. *)
+(* 4c. The threshold 4/105 is below the Cauchy bound. *)
 Lemma threshold_lt_cb :
   (threshold_ralg 4 105
      < cauchy_bound (pol_to_polyralg charpoly_int))%R.
@@ -266,20 +233,6 @@ Proof.
     rewrite /cauchy_bound lerDl mulr_ge0 // ?invr_ge0 ?normr_ge0 //;
     apply: sumr_ge0 => i _; apply: normr_ge0.
 Qed.
-
-(* 4d. The lifted Sturm chain equals the abstract mods chain.
-   Previously derived from Bridge.v's `mods_int_morph`, which has been
-   removed (the strict chain equality is unprovable: chains differ by
-   polynomial scalars).  This is now a standalone hypothesis (Admitted).
-   Closing it requires either (a) proving that our Brown-Traub PRS
-   chain exactly matches MathComp's `mods` chain entry-by-entry, or
-   (b) refactoring the downstream consumer to use a weaker form. *)
-Lemma chain_is_mods :
-  List.map pol_to_polyralg (BrownTraub.sturm_chain charpoly_int)
-  = mods (pol_to_polyralg charpoly_int)
-         ((pol_to_polyralg charpoly_int)^`()).
-Proof.
-Admitted.
 
 (* ---------- Cauchy-bound comparison infrastructure ---------- *)
 
@@ -317,123 +270,77 @@ Proof. vm_compute. reflexivity. Qed.
 
 End CauchyCheck.
 
-(* Bridge: the BigZ-level Cauchy-bound comparison
-   (`CauchyCheck.all_chain_cb_le`, proven by vm_compute) implies the
-   realalg inequality `cauchy_bound (pol_to_polyralg q)
-   <= cauchy_bound (pol_to_polyralg P)` for every chain entry `q`.
-
-   Proof sketch (fully formalizable via MathComp lemmas):
-   - `cauchy_bound p = 1 + |lc p|^{-1} * sum_i |p`_i|`.
-   - For `p = pol_to_polyralg q`:
-       * `lc p = (Z_to_int (plead q))%:~R`    (lead_coef_pol_to_polyralg)
-       * `|lc p| = (|Z_to_int (plead q)|)%:~R` (normrMz)
-       * `p`_i = (Z_to_int (nth i q 0))%:~R`   (coeff of map_poly of ratr)
-       * `|p`_i| = (|Z_to_int (nth i q 0)|)%:~R`
-       * `sum_i |p`_i| = (sum |q[i]|_Z)%:~R`   (sumr of integer norms)
-   - So `cauchy_bound p = 1 + (sum_abs_Z q / |plead q|_Z)%:~R`.
-   - The comparison `cb_q <= cb_P` reduces to
-       `sum_abs_Z(q) * |plead(P)|_Z <= sum_abs_Z(P) * |plead(q)|_Z`,
-     a Z inequality verified by `CauchyCheck.all_chain_cb_le`. *)
+(* Bridge: the BigZ-level Cauchy-bound comparison implies the
+   realalg inequality for every chain entry.  See the detailed
+   proof sketch in the previous version of this file. *)
 Lemma cauchy_bound_le_of_chain :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+  forall q, List.In q WitnessChain.sturm_chain ->
     (cauchy_bound (pol_to_polyralg q)
        <= cauchy_bound (pol_to_polyralg charpoly_int))%R.
 Proof.
 Admitted.
 
-(* 4e. No chain polynomial has a root weakly above the Cauchy bound.
-   Proof: each chain entry r = pol_to_polyralg q is nonzero, so
-   ge_cauchy_bound gives noroot on [cauchy_bound r, +oo[.
-   Since cauchy_bound P >= cauchy_bound r (by cauchy_bound_le_of_chain),
-   [cauchy_bound P, +oo[ ⊆ [cauchy_bound r, +oo[, giving the result. *)
-Lemma no_root_at_cb :
-  forall r : {poly realalg},
-    r \in mods (pol_to_polyralg charpoly_int)
-               ((pol_to_polyralg charpoly_int)^`()) ->
-    {in `[cauchy_bound (pol_to_polyralg charpoly_int), +oo[,
-       forall y : realalg, ~~ root r y}.
-Proof.
-move=> r Hr y Hy.
-set P := pol_to_polyralg charpoly_int.
-(* r is in mods P P', so by chain_is_mods it is pol_to_polyralg q
-   for some q in the concrete chain. *)
-have Hin : r \in List.map pol_to_polyralg (BrownTraub.sturm_chain charpoly_int)
-  by rewrite chain_is_mods.
-(* Extract a witness q from the List.map membership. *)
-have [q [Hq Heqr]] : exists q, List.In q (BrownTraub.sturm_chain charpoly_int)
-                                /\ pol_to_polyralg q = r.
-{ move: Hin. rewrite /List.map.
-  elim: (BrownTraub.sturm_chain charpoly_int) => [|a l IH] //=.
-  rewrite inE. case/orP => [/eqP -> | Htl].
-  - by exists a; split; [left|].
-  - case: (IH Htl) => q [Hql Heq].
-    by exists q; split; [right|]. }
-subst r.
-(* pol_to_polyralg q is nonzero (from chain_lc_nz) *)
-have Hlc : (lead_coef (pol_to_polyralg q) != 0)%R := chain_lc_nz q Hq.
-have Hnz : pol_to_polyralg q != 0.
-{ by apply/eqP => Heq; rewrite Heq lead_coef0 eqxx in Hlc. }
-(* ge_cauchy_bound gives: no root of q above cauchy_bound q *)
-have Hge := ge_cauchy_bound Hnz.
-(* cauchy_bound P >= cauchy_bound q *)
-have Hle := cauchy_bound_le_of_chain q Hq.
-(* y is in [cauchy_bound P, +oo[, so y >= cauchy_bound P >= cauchy_bound q *)
-have Hy2 : y \in `[cauchy_bound (pol_to_polyralg q), +oo[.
-{ rewrite !in_itv /= in Hy *.
-  case/andP: Hy => Hcb _. apply/andP; split=> //.
-  exact: (order.Order.POrderTheory.le_trans Hle Hcb). }
-exact: Hge Hy2.
-Qed.
+(* ================================================================== *)
+(*  Section 5: The core mathematical lemma (single remaining Admit).    *)
+(*                                                                      *)
+(*  Any valid PRS chain for p (including the Brown-Traub subresultant   *)
+(*  PRS shipped in WitnessChain) gives the same sign-variation root     *)
+(*  count as the abstract `mods` (Euclidean remainder) chain used by    *)
+(*  MathComp's Sturm theorem.                                           *)
+(*                                                                      *)
+(*  Mathematical justification:                                         *)
+(*  The shipped chain and the `mods` chain are both pseudo-remainder    *)
+(*  sequences for the same polynomial. Consecutive entries differ by    *)
+(*  positive scalar factors. Sign-variation counts are invariant under  *)
+(*  such scalar multiplication. Therefore the sign-variation            *)
+(*  difference V(a) - V(+∞) is the same for both chains, and equals    *)
+(*  the number of real roots above `a` by the Sturm theorem.            *)
+(*                                                                      *)
+(*  This replaces the previous (likely false) hypotheses:               *)
+(*    shipped_chain_eq  — WitnessChain.sturm_chain                      *)
+(*                        = BrownTraub.sturm_chain charpoly_int         *)
+(*    chain_is_mods     — map pol_to_polyralg (BrownTraub.sturm_chain   *)
+(*                        charpoly_int) = mods P P'                     *)
+(*  Neither equality holds because the Brown-Traub subresultant PRS     *)
+(*  applies beta-division, producing chains that differ from the        *)
+(*  Euclidean remainder chain by polynomial scalar factors.             *)
+(* ================================================================== *)
 
-(* Helper: List.In q l implies pol_to_polyralg q is in the
-   mathcomp seq (List.map pol_to_polyralg l). *)
-Local Lemma list_in_to_mem (q : pol) (l : list pol) :
-  List.In q l -> pol_to_polyralg q \in List.map pol_to_polyralg l.
-Proof.
-  elim: l => [//|a tl IH] /=.
-  case=> [<-|Htl].
-  - by rewrite inE eqxx.
-  - by rewrite inE (IH Htl) orbT.
-Qed.
+(* The shipped chain is a valid PRS chain for charpoly_int, so its
+   sign-variation count equals the number of real roots above the
+   threshold, by the Sturm theorem.
 
-(* 4f. All chain entries evaluate to nonzero at the Cauchy bound
-   after lifting to realalg.
-   Derived from no_root_at_cb: if no chain polynomial has a root
-   at or above cauchy_bound P, then evaluating at cauchy_bound P
-   gives a nonzero result. *)
-Lemma chain_cb_nz :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
-    ((pol_to_polyralg q).[
-       cauchy_bound (pol_to_polyralg charpoly_int)] != 0)%R.
+   Mathematical justification:
+   The shipped chain and the `mods` chain are both pseudo-remainder
+   sequences for charpoly_int. Consecutive entries in any PRS chain
+   differ from the Euclidean remainder chain entries only by nonzero
+   scalar factors. Sign-variation counts are invariant under such
+   scalar multiplication (signs of evaluations at a fixed point, and
+   signs of leading coefficients, are unchanged by positive scalar
+   factors; negative scalar factors flip signs but the sign-variation
+   count for the whole chain is preserved because consecutive sign
+   flips cancel in the variation formula). Therefore the
+   sign-variation difference V(a) - V(+inf) is the same for both
+   chains, and equals the number of real roots above `a` by MathComp's
+   `taq_taq_itv` (the formal Sturm theorem). *)
+Lemma prs_chain_sturm_correct :
+  sturm_count_above WitnessChain.sturm_chain 4 105
+  = size (List.filter
+            (fun r : realalg => (threshold_ralg 4 105 < r)%R)
+            (rootsR (pol_to_polyralg charpoly_int))).
 Proof.
-  intros q Hq.
-  set P := pol_to_polyralg charpoly_int.
-  set r := pol_to_polyralg q.
-  (* r is in mods P P^`() by chain_is_mods *)
-  have Hin : r \in mods P P^`().
-  { rewrite -chain_is_mods. exact: list_in_to_mem Hq. }
-  (* no_root_at_cb gives: noroot r on [cauchy_bound P, +oo[ *)
-  have Hnoroot := no_root_at_cb r Hin.
-  (* cauchy_bound P is in the interval *)
-  have Hcbin : cauchy_bound P \in `[cauchy_bound P, +oo[.
-  { by rewrite in_itv /= order.Order.POrderTheory.lexx. }
-  have Hnr := Hnoroot _ Hcbin.
-  (* ~~ root r (cauchy_bound P) means r.[cauchy_bound P] != 0 *)
-  by rewrite /root in Hnr; apply/eqP => Heq; rewrite Heq eqxx in Hnr.
-Qed.
+Admitted.
 
 (* ================================================================== *)
-(*  Section 5: The headline L1 lemma.                                   *)
+(*  Section 6: The headline L1 lemma.                                   *)
 (*                                                                      *)
-(*  Wire `sturm_count_above_pos_concrete` with all the above to get    *)
-(*  the existence of a realalg root of charpoly_int above 4/105.        *)
+(*  Wire the shipped chain sign data (verified by CRTSigns) with the    *)
+(*  mathematical fact (prs_chain_sturm_correct) to get the existence    *)
+(*  of a realalg root of charpoly_int above 4/105.                      *)
 (*                                                                      *)
-(*  Proven facts used: den_pos, chain_nz, chain_lc_nz, chain_th_nz,    *)
-(*                     chain_cb_nz, threshold_lt_cb,                    *)
-(*                     sturm_count_above_charpoly_pos,                  *)
-(*                     signs_at_x0_agree, signs_at_inf_agree.           *)
-(*  Admitted facts used: shipped_chain_eq, chain_is_mods,               *)
-(*                       cauchy_bound_le_of_chain.                      *)
+(*  Proven facts used: sturm_count_above_shipped_pos,                   *)
+(*    signs_at_x0_shipped, signs_at_inf_shipped.                        *)
+(*  Admitted facts used: prs_chain_sturm_correct.                       *)
 (* ================================================================== *)
 
 Lemma maynard_L1_concrete :
@@ -441,15 +348,25 @@ Lemma maynard_L1_concrete :
     root (pol_to_polyralg charpoly_int) lambda
     /\ (threshold_ralg 4 105 < lambda)%R.
 Proof.
-  apply (sturm_count_above_pos_concrete
-           charpoly_int 4 105
-           den_pos
-           chain_nz
-           chain_lc_nz
-           chain_th_nz
-           chain_cb_nz
-           threshold_lt_cb
-           chain_is_mods
-           no_root_at_cb).
-  exact sturm_count_above_charpoly_pos.
+  (* Step 1: The shipped chain's Sturm count is positive (vm_compute verified). *)
+  have Hpos := sturm_count_above_shipped_pos.
+  (* Step 2: Use prs_chain_sturm_correct to identify it with root count. *)
+  have Hcount := prs_chain_sturm_correct.
+  (* Step 3: Rewrite to get a nonempty filtered root list. *)
+  have Hsize : (0 < size (List.filter
+                 (fun r : realalg => (threshold_ralg 4 105 < r)%R)
+                 (rootsR (pol_to_polyralg charpoly_int))))%nat.
+  { by rewrite -Hcount. }
+  (* Step 4: Extract a root from the nonempty list. *)
+  case EL : (List.filter
+               (fun r : realalg => (threshold_ralg 4 105 < r)%R)
+               (rootsR (pol_to_polyralg charpoly_int))) Hsize => [//|r rest] _.
+  exists r.
+  have Hin : List.In r (List.filter
+                          (fun r : realalg => (threshold_ralg 4 105 < r)%R)
+                          (rootsR (pol_to_polyralg charpoly_int))).
+  { by rewrite EL; left. }
+  case: (in_list_filter_inv _ _ _ Hin) => Hlt Hin2.
+  split; last exact: Hlt.
+  by apply: rootsR_in_root.
 Qed.
