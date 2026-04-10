@@ -20,7 +20,7 @@ From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness.
+From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 UnitmxCheck.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
@@ -46,7 +46,15 @@ Definition A_rat : 'M[rat]_42 :=
    Will be discharged by a `vm_compute`-free integer determinant check
    when the real definition of A_rat lands. *)
 Lemma A_rat_unitmx : A_rat \in unitmx.
-Admitted.
+Proof.
+  rewrite /A_rat.
+  have [HM1 HM2] := A_rat_unitmx_from_check
+    M1_det_nonzero_mod M2_det_nonzero_mod
+    (D_M1 : BinInt.Z) (D_M2 : BinInt.Z)
+    ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate).
+  rewrite unitmx_mul unitmx_inv; apply/andP; split;
+    [exact HM1 | exact HM2].
+Qed.
 
 (* ------------------------------------------------------------------
    L1 — Sturm count of the chain shipped in WitnessChain.v equals
@@ -66,7 +74,7 @@ Lemma sturm_count_correct :
   exists lambda : realalg,
     root charpoly_as_poly_realalg lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Admitted.
+Proof. exact maynard_L1_concrete. Qed.
 
 (* ------------------------------------------------------------------
    L2 — the integer-cleared shipped polynomial equals `char_poly A_rat`
