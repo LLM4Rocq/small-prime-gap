@@ -19,6 +19,10 @@
 (*    - All 43 sign entries at inf are nonzero (+/-1)                   *)
 (*                                                                      *)
 (*  Now proven (Qed):                                                   *)
+(*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
+(*                         (via CRTSigns + shipped_chain_eq)            *)
+(*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
+(*                         (via CRTSigns + shipped_chain_eq)            *)
 (*    chain_lc_nz       — leading coefficients nonzero (realalg)        *)
 (*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
 (*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
@@ -26,8 +30,7 @@
 (*                         (derived from no_root_at_cb)                 *)
 (*                                                                      *)
 (*  Remaining admitted obligations (future work):                       *)
-(*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
-(*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
+(*    shipped_chain_eq  — shipped chain = computed chain (Z-level)      *)
 (*    no_root_at_cb     — no chain poly roots >= cauchy_bound           *)
 (*    chain_is_mods     — lifted chain = abstract mods (moved from      *)
 (*                         Bridge.v; strict equality unprovable there)  *)
@@ -41,6 +44,7 @@ From mathcomp.real_closed Require Import polyrcf qe_rcf_th realalg.
 Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly BrownTraub SignChain Witness Bridge.
+From PrimeGapS1 Require Import WitnessChain CRTSigns.
 
 Local Open Scope ring_scope.
 
@@ -99,33 +103,44 @@ Proof. vm_compute. reflexivity. Qed.
 (*  these agree with the Rocq-side `sign_at_rat` and `sign_at_pinf`    *)
 (*  computations on `BrownTraub.sturm_chain charpoly_int`.              *)
 (*                                                                      *)
-(*  This is a computational equality, but the chain polynomials have    *)
-(*  coefficients up to ~200 000 bits, making direct vm_compute          *)
-(*  intractable in Rocq. Future work: either (a) use native_compute    *)
-(*  with bignum support, or (b) verify the chain equality via a         *)
-(*  modular-arithmetic certificate.                                     *)
+(*  CRTSigns.v (or its future replacement) machine-verifies that the   *)
+(*  sign vectors agree with signs computed from the SHIPPED chain       *)
+(*  (WitnessChain.sturm_chain).  We bridge to the COMPUTED chain       *)
+(*  (BrownTraub.sturm_chain charpoly_int) via shipped_chain_eq.        *)
 (* ================================================================== *)
 
+(* The shipped chain data (WitnessChain.sturm_chain) equals the chain
+   computed by BrownTraub on charpoly_int.  This is a Z-level equality
+   that can be verified by CRT modular checking (cf. CRTCheck.v) once
+   the CRT-to-Z lifting argument is formalized.  Strictly weaker than
+   chain_is_mods (which operates on lifted polyralg values). *)
+Lemma shipped_chain_eq :
+  WitnessChain.sturm_chain = BrownTraub.sturm_chain charpoly_int.
+Proof.
+Admitted.
+
 (* The precomputed sign data matches the computed sign sequence at
-   the threshold 4/105. *)
+   the threshold 4/105.
+   Proof: CRTSigns proves signs match the shipped chain;
+   shipped_chain_eq bridges shipped -> computed. *)
 Lemma signs_at_x0_agree :
   signs_at_x0
   = List.map (fun p => sign_at_rat p 4 105)
              (BrownTraub.sturm_chain charpoly_int).
 Proof.
-  (* Computational equality on list Z, but the intermediate chain
-     polynomials have ~200 kbit coefficients. Intractable for
-     vm_compute; a modular-arithmetic certificate or segmented
-     native_compute can close this. *)
-Admitted.
+  rewrite <- shipped_chain_eq.
+  exact signs_at_x0_shipped.
+Qed.
 
-(* The precomputed sign data matches sign_at_pinf on the chain. *)
+(* The precomputed sign data matches sign_at_pinf on the chain.
+   Same strategy: CRTSigns + shipped_chain_eq. *)
 Lemma signs_at_inf_agree :
   signs_at_inf
   = List.map sign_at_pinf (BrownTraub.sturm_chain charpoly_int).
 Proof.
-  (* Same computational issue as signs_at_x0_agree. *)
-Admitted.
+  rewrite <- shipped_chain_eq.
+  exact signs_at_inf_shipped.
+Qed.
 
 (* Combining the sign agreements with the verified variation counts
    gives us the sturm_count_above positivity on the actual chain. *)
@@ -317,9 +332,9 @@ Qed.
 (*                                                                      *)
 (*  Proven facts used: den_pos, chain_nz, chain_lc_nz, chain_th_nz,    *)
 (*                     chain_cb_nz, threshold_lt_cb,                    *)
-(*                     sturm_count_above_charpoly_pos.                  *)
-(*  Admitted facts used: no_root_at_cb, chain_is_mods,                  *)
-(*                       signs_at_x0_agree, signs_at_inf_agree.         *)
+(*                     sturm_count_above_charpoly_pos,                  *)
+(*                     signs_at_x0_agree, signs_at_inf_agree.           *)
+(*  Admitted facts used: shipped_chain_eq, no_root_at_cb, chain_is_mods.*)
 (* ================================================================== *)
 
 Lemma maynard_L1_concrete :

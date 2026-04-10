@@ -14,6 +14,7 @@ theories/S1/Bridge.v
 theories/S1/IntMatProof.v
 theories/S1/CharPolyHelpers.v
 theories/S1/CharPolyL2.v
+theories/S1/CRTSigns.v
 theories/S1/CertL1.v
 theories/S1/PRSCheck.v
 theories/S1/PrimPoly.v
