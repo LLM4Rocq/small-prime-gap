@@ -129,39 +129,75 @@ Lemma pol_to_polyralg_pzero :
   pol_to_polyralg pzero = 0 :> {poly realalg}.
 Proof. by rewrite /pol_to_polyralg /pzero /pol_to_polyrat /= rmorph0. Qed.
 
-(* Lifting commutes with negation.  Left admitted because
-   `pol_to_polyralg_cons` (the structural unfolding) is defined later
-   in this file; we would need to forward-reference it.  The proof is
-   a straightforward induction on `p` using `pol_to_polyralg_cons`
-   once both lemmas are in scope. *)
+(* Lifting commutes with negation.  Proof by induction on `p`,
+   unfolding the raw `pol_to_polyrat` / `cons_poly_def` / `map_poly`
+   definitions directly (since `pol_to_polyralg_cons` is defined later). *)
 Lemma pol_to_polyralg_pneg (p : pol) :
   pol_to_polyralg (pneg p) = - pol_to_polyralg p.
 Proof.
-Admitted.
-(* Proof obligation: induction on `p` using the cons-lemma for
-   `pol_to_polyralg` and the fact that integer negation lifts through
-   `Z_to_int` to mathcomp's `int` negation. *)
+elim: p => [|x p IH].
+- by rewrite /pneg /= /pol_to_polyralg /pol_to_polyrat /= rmorph0 oppr0.
+- rewrite /pneg -/pneg /=.
+  rewrite /pol_to_polyralg /pol_to_polyrat /=.
+  fold (pol_to_polyrat p).
+  fold (pol_to_polyrat (pneg p)).
+  fold (pol_to_polyralg p).
+  fold (pol_to_polyralg (pneg p)).
+  rewrite !cons_poly_def.
+  rewrite !rmorphD !rmorphM /= !map_polyX !map_polyC.
+  change (map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr
+    (Poly (ListDef.map (fun z : Z => (Z_to_int z)%:~R) (ListDef.map Z.opp p))))
+    with (pol_to_polyralg (pneg p)).
+  change (map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr
+    (pol_to_polyrat p)) with (pol_to_polyralg p).
+  rewrite IH.
+  rewrite opprD mulNr.
+  congr (_ + _).
+  rewrite -polyCN.
+  congr (_%:P).
+  rewrite -rmorphN.
+  congr (ratr _).
+  case: x => [|q|q] /=.
+  + by rewrite oppr0.
+  + rewrite NegzE.
+    have Hq := Pos2Nat.is_pos q.
+    by case Hn : (Pos.to_nat q) => [|n]; [lia| rewrite subn1 /=].
+  + rewrite NegzE.
+    have Hq := Pos2Nat.is_pos q.
+    by case Hn : (Pos.to_nat q) => [|n]; [lia| rewrite subn1 /= opprK].
+Qed.
 
-(* Lifting is invariant under `pnorm`.  Since `pnorm` only strips
-   trailing zero coefficients (which contribute 0 to the lifted
-   polynomial anyway), the lifted polynomial is unchanged.
-
-   The proof goes via `drop_leading_zeros` applied to the reverse of
-   the list; we state and prove the helper on the reversed list first.
-
-   NOTE: this is a structural fact about `{poly realalg}` on lists whose
-   last element is zero, and is left admitted for brevity.  It is NOT
-   part of the S1 chain used by `Cert.maynard_eigenvalue_S1`. *)
+(* Lifting is invariant under `pnorm`.  Proof: `pnorm` strips trailing
+   zeros via `rev (drop_leading_zeros (rev p))`.  We show that
+   `drop_leading_zeros` only removes entries that map to 0 under
+   `Z_to_int`, and `Poly` already normalises by stripping trailing
+   zeros, so both sides yield the same `{poly rat}` and hence the
+   same `{poly realalg}` after `map_poly ratr`. *)
 Lemma pol_to_polyralg_pnorm (p : pol) :
   pol_to_polyralg (pnorm p) = pol_to_polyralg p.
 Proof.
-Admitted.
-(* Proof obligation: show that stripping a trailing `0` coefficient off
-   a `pol` does not change `pol_to_polyralg`.  This reduces to the
-   mathcomp fact that `cons_poly 0 q = q * 'X`, i.e. a polynomial
-   whose top coefficient is 0 is the same as the polynomial with that
-   top coefficient dropped (given `size`-normalisation).  Combined
-   with induction on `rev p` this gives the lemma. *)
+rewrite /pol_to_polyralg /pol_to_polyrat /pnorm.
+set f := (fun z : Z => (Z_to_int z)%:~R : rat).
+have Hdlz : forall l : list Z,
+  Poly (List.map f (List.rev (drop_leading_zeros l)))
+  = Poly (List.map f (List.rev l)) :> {poly rat}.
+{ move=> l.
+  elim: l => [//|a l IH] /=.
+  case Ha : (Z.eqb a 0); last by [].
+  move/Z.eqb_eq in Ha; subst a.
+  rewrite IH.
+  have Hf0 : f BinInt.Z0 = 0
+    by rewrite /f /Z_to_int /=; exact: mulr0z.
+  rewrite List.map_app /= Hf0.
+  apply/polyP => j.
+  rewrite !coef_Poly nth_cat size_map.
+  case: (ltnP j (size (List.rev l))) => Hj; first by [].
+  have -> : [:: (0 : rat)]`_(j - size (List.rev l)) = 0.
+  { by case: (j - size (List.rev l))%N => [//|k] /=;
+       rewrite nth_nil. }
+  by rewrite nth_default //; rewrite size_map. }
+by rewrite (Hdlz (List.rev p)) List.rev_involutive.
+Qed.
 
 (* ------------------------------------------------------------------ *)
 (*  Base cases of the `mods` / `mods_int` recursion.                    *)
@@ -239,33 +275,49 @@ case E : (pnorm p) => [|x xs].
   { rewrite -(pol_to_polyralg_pnorm p) E.
     by rewrite /pol_to_polyralg /pol_to_polyrat /= rmorph0. }
   by rewrite /= Hp eqxx.
-- (* pnorm p = x :: xs -> we need pol_to_polyralg p != 0. *)
-  rewrite /=.
-  have Hp : pol_to_polyralg p = pol_to_polyralg (pnorm p).
-  { by rewrite pol_to_polyralg_pnorm. }
-  rewrite Hp E.
-  (* Goal: [:: pol_to_polyralg (x :: xs)]
-         = (if pol_to_polyralg (x :: xs) == 0 then [::]
-            else [:: pol_to_polyralg (x :: xs)]) *)
-  (* We need `pol_to_polyralg (x :: xs) != 0`, but this is precisely
-     the structural content of `pnorm`: a pnorm-normalised nonempty
-     list has nonzero lifted polynomial.  We leave this as a local
-     side-admit since it is not used elsewhere in the L1 chain. *)
-  case Hnz : (pol_to_polyralg (x :: xs) == 0); last by [].
-  (* In the degenerate `Hnz = true` branch, we would need to derive
-     a contradiction from the fact that `x :: xs` is a pnorm output
-     (so its last element is nonzero).  Since we cannot close this
-     without the structural admit above, we leave the lemma conditional. *)
-  exfalso.
-  (* The `Hnz` branch is unreachable given that `x :: xs = pnorm p`
-     with a nonzero trailing coefficient, but establishing that needs
-     the same structural admit as `pol_to_polyralg_pnorm` — so we
-     close this via an `admit` tied to the same obligation. *)
-Admitted.
-(* Proof obligation: a pnorm-normalised nonempty `list Z` lifts to a
-   nonzero `{poly realalg}` (because its trailing coefficient is
-   nonzero by construction of `pnorm`, and that coefficient is the
-   leading coefficient of the lifted polynomial). *)
+- (* pnorm p = x :: xs -> pol_to_polyralg p != 0. *)
+  rewrite /= -(pol_to_polyralg_pnorm p) E.
+  suff -> : (pol_to_polyralg (x :: xs) == 0) = false by [].
+  apply/negP => /eqP Habs.
+  (* 1. Last element of pnorm p = x :: xs is nonzero. *)
+  have HE2 : last x xs <> BinInt.Z0.
+  { have Hlnz : forall l a bs,
+      List.rev (drop_leading_zeros l) = a :: bs ->
+      last a bs <> BinInt.Z0.
+    { move=> l; elim: l => [//|b l' IHl] a bs /=.
+      case Hb : (Z.eqb b 0); first exact: IHl.
+      move/Z.eqb_neq in Hb.
+      (* List.rev (b :: l') = (List.rev l' ++ [:: b])%list *)
+      move=> Heq.
+      suff : last a bs = b by move=> ->.
+      move: Heq; rewrite /=.
+      case Hl : (List.rev l') => [|h t].
+      - by move=> [<- <-] /=.
+      - by move=> [<- Hbs]; rewrite -Hbs last_cat. }
+    have HE3 : List.rev (drop_leading_zeros (List.rev p))
+             = x :: xs by rewrite -E.
+    exact: Hlnz _ _ _ HE3. }
+  (* 2. The rat coefficient list has nonzero last element. *)
+  set fq := (fun z : Z => (Z_to_int z)%:~R : rat).
+  have Hmap_last_nz : last 0 (List.map fq (x :: xs)) != 0.
+  { have Hml : last 0 (List.map fq (x :: xs))
+             = (Z_to_int (last x xs))%:~R.
+    { clear -fq; elim: xs x => [//|y ys IH] x' /=; exact: IH. }
+    rewrite Hml intr_eq0; apply/eqP => H0; apply: HE2.
+    case: (last x xs) H0 => [//|q|q]; rewrite /Z_to_int /=.
+    - by move=> H; exfalso; have := Pos2Nat.is_pos q;
+         case: (Pos.to_nat q) H => [|n] //= _;
+         exact: (PeanoNat.Nat.lt_irrefl 0).
+    - by case: (Pos.to_nat q) (Pos2Nat.is_pos q) => [|n] //=. }
+  (* 3. The rat polynomial is nonzero (last coef is nonzero). *)
+  have Hrat_nz : Poly (List.map fq (x :: xs)) != 0.
+  { apply/eqP => Habs2; have := PolyK Hmap_last_nz.
+    by rewrite Habs2 polyseq0. }
+  (* 4. map_poly ratr preserves nonzero. *)
+  have : pol_to_polyralg (x :: xs) != 0
+    by rewrite /pol_to_polyralg /pol_to_polyrat map_poly_eq0.
+  by rewrite Habs eqxx.
+Qed.
 
 (* When `p = pzero`, both sides likewise collapse.  On the mathcomp
    side, `mods 0 q = [::]` unconditionally, so this case is an
