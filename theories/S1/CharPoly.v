@@ -426,20 +426,27 @@ Proof. Admitted.
 (* ------------------------------------------------------------------
    L2 (PLAN_S1.md §3) — the load-bearing correctness lemma.
 
-   Signature updated so that `char_poly_int` now takes only a matrix.
-   The denominator `D` appears solely in the lifted statement, matching
-   the scaling convention that will be tightened up in a later sprint.
-   Proof is non-trivial (Newton's identities) and is deferred.
+   `char_poly_int M` computes `det(λI − M)` for an integer matrix M.
+   `mat_int_to_rat M 1 n` lifts M to `'M[rat]_n` with denominator 1
+   (i.e., each entry is just `Z_to_int M[i][j] : rat`).
+
+   With D = 1, the two sides agree directly:
+     pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n)
+
+   For D ≠ 1, the equation does NOT hold without a D^n scaling factor
+   (the coefficients of char_poly(M/D) involve negative powers of D).
+   The correct general form would be:
+     coef i of pol_to_polyrat (char_poly_int M)
+       = coef i of char_poly (mat_int_to_rat M D n) * D^(n-i)
+   but this is not needed by the project: Cert.v's L2 bridge uses
+   `charpoly_int` (a pre-computed certificate from Witness.v, NOT
+   derived from `char_poly_int`), so this lemma is only useful for
+   cross-validation with D = 1.
    ------------------------------------------------------------------ *)
 Lemma char_poly_int_correct
-  (M : mat) (D : Z) (n : nat)
-  (sq : mat_dim M = n)
-  (Dnz : D <> Z0) :
-  (* Intended precise form:
-        pol_to_polyrat (char_poly_int M)
-      = (D%:~R) ^+ n *: char_poly (mat_int_to_rat M D n)
-     Left in the equational shape used by Cert.v's architecture. *)
-  pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M D n).
+  (M : mat) (n : nat)
+  (sq : mat_dim M = n) :
+  pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n).
 Admitted.
 
 (* ==================================================================
