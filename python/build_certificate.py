@@ -121,29 +121,106 @@ def G_n_2(n: int, k: int) -> Fraction:
         out += bcoef * inner
     return out
 
-# Spot checks of M1.
-checks = [
-    ((0, 0), Fraction(1, math.factorial(105))),                         # F=1
-    ((0, 1), Fraction(1, math.factorial(106))),                         # F·F = x
-    ((0, 2), Fraction(G_n_2(1, 105), math.factorial(107))),             # F·F = y, G_{1,2}=2k=210
-    ((1, 1), Fraction(math.factorial(2), math.factorial(107))),         # F·F = x^2
-]
-for (i, j), expected in checks:
-    actual = M1_rat[i][j]
-    assert actual == expected, f"M1[{i}][{j}] mismatch: {actual} != {expected}"
-print(f"  ✓ {len(checks)} M1 entries match closed-form integrals")
+# --- Closed-form M1 entry: M1[i,j] = (b! / (K+b+2c)!) * G_{c,2}(K) ---
+# where b = b_i+b_j, c = c_i+c_j.
+def closed_form_M1(i, j):
+    b = Xexp[i] + Xexp[j]
+    c = Yexp[i] + Yexp[j]
+    return Fraction(math.factorial(b), math.factorial(K + b + 2 * c)) * G_n_2(c, K)
 
-# Spot check M2[0][0]: F=1, J_K(1) = ∫_{Δ_{K-1}} (1-Σ' t)^2 dt' = 2/(K+1)!
-assert M2_rat[0][0] == Fraction(2, math.factorial(106)), \
-    f"M2[0][0]: {M2_rat[0][0]} != 2/106!"
-print("  ✓ M2[0][0] = 2/106! matches closed form")
+# Precompute G_n_2 values we need (c ranges up to 2*max(Yexp) = 2*5 = 10 for diag,
+# up to sum of any two Yexp for off-diag).
+_max_y = max(Yexp)
+_G_cache = {n: G_n_2(n, K) for n in range(2 * _max_y + 1)}
 
-# Symmetry.
+def closed_form_M1_fast(i, j):
+    b = Xexp[i] + Xexp[j]
+    c = Yexp[i] + Yexp[j]
+    return Fraction(math.factorial(b), math.factorial(K + b + 2 * c)) * _G_cache[c]
+
+# (a) Check ALL 42 M1 diagonal entries.
+for i in range(DIM):
+    expected = closed_form_M1_fast(i, i)
+    actual = M1_rat[i][i]
+    assert actual == expected, f"M1[{i}][{i}] diagonal mismatch"
+print(f"  ✓ all {DIM} M1 diagonal entries match closed-form integrals")
+
+# (b) Check ALL M1 entries exhaustively (both upper and lower triangle).
+m1_entry_checks = 0
+for i in range(DIM):
+    for j in range(DIM):
+        expected = closed_form_M1_fast(i, j)
+        actual = M1_rat[i][j]
+        assert actual == expected, f"M1[{i}][{j}] mismatch"
+        m1_entry_checks += 1
+print(f"  ✓ all {m1_entry_checks} M1 entries ({DIM}×{DIM}) match closed-form integrals")
+
+# --- Closed-form M2 entry via eq 7.8 transform + const_gram at K-1 ---
+# Each monomial x^b y^c is transformed by integrating out t_1:
+#   -> sum_{cp=0..c} C(c,cp) * b!(2c-2cp)! / (b+2c-2cp+1)! * x'^{b+2c-2cp+1} * y'^{cp}
+# Then M2[i,j] = sum over transformed terms of const_gram at K-1.
+def _binom(n, k):
+    return Fraction(math.comb(n, k))
+
+# G_{n,2}(K-1) cache for M2.
+_G_cache_Km1 = {n: G_n_2(n, K - 1) for n in range(24)}
+
+def _transform_monomial(b, c):
+    """Apply eq 7.8 to monomial x^b y^c, return list of (b', c', coeff)."""
+    terms = []
+    for cp in range(c + 1):
+        bp = b + 2 * c - 2 * cp + 1
+        co = _binom(c, cp) * Fraction(
+            math.factorial(b) * math.factorial(2 * c - 2 * cp),
+            math.factorial(b + 2 * c - 2 * cp + 1))
+        terms.append((bp, cp, co))
+    return terms
+
+# Pre-transform all basis monomials.
+_transformed = [_transform_monomial(Xexp[i], Yexp[i]) for i in range(DIM)]
+
+def closed_form_M2(i, j):
+    """M2[i,j] via eq 7.8 transform + const_gram at K-1."""
+    s = Fraction(0)
+    for (b1, c1, co1) in _transformed[i]:
+        for (b2, c2, co2) in _transformed[j]:
+            bsum = b1 + b2
+            csum = c1 + c2
+            s += co1 * co2 * Fraction(
+                math.factorial(bsum),
+                math.factorial((K - 1) + bsum + 2 * csum)) * _G_cache_Km1[csum]
+    return s
+
+# (c) Check ALL 42 M2 diagonal entries.
+for i in range(DIM):
+    expected = closed_form_M2(i, i)
+    actual = M2_rat[i][i]
+    assert actual == expected, f"M2[{i}][{i}] diagonal mismatch"
+print(f"  ✓ all {DIM} M2 diagonal entries match closed-form integrals")
+
+# (d) Check ALL M2 entries exhaustively.
+m2_entry_checks = 0
+for i in range(DIM):
+    for j in range(DIM):
+        expected = closed_form_M2(i, j)
+        actual = M2_rat[i][j]
+        assert actual == expected, f"M2[{i}][{j}] mismatch"
+        m2_entry_checks += 1
+print(f"  ✓ all {m2_entry_checks} M2 entries ({DIM}×{DIM}) match closed-form integrals")
+
+# (e) Symmetry (kept for explicitness).
 for i in range(DIM):
     for j in range(i + 1, DIM):
         assert M1_rat[i][j] == M1_rat[j][i], (i, j)
         assert M2_rat[i][j] == M2_rat[j][i], (i, j)
 print("  ✓ M1 and M2 symmetric")
+
+# Total coverage report.
+total_entries = 2 * DIM * DIM  # M1 + M2
+sym_pairs = 2 * DIM * (DIM - 1) // 2  # symmetry pairs checked
+print(f"  Total: {m1_entry_checks + m2_entry_checks} of {total_entries} matrix entries "
+      f"verified against independent closed-form formulas")
+print(f"         + {sym_pairs} symmetry pairs checked")
 
 # ----------------------------------------------------------------------
 # 3. Integer-clear M1, M2.
