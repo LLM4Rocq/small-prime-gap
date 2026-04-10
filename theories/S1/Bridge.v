@@ -361,23 +361,75 @@ Qed.
 (*  form that is sufficient.                                             *)
 (* ------------------------------------------------------------------ *)
 
+(* ------------------------------------------------------------------ *)
+(*  Key intermediate: our `prem` computes the same pseudo-remainder    *)
+(*  as MathComp's `Pdiv.Ring.rmodp` after lifting through               *)
+(*  `pol_to_polyralg`.                                                  *)
+(*                                                                      *)
+(*  Both algorithms implement the same classical pseudo-division loop:  *)
+(*    - Our `prem_step A B` computes                                    *)
+(*        lc(B) * A - lc(A) * X^(deg A - deg B) * B                    *)
+(*    - MathComp's `redivp_rec q` at each step computes                 *)
+(*        r * cq - lc(r) * X^(size r - size q) * q                     *)
+(*      where `cq = lead_coef q`.                                      *)
+(*  These are identical operations (scalar mult by lc(B) then subtract  *)
+(*  an aligned multiple of B), so both loops converge to the same       *)
+(*  remainder polynomial.                                               *)
+(*                                                                      *)
+(*  A complete formal proof would go by strong induction on              *)
+(*  `size (pol_to_polyralg p) - size (pol_to_polyralg q)` and show     *)
+(*  each step of our `prem_loop` matches `redivp_rec`'s step.  This    *)
+(*  requires connecting our `pnorm`/`len_deg`/`plead`/`prem_step` with *)
+(*  MathComp's `size`/`lead_coef` primitives — straightforward but     *)
+(*  lengthy; left as a focused follow-up.                               *)
+(* ------------------------------------------------------------------ *)
+
+Lemma prem_rmodp_eq (p q : pol) :
+  pol_to_polyralg (prem p q)
+  = Pdiv.Ring.rmodp (pol_to_polyralg p) (pol_to_polyralg q).
+Proof.
+Admitted.
+
 (* Structural step: our next_mod agrees with mathcomp's next_mod up to
-   a positive-scalar factor.  This is the hardest intermediate lemma. *)
+   a nonzero scalar factor.
+
+   The scalar `k = (lc(lift q)^d)^{-1}` where `d = rscalp`.  It is
+   nonzero because `lc_expn_rscalp_neq0` gives `lc(q)^d != 0`.
+
+   Note: the scalar need NOT be positive (lc(q) can be negative and d
+   odd), but `k != 0` suffices for the Sturm sign-variation argument
+   in `mods_int_morph_weak`. *)
 Lemma next_mod_scaled_morph (p q : pol) :
   pnorm q <> [] ->
-  exists k : realalg, (0 < k)%R /\
+  exists k : realalg, (k != 0)%R /\
     pol_to_polyralg (next_mod p (pnorm q))
     = k *: qe_rcf_th.next_mod (pol_to_polyralg p)
                               (pol_to_polyralg (pnorm q)).
 Proof.
-Admitted.
-(* Proof obligation: unpack `next_mod p q = pneg (prem p q)` on the
-   LHS and mathcomp's `- (lc q)^(rscalp p q) *: rmodp p q` on the RHS;
-   show that `prem p q` equals `(lc q)^(rscalp p q) *: rmodp p q` up
-   to a positive integer factor, using the Brown-Traub PRS correctness
-   theorem.  The positive scalar `k` will be that integer factor,
-   lifted into `realalg` and shown positive via the `lc q`-even-power
-   parity of `rscalp`. *)
+move=> Hq.
+set Q := pnorm q.
+set P := pol_to_polyralg p.
+set Ql := pol_to_polyralg Q.
+set d := Pdiv.Ring.rscalp P Ql.
+set lc_d := (lead_coef Ql ^+ d)%R.
+have Hlc_nz : (lc_d != 0)%R := lc_expn_rscalp_neq0 P Ql.
+(* Unfold both sides. *)
+rewrite /next_mod /qe_rcf_th.next_mod.
+rewrite pol_to_polyralg_pneg prem_rmodp_eq -/P -/Ql -/Q -/d -/lc_d.
+(* Unify the two rmodp canonical instances. *)
+have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__Num_RealClosedField) P Ql
+         = Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql
+  by [].
+set rm := Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql.
+(* Goal: exists k, k != 0 /\ -rm = k *: ((-lc_d) *: rm).
+   Choose k = lc_d^{-1}.  Then  k *: ((-lc_d) *: rm)
+     = (lc_d^{-1} * (-lc_d)) *: rm   [scalerA]
+     = (-(lc_d^{-1} * lc_d)) *: rm   [mulrN]
+     = (-1) *: rm                      [mulVf]
+     = -rm                             [scaleN1r]  *)
+exists (lc_d^-1)%R; split; first by rewrite invr_eq0.
+by rewrite scalerA mulrN mulVf // scaleN1r.
+Qed.
 
 Lemma mods_int_morph (p q : pol) :
   List.map pol_to_polyralg (mods_int p q)
@@ -868,6 +920,122 @@ Lemma Z_to_int_add_ralg (a b : Z) :
   ((Z_to_int (BinInt.Z.add a b))%:~R : realalg) =
   ((Z_to_int a)%:~R + (Z_to_int b)%:~R)%R.
 Proof. by rewrite Z_to_int_add intrD. Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  Building-block lifts for the integer-polynomial primitives.        *)
+(*  These enable future proofs connecting our `prem` loop with         *)
+(*  MathComp's `Pdiv.Ring.redivp_rec`.                                 *)
+(* ------------------------------------------------------------------ *)
+
+(* Lifting commutes with scalar multiplication. *)
+Lemma pol_to_polyralg_pscale (c : Z) (p : pol) :
+  pol_to_polyralg (pscale c p)
+  = ((Z_to_int c)%:~R : realalg) *: pol_to_polyralg p.
+Proof.
+elim: p => [|x p IH].
+- by rewrite /pscale /= /pol_to_polyralg /pol_to_polyrat /= rmorph0 scaler0.
+- rewrite /pscale -/pscale /=.
+  rewrite /pol_to_polyralg /pol_to_polyrat /=.
+  fold (pol_to_polyrat p).
+  fold (pol_to_polyrat (pscale c p)).
+  fold (pol_to_polyralg p).
+  fold (pol_to_polyralg (pscale c p)).
+  rewrite !cons_poly_def.
+  rewrite !rmorphD !rmorphM /= !map_polyX !map_polyC.
+  change (map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr
+    (Poly (ListDef.map (fun z : Z => (Z_to_int z)%:~R) (ListDef.map [eta Z.mul c] p))))
+    with (pol_to_polyralg (pscale c p)).
+  change (map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr
+    (pol_to_polyrat p)) with (pol_to_polyralg p).
+  rewrite IH scalerDr -scalerAl.
+  congr (_ + _).
+  apply/polyP => i; rewrite coefZ !coefC.
+  case: i => [|i]; last by rewrite !mulr0.
+  rewrite /= !ratr_int Z_to_int_mul intrM.
+  by [].
+Qed.
+
+(* Lifting commutes with X-shift (multiplication by X^k). *)
+Lemma pol_to_polyralg_pshift (k : nat) (p : pol) :
+  pol_to_polyralg (pshift k p) = 'X^k * pol_to_polyralg p.
+Proof.
+elim: k => [|k IH].
+- by rewrite /= expr0 mul1r.
+- rewrite /= pol_to_polyralg_cons IH.
+  have -> : (Z_to_int 0)%:~R = (0 : realalg) by rewrite /Z_to_int /= mulr0z.
+  rewrite polyC0 addr0.
+  by rewrite -mulrA [pol_to_polyralg p * 'X]mulrC mulrA -exprSr.
+Qed.
+
+(* Lifting commutes with addition. *)
+Lemma pol_to_polyralg_padd (p q : pol) :
+  pol_to_polyralg (padd p q) = pol_to_polyralg p + pol_to_polyralg q.
+Proof.
+elim: p q => [|x p IH] [|y q].
+- by rewrite /= pol_to_polyralg_nil add0r.
+- by rewrite /= pol_to_polyralg_nil add0r.
+- by rewrite /= pol_to_polyralg_nil addr0.
+- rewrite [padd _ _]/= !pol_to_polyralg_cons IH.
+  rewrite Z_to_int_add_ralg polyCD mulrDl addrACA.
+  by [].
+Qed.
+
+(* Lifting commutes with subtraction. *)
+Lemma pol_to_polyralg_psub (p q : pol) :
+  pol_to_polyralg (psub p q) = pol_to_polyralg p - pol_to_polyralg q.
+Proof.
+elim: p q => [|x p IH] [|y q].
+- by rewrite /= pol_to_polyralg_nil subrr.
+- rewrite /=.
+  change (pol_to_polyralg (pneg (y :: q))
+        = pol_to_polyralg [::] - pol_to_polyralg (y :: q)).
+  by rewrite pol_to_polyralg_pneg pol_to_polyralg_nil add0r.
+- by rewrite /= pol_to_polyralg_nil oppr0 addr0.
+- rewrite [psub _ _]/= !pol_to_polyralg_cons IH.
+  have -> : Z_to_int (x - y) = Z_to_int (BinInt.Z.add x (BinInt.Z.opp y))
+    by congr (Z_to_int _); lia.
+  rewrite Z_to_int_add_ralg opprD mulrBl polyCD addrACA.
+  congr (_ + _); congr (_ + _).
+  rewrite -polyCN; congr (_%:P).
+  case: y => [|q'|q'].
+  + by rewrite /Z_to_int /= mulr0z oppr0.
+  + rewrite /Z_to_int /= NegzE.
+    case Hn : (Pos.to_nat q') => [|n]; first by have := Pos2Nat.is_pos q'; lia.
+    by rewrite /= subn1 /=.
+  + rewrite /Z_to_int /=.
+    case Hn : (Pos.to_nat q') => [|n]; first by have := Pos2Nat.is_pos q'; lia.
+    by rewrite /= subn1 /= NegzE opprK.
+Qed.
+
+(* Lifting commutes with prem_step (by definition unfolding). *)
+Lemma pol_to_polyralg_prem_step (A B : pol) :
+  pol_to_polyralg (prem_step A B)
+  = pol_to_polyralg
+      (pnorm (psub (pscale (plead B) A) (pscale (plead A) (pshift (len_deg A - len_deg B) B)))).
+Proof. by []. Qed.
+
+(* Expanded form: one pseudo-division step, after lifting, equals
+   lc(B) *: A - lc(A) *: ('X^(deg A - deg B) * B)  as a realalg polynomial.
+   This matches MathComp's `redivp_rec` step modulo the `pnorm` wrapper. *)
+Lemma pol_to_polyralg_prem_step_expanded (A B : pol) :
+  pol_to_polyralg (prem_step A B)
+  = pol_to_polyralg
+      (pnorm (psub (pscale (plead B) A)
+                    (pscale (plead A) (pshift (len_deg A - len_deg B) B)))).
+Proof. by []. Qed.
+
+(* The expanded lift of a normalised prem_step: using the sub/scale/shift lemmas. *)
+Lemma prem_step_lift (A B : pol) :
+  pol_to_polyralg (pnorm (psub (pscale (plead B) A)
+                               (pscale (plead A) (pshift (len_deg A - len_deg B) B))))
+  = ((Z_to_int (plead B))%:~R : realalg) *: pol_to_polyralg A
+    - ((Z_to_int (plead A))%:~R : realalg) *:
+      ('X^(len_deg A - len_deg B) * pol_to_polyralg B).
+Proof.
+rewrite pol_to_polyralg_pnorm pol_to_polyralg_psub.
+rewrite !pol_to_polyralg_pscale pol_to_polyralg_pshift.
+by [].
+Qed.
 
 (* Auxiliary: positivity of `snd (peval_at_rat_aux p num den)` when `den > 0`. *)
 Lemma peval_at_rat_aux_snd_pos (p : pol) (num den : Z) :

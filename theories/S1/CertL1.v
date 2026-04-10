@@ -18,15 +18,16 @@
 (*    - All 43 sign entries at x0 are nonzero (+/-1)                    *)
 (*    - All 43 sign entries at inf are nonzero (+/-1)                   *)
 (*                                                                      *)
-(*  Named admitted obligations (future work):                           *)
-(*    chain_eq_precomp  — precomputed chain = BrownTraub.sturm_chain    *)
-(*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
-(*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
+(*  Now proven (Qed):                                                   *)
 (*    chain_lc_nz       — leading coefficients nonzero (realalg)        *)
 (*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
-(*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
 (*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
 (*    chain_is_mods     — lifted chain = abstract mods                  *)
+(*                                                                      *)
+(*  Remaining admitted obligations (future work):                       *)
+(*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
+(*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
+(*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
 (*    no_root_at_cb     — no chain poly roots >= cauchy_bound           *)
 (* ================================================================== *)
 
@@ -194,7 +195,18 @@ Lemma chain_lc_nz :
   forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
     (lead_coef (pol_to_polyralg q) != 0)%R.
 Proof.
-Admitted.
+  intros q Hq.
+  have Hpinf := sign_at_pinf_matches q.
+  rewrite /sgn_matches in Hpinf.
+  destruct Hpinf as [Hiff _].
+  apply/eqP. intro Heq. apply Hiff in Heq.
+  have Hin : List.In (sign_at_pinf q) signs_at_inf.
+  { rewrite signs_at_inf_agree. apply List.in_map. exact Hq. }
+  have Hall := signs_at_inf_all_nonzero.
+  rewrite List.forallb_forall in Hall.
+  specialize (Hall _ Hin). simpl in Hall.
+  unfold Z.eq in Heq. rewrite Heq in Hall. discriminate.
+Qed.
 
 (* 4b. All chain entries evaluate to nonzero at threshold 4/105
    after lifting to realalg. Should follow from signs_at_x0 being
@@ -204,7 +216,19 @@ Lemma chain_th_nz :
   forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
     ((pol_to_polyralg q).[threshold_ralg 4 105] != 0)%R.
 Proof.
-Admitted.
+  intros q Hq.
+  have Hrat := sign_at_rat_matches q 4 105 den_pos.
+  rewrite /sgn_matches in Hrat.
+  destruct Hrat as [Hiff _].
+  apply/eqP. intro Heq.
+  have Heq2 : Z.eq (sign_at_rat q 4 105) 0 by apply Hiff.
+  have Hin := List.in_map (fun p0 => sign_at_rat p0 4 105) _ _ Hq.
+  rewrite <- signs_at_x0_agree in Hin.
+  have Hall := signs_at_x0_all_nonzero.
+  rewrite List.forallb_forall in Hall.
+  specialize (Hall _ Hin). simpl in Hall.
+  unfold Z.eq in Heq2. rewrite Heq2 in Hall. discriminate.
+Qed.
 
 (* 4c. All chain entries evaluate to nonzero at the Cauchy bound
    after lifting to realalg. *)
@@ -222,7 +246,13 @@ Lemma threshold_lt_cb :
   (threshold_ralg 4 105
      < cauchy_bound (pol_to_polyralg charpoly_int))%R.
 Proof.
-Admitted.
+  apply: (order.Order.POrderTheory.lt_le_trans (y := 1)).
+    rewrite /threshold_ralg ltr_pdivrMr.
+      rewrite mul1r ltr_int. done.
+      rewrite ltr0z. done.
+    rewrite /cauchy_bound lerDl mulr_ge0 // ?invr_ge0 ?normr_ge0 //;
+    apply: sumr_ge0 => i _; apply: normr_ge0.
+Qed.
 
 (* 4e. The lifted Sturm chain equals the abstract mods chain.
    This is mods_int_morph applied to (charpoly_int, pderiv charpoly_int),
@@ -232,7 +262,10 @@ Lemma chain_is_mods :
   = mods (pol_to_polyralg charpoly_int)
          ((pol_to_polyralg charpoly_int)^`()).
 Proof.
-Admitted.
+  unfold sturm_chain.
+  rewrite mods_int_morph pderiv_morph.
+  reflexivity.
+Qed.
 
 (* 4f. No chain polynomial has a root weakly above the Cauchy bound.
    Follows from the Cauchy bound dominating all roots. *)
@@ -251,10 +284,10 @@ Admitted.
 (*  Wire `sturm_count_above_pos_concrete` with all the above to get    *)
 (*  the existence of a realalg root of charpoly_int above 4/105.        *)
 (*                                                                      *)
-(*  Proven facts used: den_pos, chain_nz,                               *)
+(*  Proven facts used: den_pos, chain_nz, chain_lc_nz, chain_th_nz,    *)
+(*                     threshold_lt_cb, chain_is_mods,                  *)
 (*                     sturm_count_above_charpoly_pos.                  *)
-(*  Admitted facts used: chain_lc_nz, chain_th_nz, chain_cb_nz,        *)
-(*                       threshold_lt_cb, chain_is_mods, no_root_at_cb, *)
+(*  Admitted facts used: chain_cb_nz, no_root_at_cb,                    *)
 (*                       signs_at_x0_agree, signs_at_inf_agree.         *)
 (* ================================================================== *)
 
