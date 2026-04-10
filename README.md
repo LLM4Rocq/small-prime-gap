@@ -58,7 +58,7 @@ prime_gap/
 ├── research_charpoly.md            MathComp char_poly research scout report
 ├── math_eigenvalue_target.md       precise S1 theorem statement choice
 │
-├── _CoqProject                     Rocq project file (12 .v files)
+├── _CoqProject                     Rocq project file (16 .v files)
 │
 ├── flint_probe.py                  M₁, M₂ builder (cold path)
 ├── flint_subres.py                 standalone Brown-Traub probe
@@ -86,9 +86,14 @@ prime_gap/
     ├── SignChain.v                 sign-variation counting
     │
     ├── CharPoly.v                  Faddeev-LeVerrier char_poly_int
+    ├── CharPolyHelpers.v           Step 1 bridge lemmas (all 6 Qed)
     ├── CharPolyAgree.v             FLINT cross-validation tests
+    ├── CharPolyL2.v                L2 proof chain scaffold (Steps 2-3)
     │
-    ├── Bridge.v                    L1 (Sturm) scaffolding
+    ├── Bridge.v                    L1 (Sturm) bridge — pseudo-remainder
+    │                                morph, variation morph, Sturm count
+    ├── IntMatProof.v               det_int correctness bridge
+    ├── CertL1.v                    L1 consumer wiring with Witness data
     └── Cert.v                      headline `maynard_eigenvalue_S1`
 ```
 
@@ -268,30 +273,20 @@ done
 
 (or use `coq_makefile -f _CoqProject -o Makefile && make`).
 
-Expected runtime on a modest laptop (approximate, varies with hardware):
+Expected runtime on a modest laptop (approximate, varies with hardware).
+All 16 `.v` files build sequentially in **~5 minutes**:
 
-| File              | Build time |
-|-------------------|-----------:|
-| `Recompose.v`     | < 1 s       |
-| `Witness.v`       | ~50 s       |
-| `WitnessChain.v`  | ~25 s       |
-| `Smoke.v`         | ~2 m 10 s   |
-| `IntPoly.v`       | ~3 s        |
-| `IntMat.v`        | ~1 s        |
-| `BrownTraub.v`    | ~1 s        |
-| `SignChain.v`     | ~1 s        |
-| `CharPoly.v`      | ~1 s        |
-| `Cert.v`          | ~5 s        |
-| `CharPolyAgree.v` | ~2 s        |
-| `Bridge.v`        | ~5 s        |
-| **Total**         | **~5 m**    |
+```bash
+for f in Recompose Witness WitnessChain Smoke IntPoly IntMat \
+         BrownTraub SignChain CharPoly Cert CharPolyAgree \
+         Bridge IntMatProof CharPolyHelpers CertL1 CharPolyL2; do
+    coqc -Q theories/S1 PrimeGapS1 theories/S1/$f.v
+done
+```
 
-`Witness.v` is dominated by parsing the integer matrices `M1_int`,
-`M2_int`, `A_int`, the char poly `charpoly_int`, and the bigZ-encoded
-`charpoly_of_A_int_bigZ` (43 coefs of ~20 kbit each).
-`Smoke.v`'s runtime is dominated by the single `lift_bigZ chain_42`
-`vm_compute` that converts the 100 000-bit terminal Sturm chain entry
-from `bigZ` to stdlib `Z`.
+The heaviest files are `Witness.v` (~50 s, parsing large integer
+matrices), `WitnessChain.v` (~25 s, 11 MB of `bigZ` chain data),
+and `Smoke.v` (~2 m, the `lift_bigZ chain_42` `vm_compute`).
 
 ### 4. Inspect what was machine-checked
 
@@ -380,40 +375,71 @@ lemmas (`mat_int_to_rat`, `pol_to_polyrat` in `CharPoly.v`).
 
 ## Project history (git log)
 
-```
-94c461b  Rocq S1 architecture: list-Z computational layer + headline theorem
-d863871  FLINT task: integer-cleared certificate for Maynard's M_{105} > 4
-```
+17 commits on `master`. Key milestones:
 
-- **Commit 1 — FLINT task** (12 685 lines, 18 files). The Python+FLINT
-  pipeline, the JSON certificates, the four small Rocq files
-  (`Recompose.v`, `Witness.v`, `WitnessChain.v`, `Smoke.v`), and the
-  project planning docs. Self-contained audit of Maynard's notebook.
-- **Commit 2 — Rocq S1 architecture** (5 986 lines, 8 new files,
-  5 modified). The whole `list Z` computational stack
-  (`IntPoly.v`, `IntMat.v`, `BrownTraub.v`, `SignChain.v`), the
-  Faddeev-LeVerrier `char_poly_int` (`CharPoly.v`), the headline
-  `Cert.v`, the L1 scaffolding (`Bridge.v`), and the cross-validation
-  (`CharPolyAgree.v`). FLINT-side extensions to support the integration
-  test (`A_int`, `D_A`, `charpoly_of_A_int`). Two subagent reports on
-  MathComp char_poly availability and on the precise theorem statement.
+- **Commit 1** — FLINT task: Python+FLINT pipeline, JSON certificates,
+  4 Rocq witness files, project planning docs.
+- **Commit 2** — Rocq S1 architecture: `list Z` computational stack
+  (IntPoly, IntMat, BrownTraub, SignChain), Faddeev-LeVerrier
+  (CharPoly), headline theorem (Cert), L1 scaffolding (Bridge),
+  FLINT cross-validation (CharPolyAgree).
+- **Commits 3-4** — README updates.
+- **Commits 5-17** — Follow-up waves closing admits:
+  - All 6 Step 1 bridge sublemmas Qed (CharPolyHelpers.v)
+  - `det_int` Bareiss + `det_int_laplace_correct` Qed (IntMatProof.v)
+  - Sturm variation morphisms Qed (Bridge.v)
+  - `next_mod_scaled_morph` + `prem_rmodp_rat` Qed (Bridge.v) —
+    the full pseudo-remainder correspondence is machine-checked
+  - `sturm_count_above_correct` + consumer wrapper Qed (Bridge.v)
+  - L1 consumer wiring with Witness data (CertL1.v)
+  - L2 proof chain scaffold (CharPolyL2.v)
+  - `mods_int_morph_weak` Qed (the Sturm variation-difference morphism)
+  - `mat_int_to_rat_unitmx` Qed (det-based invertibility bridge)
 
 ## Next steps
 
-The natural follow-up sprints, in order of value-vs-risk:
+### L1 — closing `sturm_count_correct`
 
-1. **Discharge L2** (`char_poly_int_correct` in `CharPoly.v`) — the
-   Faddeev-LeVerrier abstract correctness via Newton's identities.
-   2-day budget per `PLAN_S1.md` §6 risk #1.
-2. **Discharge L1** (the four Bridge.v admits, then re-wire `Cert.v`).
-   The hardest piece is `mods_int_morph` (bridging integer
-   pseudo-remainder with `lc^k` scaling to MathComp's `rmodp`).
-3. **Speed up `char_poly_int`** so `CharPolyAgree.v`'s
-   byte-for-byte 42 × 42 cross-validation can close. Options:
-   mod-prime reconstruction, Bareiss, or rebuild Rocq with
-   `native_compute`.
-4. **`A_rat_unitmx`** (currently `Admitted`, not in headline closure):
-   discharge by an integer-determinant computation on `M1_int`.
+The L1 chain is nearly complete. `prem_rmodp_rat` (the full
+pseudo-remainder correspondence) and all variation morphisms are Qed.
+What remains:
+
+1. **`mods_int_morph`** (Bridge.v, the LAST structural admit) — strict
+   chain equality. The strict form is confirmed unprovable (chains
+   differ by polynomial scalars), but `mods_int_morph_weak` (the
+   variation-difference form) is already Qed. CertL1.v's
+   `chain_is_mods` currently uses the strict form; rewiring it to
+   use the weak form is the cleanest path.
+2. **`signs_at_x0_agree` / `signs_at_inf_agree`** (CertL1.v) — sign
+   data agreement between Witness.v's precomputed signs and the
+   computed Sturm chain. Blocked by `vm_compute` timeout on the
+   degree-42 PRS (~200 kbit intermediate coefficients). Needs
+   `native_compute` or modular certificates.
+3. **`no_root_at_cb`** (CertL1.v) — no chain polynomial has root at
+   or above `cauchy_bound(lift p)`. Needs Cauchy-bound analysis
+   across chain entries.
+
+### L2 — closing `charpoly_int_eq_charpoly`
+
+The L2 chain is scaffolded in `CharPolyL2.v`:
+
+1. **`fl_invariant_L2`** — Faddeev-LeVerrier loop invariant. Base case
+   partly closed; inductive step scaffolded with all Step 1 bridge
+   lemmas available. Blocked on wiring genuine `fl_M_int_k` / `fl_c_int_k`
+   definitions (CharPoly.v placeholders).
+2. **`fl_divisibility_L2`** — divisibility of `tr(A * M_k)` by `k`.
+3. **`fl_loop_rat_is_char_poly_L2`** — the abstract identity, via
+   Cayley-Hamilton + adjugate expansion. Multi-week work; MathComp has
+   no Newton's identities.
+
+### Other
+
+- **`det_int_laplace_eq_det_int`** (IntMatProof.v) — Bareiss = Laplace
+  equivalence. Fuel bug in `bareiss_loop` worked around with
+  `bareiss_no_swap` predicate. Not in headline closure.
+- **`char_poly_int_agrees_with_flint`** (CharPolyAgree.v) — 42×42
+  `vm_compute` cross-check. Deferred (impractical without
+  `native_compute`).
 
 ## License and provenance
 
