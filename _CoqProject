@@ -18,5 +18,4 @@ theories/S1/CRTSigns.v
 theories/S1/CertL1.v
 theories/S1/PRSCheck.v
 theories/S1/PrimPoly.v
-theories/S1/CRTPrimes.v
 theories/S1/CRTCheck.v

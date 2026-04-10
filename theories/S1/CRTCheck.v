@@ -174,18 +174,26 @@ Fixpoint check_all_steps_mod (primes : list int)
   end.
 
 (* ============================================================== *)
-(*  Section 6: The prime list                                       *)
+(*  Section 6: Prime list and primality verification                *)
 (*                                                                  *)
 (*  We use primes just above 2^30 = 1073741824.  With primes this  *)
 (*  size, residues fit in 31 bits, products in 62 bits < 63 bits.   *)
 (*                                                                  *)
-(*  For the prototype we use 10 primes.  This is enough to verify   *)
-(*  the computation pipeline.  For a complete CRT proof, we would   *)
-(*  need ~6700 primes to cover 200 kbit coefficients.               *)
+(*  10 primes give ~300-bit CRT coverage — a strong probabilistic   *)
+(*  check but not a full CRT proof.  Full coverage of the 293 kbit  *)
+(*  max coefficient requires ~9776 primes; this would take ~6 hours *)
+(*  under vm_compute due to BigZ.modulo cost on 100 kbit chain      *)
+(*  entries.  Scaling options for future work: rebuild Rocq with     *)
+(*  native_compute, or precompute modular reductions externally and  *)
+(*  ship as Uint63 arrays (verified in Rocq by re-checking the      *)
+(*  reduction identity).                                            *)
+(*                                                                  *)
+(*  TRUST: the primality of these 10 values is verified IN Rocq by  *)
+(*  Uint63 trial division below — no external script needed.        *)
 (* ============================================================== *)
 
 Definition crt_primes : list int :=
-  [ 1073741827%uint63   (* next prime after 2^30 *)
+  [ 1073741827%uint63
   ; 1073741831%uint63
   ; 1073741833%uint63
   ; 1073741839%uint63
@@ -196,6 +204,28 @@ Definition crt_primes : list int :=
   ; 1073741939%uint63
   ; 1073741953%uint63
   ].
+
+(* --- Primality verification via Uint63 trial division ----------- *)
+
+(* Trial division: check that n has no factor in [2, k]. *)
+Fixpoint no_factor_upto (n k : int) (fuel : nat) : bool :=
+  match fuel with
+  | O => true  (* ran out of fuel — vacuously true *)
+  | S f =>
+    if Uint63.ltb k 2 then true  (* checked all candidates *)
+    else if Uint63.eqb (Uint63.mod n k) 0 then false  (* k divides n *)
+    else no_factor_upto n (Uint63.sub k 1) f
+  end.
+
+(* Primality test: n > 1 and no factor in [2, floor(sqrt(n))].
+   46340 > sqrt(2^31 - 1) ≈ 46340.95, so this covers all primes < 2^31. *)
+Definition is_prime_uint63 (n : int) : bool :=
+  Uint63.ltb 1 n && no_factor_upto n 46340 46340%nat.
+
+(* Machine-verified: every entry in crt_primes is prime. *)
+Lemma crt_primes_all_prime :
+  List.forallb is_prime_uint63 crt_primes = true.
+Proof. vm_compute. reflexivity. Qed.
 
 (* ============================================================== *)
 (*  Section 7: The main check and its verification                  *)
