@@ -117,22 +117,78 @@ Lemma fl_invariant_L2 (M : mat) (sz : nat) (k : nat) :
   ((Z_to_int (fl_c_int_k M k))%:~R : rat)
     = fl_c_rat A k.
 Proof.
-  intros Hdim Hle.
-  destruct k as [|k'].
-  - (* Base case k = 0.
-       fl_M_int_k M 0 = [] (the placeholder) and fl_M_rat ... 0 = 0.
-       fl_c_int_k M 0 = Z0 (the placeholder) and fl_c_rat ... 0 = 1.
+  move=> A Hdim Hle.
+  elim: k Hle => [|k IH] Hle.
+  - (* ================================================================
+       Base case  k = 0.
 
-       NOTE: Because fl_M_int_k / fl_c_int_k are placeholder definitions
-       (fl_M_int_k _ _ := [::], fl_c_int_k _ _ := Z0) rather than the
-       genuine iterative extraction, the base case does NOT close
-       definitionally.  The placeholders were inserted in CharPoly.v to
-       avoid Parameter axioms.  When the genuine definitions are wired
-       in, this base case will follow from mat_int_to_rat_mzero and
-       Z_to_int_1.  We admit for now.  *)
-    admit.
-  - (* Inductive step: admitted pending fl_divisibility + Step 1 lemmas. *)
-    admit.
+       fl_M_int_k M 0 := [::] (placeholder) and fl_M_rat A 0 = 0.
+       fl_c_int_k M 0 := Z0 (placeholder) and fl_c_rat A 0 = 1.
+
+       Matrix conjunct: mat_int_to_rat [::] 1 sz = 0  — TRUE because
+       mat_get [::] i j = 0 for all i j (nth on empty list overflows).
+
+       Coefficient conjunct: (Z_to_int Z0)%:~R = 1 — FALSE with the
+       placeholder.  When the genuine definition (fl_c_int_k M 0 = 1)
+       is wired in, this will follow from Z_to_int_1_rat.
+       ================================================================ *)
+    rewrite /fl_M_int_k /fl_c_int_k /fl_M_rat /fl_c_rat /fl_loop_rat /=.
+    split.
+    + (* mat_int_to_rat [::] 1 sz = 0 — closed. *)
+      apply/matrixP => i j.
+      rewrite /mat_int_to_rat !mxE /mat_get /=.
+      have -> : (match nat_of_ord i with 0%N | _ => @nil Z end) = (@nil Z)
+        by case: (nat_of_ord i).
+      rewrite /nth_Z /=.
+      have -> : (match nat_of_ord j with 0%N | _ => BinInt.Z0 end) = BinInt.Z0
+        by case: (nat_of_ord j).
+      by rewrite Z_to_int_0 /= mul0r.
+    + (* Coefficient base case: blocked by placeholder fl_c_int_k _ 0 = Z0.
+         With the genuine definition (fl_c_int_k M 0 = Zpos xH), this
+         closes via Z_to_int_1_rat. *)
+      admit.
+  - (* ================================================================
+       Inductive step  k -> k.+1.
+
+       IH gives the agreement at step k; extract both components.
+       ================================================================ *)
+    have Hk_le : (k <= sz)%N by apply: ltnW.
+    have [IHmat IHcoeff] := IH Hk_le.
+    (* Unfold fl_M_rat / fl_c_rat at k.+1 to expose one step of
+       the rational FL recurrence, then fold back the k-level
+       projections for readability. *)
+    rewrite /fl_M_rat /fl_c_rat /= -/fl_loop_rat.
+    rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
+    (* Rewrite the rational RHS using IH so both sides are expressed
+       in terms of the integer-side operations. *)
+    rewrite -IHmat -IHcoeff.
+    split.
+    + (* Matrix conjunct of the inductive step.
+
+         With the genuine definition
+           fl_M_int_k M k.+1
+             = madd (mmul M (fl_M_int_k M k))
+                    (mscale (fl_c_int_k M k) (meye sz))
+         the proof would proceed:
+           rewrite mat_int_to_rat_madd  // (CharPolyHelpers, Qed)
+           rewrite mat_int_to_rat_mmul  // (CharPolyHelpers, Qed)
+           rewrite mat_int_to_rat_mscale   (CharPolyHelpers, Qed)
+           rewrite mat_int_to_rat_meye     (CharPolyHelpers, Qed)
+         yielding definitional equality.
+         Blocked by the placeholder fl_M_int_k _ _ := [::]. *)
+      admit.
+    + (* Coefficient conjunct of the inductive step.
+
+         With the genuine definition
+           fl_c_int_k M k.+1
+             = Z.div (Z.opp (mtrace (mmul M (fl_M_int_k M k.+1))))
+                     (Z.of_nat k.+1)
+         the proof would proceed:
+           rewrite mtrace_int_to_rat      (CharPolyHelpers, Qed)
+         then use fl_divisibility_L2 to justify that the Z.div is
+         exact, converting Z.div/Z.opp to rational -//.
+         Blocked by the placeholder fl_c_int_k _ _ := Z0. *)
+      admit.
 Admitted.
 
 (* ==================================================================

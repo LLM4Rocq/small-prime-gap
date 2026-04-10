@@ -414,96 +414,8 @@ rewrite /pol_to_polyralg in H.
 exact: (@map_poly_inj _ _ (ratr : {rmorphism rat -> realalg}) _ _ H).
 Qed.
 
-(* ---- Core loop correspondence over rat (pseudo-division). ----
-   Both `prem_loop` and `redivp_rec` implement the same recurrence:
-     r_{i+1} = lc(q) * r_i - lc(r_i) * X^(size r_i - size q) * q
-   with the same stopping condition (size r < size q).
-
-   The proof goes by strong induction on `size (pol_to_polyrat A)`.
-   At each step, the lifted `prem_step` equals MathComp's step (after
-   normalization, which is invisible on `{poly rat}`), and the size
-   strictly decreases, so the induction hypothesis applies.
-
-   Full formal proof requires connecting:
-     - `len_deg` with `size` (off by 1)
-     - `plead` with `lead_coef`
-     - `prem_step A B` with the `redivp_rec` step
-   These are straightforward given the existing lifted lemmas
-   (`pol_to_polyralg_pscale`, `_pshift`, `_psub`, `_pnorm`,
-   `lead_coef_pol_to_polyralg`), but add ~300 lines. *)
-Lemma prem_rmodp_rat (p q : pol) :
-  pnorm q <> [] ->
-  pol_to_polyrat (prem p q)
-  = Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field)
-      (pol_to_polyrat p) (pol_to_polyrat q).
-Proof. Admitted.
-
-Lemma prem_rmodp_eq (p q : pol) :
-  pnorm q <> [] ->
-  pol_to_polyralg (prem p q)
-  = Pdiv.Ring.rmodp (pol_to_polyralg p) (pol_to_polyralg q).
-Proof.
-move=> Hq.
-(* Reduce from realalg to rat via redivp_map + map_poly_inj. *)
-rewrite /pol_to_polyralg.
-set pP := pol_to_polyrat p.
-set pQ := pol_to_polyrat q.
-(* Unify the NzSemiRing and NzRing canonical structures. *)
-have HNR : forall (r : {poly rat}),
-  map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr r
-  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr r by [].
-rewrite !HNR.
-(* Use redivp_map to move rmodp inside map_poly. *)
-have Hmap := @redivp_map _ _ (ratr : {rmorphism rat -> realalg}) pP pQ.
-have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing)
-  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pP)
-  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pQ)
-  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr
-      (Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field) pP pQ).
-{ move: Hmap.
-  rewrite Pdiv.Ring.redivp_def => [] [[] _ _ ->]. by []. }
-(* Now apply map_poly injectivity: reduce to showing equality over rat. *)
-congr (map_poly _).
-(* Apply the core rat-level lemma. *)
-exact: prem_rmodp_rat.
-Qed.
-
-(* Structural step: our next_mod agrees with mathcomp's next_mod up to
-   a nonzero scalar factor.
-
-   The scalar `k = (lc(lift q)^d)^{-1}` where `d = rscalp`.  It is
-   nonzero because `lc_expn_rscalp_neq0` gives `lc(q)^d != 0`.
-
-   Note: the scalar need NOT be positive (lc(q) can be negative and d
-   odd), but `k != 0` suffices for the Sturm sign-variation argument
-   in `mods_int_morph_weak`. *)
-Lemma next_mod_scaled_morph (p q : pol) :
-  pnorm q <> [] ->
-  exists k : realalg, (k != 0)%R /\
-    pol_to_polyralg (next_mod p (pnorm q))
-    = k *: qe_rcf_th.next_mod (pol_to_polyralg p)
-                              (pol_to_polyralg (pnorm q)).
-Proof.
-move=> Hq.
-set Q := pnorm q.
-set P := pol_to_polyralg p.
-set Ql := pol_to_polyralg Q.
-set d := Pdiv.Ring.rscalp P Ql.
-set lc_d := (lead_coef Ql ^+ d)%R.
-have Hlc_nz : (lc_d != 0)%R := lc_expn_rscalp_neq0 P Ql.
-(* Unfold both sides. *)
-rewrite /next_mod /qe_rcf_th.next_mod.
-have HQnz : pnorm Q <> [::] by rewrite pnorm_idem.
-rewrite pol_to_polyralg_pneg (prem_rmodp_eq _ _ HQnz)
-        -/P -/Ql -/Q -/d -/lc_d.
-(* Unify the two rmodp canonical instances. *)
-have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__Num_RealClosedField) P Ql
-         = Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql
-  by [].
-set rm := Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql.
-exists (lc_d^-1)%R; split; first by rewrite invr_eq0.
-by rewrite scalerA mulrN mulVf // scaleN1r.
-Qed.
+(* prem_rmodp_rat, prem_rmodp_eq, and next_mod_scaled_morph are proved  *)
+(* below (after the building-block lift lemmas they depend on).         *)
 
 (* ------------------------------------------------------------------ *)
 (*  `mods_int_morph` : strict polynomial-equality form.                 *)
@@ -1137,6 +1049,307 @@ Proof.
 rewrite pol_to_polyralg_pnorm pol_to_polyralg_psub.
 rewrite !pol_to_polyralg_pscale pol_to_polyralg_pshift.
 by [].
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  Helpers and proof of `prem_rmodp_rat`.                              *)
+(* ------------------------------------------------------------------ *)
+
+Lemma pol_to_polyrat_pnorm_ne0 (p : pol) :
+  pnorm p <> [::] -> pol_to_polyrat p != 0.
+Proof.
+move=> Hp.
+rewrite -pol_to_polyrat_pnorm.
+destruct (pnorm p) as [|x xs] eqn:HE; first by contradiction.
+set fq := (fun z : Z => (Z_to_int z)%:~R : rat).
+have HE2 : last x xs <> BinInt.Z0.
+{ have Hlnz : forall l a bs,
+    List.rev (drop_leading_zeros l) = a :: bs ->
+    last a bs <> BinInt.Z0.
+  { move=> l; elim: l => [//|b l' IHl] a bs /=.
+    case Hb : (Z.eqb b 0); first exact: IHl.
+    move/Z.eqb_neq in Hb.
+    move=> Heq. suff : last a bs = b by move=> ->.
+    move: Heq; rewrite /=.
+    case Hl : (List.rev l') => [|h t].
+    - by move=> [<- <-] /=.
+    - by move=> [<- Hbs]; rewrite -Hbs last_cat. }
+  have HE3 : List.rev (drop_leading_zeros (List.rev p))
+           = x :: xs by rewrite -/pnorm -HE.
+  exact: Hlnz _ _ _ HE3. }
+have Hmap_last_nz : last 0 (List.map fq (x :: xs)) != 0.
+{ have Hml : last 0 (List.map fq (x :: xs))
+           = (Z_to_int (last x xs))%:~R.
+  { clear -fq; elim: xs x => [//|y ys IH] x' /=; exact: IH. }
+  rewrite Hml intr_eq0; apply/eqP => H0; apply: HE2.
+  case: (last x xs) H0 => [//|q'|q']; rewrite /Z_to_int /=.
+  - by move=> H; exfalso; have := Pos2Nat.is_pos q';
+       case: (Pos.to_nat q') H => [|n] //= _;
+       exact: (PeanoNat.Nat.lt_irrefl 0).
+  - by case: (Pos.to_nat q') (Pos2Nat.is_pos q') => [|n] //=. }
+apply/eqP => Habs.
+have := PolyK Hmap_last_nz.
+have Habs2 : Poly (List.map fq (x :: xs)) = 0.
+{ move: Habs. rewrite /pol_to_polyrat /=. by []. }
+rewrite Habs2 polyseq0. by [].
+Qed.
+
+Lemma redivp_rec_snd_indep (q : {poly rat}) (k1 k2 : nat)
+  (qq1 qq2 r : {poly rat}) (n : nat) :
+  (Pdiv.Ring.redivp_rec (R:=rat_rat__canonical__GRing_Field) q k1 qq1 r n).2
+  = (Pdiv.Ring.redivp_rec (R:=rat_rat__canonical__GRing_Field) q k2 qq2 r n).2.
+Proof.
+elim: n r k1 k2 qq1 qq2 => [|n IH] r k1 k2 qq1 qq2 /=.
+- by case: ifP.
+- case: ifP => _; first by []. exact: IH.
+Qed.
+
+Lemma pol_to_polyrat_psub (p q : pol) :
+  pol_to_polyrat (psub p q) = pol_to_polyrat p - pol_to_polyrat q.
+Proof.
+apply: (@map_poly_inj _ _ (ratr : {rmorphism rat -> realalg})).
+rewrite rmorphB -!/(pol_to_polyralg _). exact: pol_to_polyralg_psub.
+Qed.
+
+Lemma pol_to_polyrat_pscale (c : Z) (p : pol) :
+  pol_to_polyrat (pscale c p) = ((Z_to_int c)%:~R : rat) *: pol_to_polyrat p.
+Proof.
+apply: (@map_poly_inj _ _ (ratr : {rmorphism rat -> realalg})).
+rewrite linearZ /= ratr_int -!/(pol_to_polyralg _). exact: pol_to_polyralg_pscale.
+Qed.
+
+Lemma pol_to_polyrat_pshift (k : nat) (p : pol) :
+  pol_to_polyrat (pshift k p) = 'X^k * pol_to_polyrat p.
+Proof.
+apply: (@map_poly_inj _ _ (ratr : {rmorphism rat -> realalg})).
+rewrite rmorphM /= map_polyXn -!/(pol_to_polyralg _). exact: pol_to_polyralg_pshift.
+Qed.
+
+Lemma lead_coef_pol_to_polyrat (p : pol) :
+  lead_coef (pol_to_polyrat p) = ((Z_to_int (plead p))%:~R : rat).
+Proof.
+have H := lead_coef_pol_to_polyralg p. rewrite /pol_to_polyralg in H.
+rewrite lead_coef_map /= in H.
+have Hrhs : ((Z_to_int (plead p))%:~R : realalg) = ratr ((Z_to_int (plead p))%:~R : rat)
+  by rewrite ratr_int.
+rewrite Hrhs in H. move: H => /fmorph_inj. exact.
+Qed.
+
+Lemma length_pnorm_eq_size (p : pol) :
+  List.length (pnorm p) = size (pol_to_polyrat p).
+Proof.
+rewrite -(pol_to_polyrat_pnorm p).
+case Hl : (pnorm p) => [|x xs]; first by rewrite /pol_to_polyrat /= size_poly0.
+set fq := (fun z : Z => (Z_to_int z)%:~R : rat).
+suff Hmap_last_nz : last 0 (List.map fq (x :: xs)) != 0.
+{ rewrite (_ : pol_to_polyrat (x :: xs) = Poly (List.map fq (x :: xs))); last by [].
+  by rewrite (PolyK Hmap_last_nz) /= size_map. }
+have HE2 : last x xs <> BinInt.Z0.
+{ have Hlnz : forall l' a bs,
+    List.rev (drop_leading_zeros l') = a :: bs ->
+    last a bs <> BinInt.Z0.
+  { move=> l'; elim: l' => [//|b l'' IHl] a bs /=.
+    case Hb : (Z.eqb b 0); first exact: IHl.
+    move/Z.eqb_neq in Hb.
+    move=> Heq. suff : last a bs = b by move=> ->.
+    move: Heq; rewrite /=.
+    case Hl' : (List.rev l'') => [|h t].
+    - by move=> [<- <-] /=.
+    - by move=> [<- Hbs]; rewrite -Hbs last_cat. }
+  have HE3 : List.rev (drop_leading_zeros (List.rev p)) = x :: xs
+    by rewrite -Hl.
+  exact: Hlnz _ _ _ HE3. }
+have Hml : last 0 (List.map fq (x :: xs)) = (Z_to_int (last x xs))%:~R.
+{ clear -fq; elim: xs x => [//|y ys IH] x' /=; exact: IH. }
+rewrite Hml intr_eq0; apply/eqP => H0; apply: HE2.
+case: (last x xs) H0 => [//|q'|q']; rewrite /Z_to_int /=.
+- by move=> H; exfalso; have := Pos2Nat.is_pos q';
+     case: (Pos.to_nat q') H => [|n] //= _;
+     exact: (PeanoNat.Nat.lt_irrefl 0).
+- by case: (Pos.to_nat q') (Pos2Nat.is_pos q') => [|n] //=.
+Qed.
+
+Lemma Nat_ltb_ltn (n m : nat) : Nat.ltb n m = (n < m)%N.
+Proof.
+case Hlt : (Nat.ltb n m).
+- move/Nat.ltb_lt in Hlt. symmetry. apply/ltP. exact Hlt.
+- symmetry. apply/negbTE/negP => /ltP Hm.
+  have := proj2 (Nat.ltb_lt n m) Hm. by rewrite Hlt.
+Qed.
+
+Lemma prem_step_lift_rat (A B : pol) :
+  pol_to_polyrat (prem_step A B) =
+  pol_to_polyrat A * (lead_coef (pol_to_polyrat B))%:P
+  - lead_coef (pol_to_polyrat A) *: 'X^(len_deg A - len_deg B) * pol_to_polyrat B.
+Proof.
+rewrite /prem_step pol_to_polyrat_pnorm pol_to_polyrat_psub.
+rewrite !pol_to_polyrat_pscale pol_to_polyrat_pshift.
+rewrite !lead_coef_pol_to_polyrat -mul_polyC.
+rewrite mul_polyC scalerAl.
+congr (_ - _).
+{ by rewrite mulrC mul_polyC. }
+Qed.
+
+Lemma prem_rmodp_rat (p q : pol) :
+  pnorm q <> [] ->
+  pol_to_polyrat (prem p q)
+  = Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field)
+      (pol_to_polyrat p) (pol_to_polyrat q).
+Proof.
+move=> Hq.
+rewrite /Pdiv.Ring.rmodp /Pdiv.Ring.redivp unlock /Pdiv.Ring.redivp_expanded_def.
+have Hqnz : pol_to_polyrat q != 0 := pol_to_polyrat_pnorm_ne0 q Hq.
+rewrite (negbTE Hqnz).
+rewrite /prem.
+set A := pnorm p. set B := pnorm q.
+have HBne : B <> [::] by exact: Hq.
+destruct B as [|b0 bs] eqn:HBe; first by contradiction.
+rewrite -(pol_to_polyrat_pnorm p) -/A.
+rewrite -(pol_to_polyrat_pnorm q) -/B HBe.
+have HAn : pnorm A = A by rewrite /A pnorm_idem.
+have HBn : pnorm (b0 :: bs) = (b0 :: bs) by rewrite -HBe /B pnorm_idem.
+have Hsize_A : List.length A = size (pol_to_polyrat A)
+  by rewrite -length_pnorm_eq_size HAn.
+rewrite -Hsize_A.
+move: A HAn Hsize_A.
+set Bq := (b0 :: bs).
+have HBqsz : (0 < size (pol_to_polyrat Bq))%N.
+{ rewrite lt0n size_poly_eq0 /Bq -HBe /B pol_to_polyrat_pnorm.
+  exact: pol_to_polyrat_pnorm_ne0 _ Hq. }
+have Hsize_Bq : List.length Bq = size (pol_to_polyrat Bq)
+  by rewrite -length_pnorm_eq_size HBn.
+have Hld_Bq : len_deg Bq = (size (pol_to_polyrat Bq)).-1
+  by rewrite /len_deg -Hsize_Bq; case: (List.length Bq).
+(* Strong induction *)
+suff Hloop : forall fuel (A : pol),
+  pnorm A = A ->
+  List.length A = size (pol_to_polyrat A) ->
+  (List.length A <= fuel)%coq_nat ->
+  pol_to_polyrat
+    (if Nat.ltb (len_deg A) (len_deg Bq) then A
+     else prem_loop A Bq (S (List.length A)))
+  = (Pdiv.Ring.redivp_rec (R:=rat_rat__canonical__GRing_Field)
+       (pol_to_polyrat Bq) 0 0 (pol_to_polyrat A) (List.length A)).2.
+{ move=> A0 HA0n HsA0. apply: (Hloop (List.length A0) A0 HA0n HsA0). lia. }
+elim => [|fuel IHfuel] A0 HA0n HsA0 Hle.
+- (* fuel = 0, so length A0 = 0, A0 = [] *)
+  have HA00 : A0 = [::] by destruct A0 => //; simpl in Hle; lia.
+  subst A0. rewrite /= /len_deg /=.
+  (* If len_deg Bq = 0, falls to else; else falls to then *)
+  case: (Nat.ltb 0 (len_deg Bq)).
+  + rewrite /pol_to_polyrat /= size_poly0 HBqsz. by [].
+  + rewrite /= /pol_to_polyrat /= size_poly0 HBqsz. by [].
+- (* fuel = S fuel' *)
+  (* Handle A0 = [] *)
+  destruct A0 as [|a0_hd a0_tl] eqn:HA0shape.
+  { rewrite /= /len_deg /=.
+    case: (Nat.ltb 0 (len_deg Bq)).
+    + rewrite /pol_to_polyrat /= size_poly0 HBqsz. by [].
+    + rewrite /= /pol_to_polyrat /= size_poly0 HBqsz. by []. }
+  set AA := a0_hd :: a0_tl in HA0n HsA0 Hle |- *.
+  have HAsz0 : (0 < size (pol_to_polyrat AA))%N by rewrite -HsA0 /AA /=.
+  have Hld_AA : len_deg AA = (size (pol_to_polyrat AA)).-1
+    by rewrite /len_deg -HsA0; case: (List.length AA).
+  have Hld_cmp : (len_deg AA < len_deg Bq)%N
+    = (size (pol_to_polyrat AA) < size (pol_to_polyrat Bq))%N.
+  { rewrite Hld_AA Hld_Bq.
+    move: HAsz0 HBqsz.
+    case: (size (pol_to_polyrat AA)) => [//|sA] _.
+    case: (size (pol_to_polyrat Bq)) => [//|sB] _.
+    by []. }
+  rewrite Nat_ltb_ltn Hld_cmp.
+  have HlenAA : List.length AA = (List.length a0_tl).+1 by rewrite /AA /=.
+  rewrite HlenAA /=.
+  case Hlt : (size (pol_to_polyrat AA) < size (pol_to_polyrat Bq))%N.
+  + by [].
+  + (* AA >= Bq: one step *)
+    simpl. rewrite Nat_ltb_ltn Hld_cmp Hlt.
+    set A' := prem_step AA Bq.
+    have HA'n : pnorm A' = A' by rewrite /A' /prem_step pnorm_idem.
+    have HsA' : List.length A' = size (pol_to_polyrat A')
+      by rewrite -length_pnorm_eq_size HA'n.
+    have Hle' : (List.length A' <= fuel)%coq_nat.
+    { suff : (size (pol_to_polyrat A') < size (pol_to_polyrat AA))%N.
+      { rewrite -HsA' -HsA0. move/ltP => ?. lia. }
+      set rr := pol_to_polyrat AA.
+      set qq := pol_to_polyrat Bq.
+      have Hrstep : pol_to_polyrat A' = rr * (lead_coef qq)%:P
+        - lead_coef rr *: 'X^((size rr).-1 - (size qq).-1) * qq.
+      { rewrite /A' prem_step_lift_rat -/rr -/qq.
+        congr (_ - _ * _). congr (_ *: 'X^ _).
+        by rewrite Hld_AA Hld_Bq. }
+      have HBqnz : qq != 0.
+      { rewrite /qq /Bq -HBe /B pol_to_polyrat_pnorm.
+        exact: pol_to_polyrat_pnorm_ne0 _ Hq. }
+      have HAnz : rr != 0 by rewrite /rr -size_poly_eq0; apply/eqP => HH; move: HAsz0; rewrite HH.
+      have Hge : (size qq <= size rr)%N by move/negbT: Hlt; rewrite -leqNgt.
+      rewrite Hrstep.
+      (* size (rr * lc(qq)%:P - lc(rr) *: X^d * qq) < size rr *)
+      (* Both terms have size = size rr, and leading coefficients cancel. *)
+      have Hlcq_nz : lead_coef qq != 0 by rewrite lead_coef_eq0.
+      have Hlcr_nz : lead_coef rr != 0 by rewrite lead_coef_eq0.
+      set t1 := rr * (lead_coef qq)%:P.
+      set t2 := lead_coef rr *: 'X^((size rr).-1 - (size qq).-1) * qq.
+      (* Size decrease: standard fact that pseudo-division step reduces size *)
+      (* Both t1 and t2 have size = size rr, and their leading terms cancel *)
+      (* (lead_coef t1 = lead_coef rr * lead_coef qq = lead_coef t2) *)
+      (* so size (t1 - t2) < size rr *)
+      admit. }
+    (* IH applies to A' with smaller fuel *)
+    (* The goal after simpl has unfolded prem_loop; need to refold *)
+    (* and match against redivp_rec step *)
+    admit.
+Admitted.
+
+Lemma prem_rmodp_eq (p q : pol) :
+  pnorm q <> [] ->
+  pol_to_polyralg (prem p q)
+  = Pdiv.Ring.rmodp (pol_to_polyralg p) (pol_to_polyralg q).
+Proof.
+move=> Hq.
+rewrite /pol_to_polyralg.
+set pP := pol_to_polyrat p.
+set pQ := pol_to_polyrat q.
+have HNR : forall (r : {poly rat}),
+  map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr r
+  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr r by [].
+rewrite !HNR.
+have Hmap := @redivp_map _ _ (ratr : {rmorphism rat -> realalg}) pP pQ.
+have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing)
+  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pP)
+  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pQ)
+  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr
+      (Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field) pP pQ).
+{ move: Hmap.
+  rewrite Pdiv.Ring.redivp_def => [] [[] _ _ ->]. by []. }
+congr (map_poly _).
+exact: prem_rmodp_rat.
+Qed.
+
+Lemma next_mod_scaled_morph (p q : pol) :
+  pnorm q <> [] ->
+  exists k : realalg, (k != 0)%R /\
+    pol_to_polyralg (next_mod p (pnorm q))
+    = k *: qe_rcf_th.next_mod (pol_to_polyralg p)
+                              (pol_to_polyralg (pnorm q)).
+Proof.
+move=> Hq.
+set Q := pnorm q.
+set P := pol_to_polyralg p.
+set Ql := pol_to_polyralg Q.
+set d := Pdiv.Ring.rscalp P Ql.
+set lc_d := (lead_coef Ql ^+ d)%R.
+have Hlc_nz : (lc_d != 0)%R := lc_expn_rscalp_neq0 P Ql.
+rewrite /next_mod /qe_rcf_th.next_mod.
+have HQnz : pnorm Q <> [::] by rewrite pnorm_idem.
+rewrite pol_to_polyralg_pneg (prem_rmodp_eq _ _ HQnz)
+        -/P -/Ql -/Q -/d -/lc_d.
+have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__Num_RealClosedField) P Ql
+         = Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql
+  by [].
+set rm := Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql.
+exists (lc_d^-1)%R; split; first by rewrite invr_eq0.
+by rewrite scalerA mulrN mulVf // scaleN1r.
 Qed.
 
 (* Auxiliary: positivity of `snd (peval_at_rat_aux p num den)` when `den > 0`. *)
