@@ -513,25 +513,196 @@ Proof.
 Qed.
 
 (* -------------------------------------------------------------------
+   Helpers for the first-row Laplace expansion lemma.
+   -------------------------------------------------------------------- *)
+
+(** `Nat.even` agrees with negated MathComp `odd`. *)
+Local Lemma Nat_even_odd (n : nat) : Nat.even n = ~~ (odd n).
+Proof.
+  have H : forall m, Nat.even m = ~~ odd m
+    by fix IH 1; case => [|[|n0]] //=; rewrite !negbK; apply IH.
+  exact: H.
+Qed.
+
+(** The Z-level sign `(if even j then 1 else -1)`, after lifting to
+    rat, equals the MathComp exponent `(-1)^+j`. *)
+Local Lemma sign_even_rat (j0 : nat) :
+  ((Z_to_int (if Nat.even j0 then BinInt.Z.one
+              else BinInt.Z.opp BinInt.Z.one))%:~R : rat)
+  = ((-1) ^+ j0)%R.
+Proof.
+  rewrite Nat_even_odd. case Hodd: (odd j0).
+  - simpl negb. rewrite Z_to_int_neg_pos_loc /=.
+    rewrite rmorphN /=. rewrite -(signr_odd rat j0) Hodd. by [].
+  - simpl negb. rewrite -(signr_odd rat j0) Hodd. by [].
+Qed.
+
+(** `drop_nth` reduces the list length by 1 when the index is in
+    range. *)
+Local Lemma length_drop_nth {A : Type} (j : nat) (xs : list A) :
+  (j < length xs)%nat -> length (drop_nth j xs) = (length xs).-1.
+Proof.
+  elim: xs j => [|x xs' IH] j Hj //.
+  case: j Hj => [|j'] Hj //=.
+  have Hj' : (j' < length xs')%nat.
+  { simpl in Hj. rewrite ltnS in Hj. exact: (leq_trans (ltnSn _) Hj). }
+  rewrite IH //. by case: (length xs') Hj'.
+Qed.
+
+(** Row-length predicate is preserved by [minor_mat]. *)
+Local Lemma Forall_minor_mat (M : mat) (k j : nat) :
+  Forall (fun row => length row = k.+1) M ->
+  (j < k.+1)%nat ->
+  Forall (fun row => length row = k) (minor_mat j M).
+Proof.
+  move=> HF Hj. rewrite /minor_mat.
+  destruct M as [|r rs] => /=; first by constructor.
+  inversion HF as [|? ? Hr Hrs]; subst.
+  clear r Hr HF.
+  induction rs as [|r' rs' IH].
+  - simpl. constructor.
+  - inversion Hrs as [|? ? Hr' Hrs']; subst.
+    simpl. constructor.
+    + rewrite length_drop_nth; [rewrite Hr'; by [] | rewrite Hr'; exact Hj].
+    + exact (IH Hrs').
+Qed.
+
+(** A standalone version of the inner `expand` fixpoint inside
+    [det_int_laplace_fuel].  We need this as a named function so that
+    [laplace_row_sum_bigop] can be stated and used by [rewrite]. *)
+Fixpoint laplace_row_sum (j0 : nat) (r : list BinInt.Z)
+    (fuel : nat) (rest : list (list BinInt.Z)) : BinInt.Z :=
+  match r with
+  | nil => BinInt.Z0
+  | x :: r' =>
+      let sign := if Nat.even j0 then BinInt.Z.one
+                   else BinInt.Z.opp BinInt.Z.one in
+      BinInt.Z.add
+        (BinInt.Z.mul (BinInt.Z.mul sign x)
+           (det_int_laplace_fuel fuel
+              (List.map (drop_nth j0) rest)))
+        (laplace_row_sum (S j0) r' fuel rest)
+  end.
+
+(** The key induction lemma: [laplace_row_sum] equals a MathComp
+    big-op over the ordinals `'I_(length r)`. *)
+Local Lemma laplace_row_sum_bigop (j0 : nat) (r : list BinInt.Z)
+    (fuel : nat) (rest : mat) :
+  ((Z_to_int (laplace_row_sum j0 r fuel rest))%:~R : rat) =
+  (\sum_(i < length r)
+     ((-1) ^+ (j0 + i)
+        * ((Z_to_int (ListDef.nth i r BinInt.Z0))%:~R : rat)
+        * (Z_to_int (det_int_laplace_fuel fuel
+             (List.map (drop_nth (j0 + i)) rest)))%:~R))%R.
+Proof.
+  elim: r j0 => [|x r' IH] j0.
+  - simpl. by rewrite big_ord0.
+  - simpl laplace_row_sum. simpl length.
+    rewrite Z_to_int_add_loc intrD.
+    rewrite big_ord_recl /=.
+    rewrite addn0.
+    congr (_ + _)%R.
+    + rewrite Z_to_int_mul_loc Z_to_int_mul_loc intrM intrM.
+      by rewrite sign_even_rat.
+    + rewrite IH.
+      apply: eq_bigr => i _.
+      rewrite /bump /= !add0n.
+      by rewrite addnS.
+Qed.
+
+(** The anonymous inner `expand` fixpoint inside [det_int_laplace_fuel]
+    is propositionally equal to [laplace_row_sum].  The proof uses
+    [change] to expose the anonymous fix as a syntactically matchable
+    term, then closes by induction on the row list. *)
+Local Lemma det_int_laplace_fuel_eq (row : list BinInt.Z)
+    (k : nat) (rest : list (list BinInt.Z)) :
+  row <> nil ->
+  det_int_laplace_fuel k.+1 (row :: rest) =
+  laplace_row_sum 0%nat row k rest.
+Proof.
+  move=> Hne.
+  destruct row as [|x0 row']; first by (exfalso; apply Hne).
+  have H : forall j (r : list BinInt.Z),
+    (fix expand (j0 : nat) (r0 : seq BinInt.Z) {struct r0} : BinInt.Z :=
+       match r0 with
+       | [::] => BinInt.Z0
+       | x :: r' =>
+           BinInt.Z.add
+             (BinInt.Z.mul
+                (BinInt.Z.mul
+                   (if Nat.even j0 then BinInt.Z.one
+                    else BinInt.Z.opp BinInt.Z.one) x)
+                (det_int_laplace_fuel k
+                   (ListDef.map (drop_nth j0) rest)))
+             (expand j0.+1 r')
+       end) j r
+    = laplace_row_sum j r k rest.
+  { move=> j r. revert j. induction r as [|x r' IH] => j.
+    - reflexivity.
+    - simpl laplace_row_sum. simpl.
+      congr (BinInt.Z.add _ _). exact (IH j.+1). }
+  change (det_int_laplace_fuel k.+1 ((x0 :: row') :: rest))
+    with ((fix expand (j0 : nat) (r0 : seq BinInt.Z) {struct r0}
+             : BinInt.Z :=
+             match r0 with
+             | [::] => BinInt.Z0
+             | x :: r' =>
+                 BinInt.Z.add
+                   (BinInt.Z.mul
+                      (BinInt.Z.mul
+                         (if Nat.even j0 then BinInt.Z.one
+                          else BinInt.Z.opp BinInt.Z.one) x)
+                      (det_int_laplace_fuel k
+                         (ListDef.map (drop_nth j0) rest)))
+                   (expand j0.+1 r')
+             end) 0%nat (x0 :: row')).
+  exact (H 0%nat (x0 :: row')).
+Qed.
+
+(* -------------------------------------------------------------------
    Target B step lemma — first row Laplace expansion of
    `det_int_laplace`, in MathComp `\sum` form.
 
-   Sketch: unfold `det_int_laplace_fuel` on a non-empty matrix of
-   dimension `k.+1`, recognise the inner local fix as a list iteration
-   over the first row, and translate that iteration into a
-   `\sum_(j < k.+1)` MathComp big-op.  The proof would proceed by an
-   auxiliary `expand_from`-style lemma generalising the inner fix to
-   start at an arbitrary index.  For now we leave this lemma Admitted;
-   it is the only piece of arithmetic on the list representation that
-   the inductive step below depends on, and is independent of the
-   minor / cofactor bridging which is closed above. *)
+   The proof uses [det_int_laplace_fuel_eq] to replace the anonymous
+   inner `expand` fixpoint with the named [laplace_row_sum], then
+   applies [laplace_row_sum_bigop] to turn it into a MathComp big-op,
+   and closes the remaining index bookkeeping.
+   -------------------------------------------------------------------- *)
 Lemma det_int_laplace_expand (M : mat) (k : nat) :
   mat_dim M = k.+1 ->
+  Forall (fun row => length row = k.+1) M ->
   ((Z_to_int (det_int_laplace M))%:~R : rat)
   = (\sum_(j < k.+1)
        ((-1)^+j * (Z_to_int (mat_get M 0 j))%:~R
                 * (Z_to_int (det_int_laplace (minor_mat j M)))%:~R) : rat)%R.
-Proof. Admitted.
+Proof.
+  move=> Hdim HF.
+  destruct M as [|row rest] eqn:HM; first by (simpl in Hdim; discriminate).
+  inversion HF as [|? ? Hrowlen HFrest]; subst.
+  have Hrest : mat_dim rest = k by injection Hdim.
+  destruct row as [|x0 row']; first by (simpl in Hrowlen; discriminate).
+  have Hrowlen' : length row' = k by simpl in Hrowlen; injection Hrowlen.
+  have Hne : (x0 :: row') <> [::] by discriminate.
+  (* Rewrite det_int_laplace to det_int_laplace_fuel *)
+  have -> : det_int_laplace ((x0 :: row') :: rest)
+          = det_int_laplace_fuel k.+1 ((x0 :: row') :: rest).
+  { rewrite /det_int_laplace.
+    change (mat_dim ((x0 :: row') :: rest)) with (mat_dim rest).+1.
+    by rewrite Hrest. }
+  (* Replace det_int_laplace_fuel with laplace_row_sum *)
+  rewrite (det_int_laplace_fuel_eq (x0 :: row') k rest Hne).
+  (* Apply the bigop lemma *)
+  rewrite laplace_row_sum_bigop.
+  (* Both sides are now big-ops; reconcile the index ranges and
+     simplify bookkeeping. *)
+  simpl length. rewrite Hrowlen'.
+  apply: eq_bigr => i _.
+  rewrite /= add0n.
+  congr (_ * _ * _)%R.
+  (* Minor-determinant fuel: length (map ...) = length rest = k *)
+  rewrite /det_int_laplace /mat_dim.
+  by rewrite length_map -/(mat_dim rest) Hrest.
+Qed.
 
 (** **Target B step** — the inductive step of [det_int_laplace_correct]:
     given the IH at dimension `n`, lift it to dimension `n.+1`.
@@ -541,14 +712,18 @@ Proof. Admitted.
     A) to identify the minors on both sides, and the IH applied to each
     minor to close the induction. *)
 Lemma det_int_laplace_correct_step (n : nat)
-  (IH : forall M : mat, mat_dim M = n ->
+  (IH : forall M : mat,
+        mat_dim M = n ->
+        Forall (fun row => length row = n) M ->
         ((Z_to_int (det_int_laplace M))%:~R : rat) = (\det (mat_int_to_rat M 1 n))%R) :
-  forall M : mat, mat_dim M = n.+1 ->
+  forall M : mat,
+    mat_dim M = n.+1 ->
+    Forall (fun row => length row = n.+1) M ->
     ((Z_to_int (det_int_laplace M))%:~R : rat) = (\det (mat_int_to_rat M 1 n.+1))%R.
 Proof.
-  move=> M Hdim.
-  have Hne : M <> [::]. { by case: M Hdim. }
-  rewrite (det_int_laplace_expand M n Hdim).
+  move=> M Hdim HF.
+  have Hne : M <> [::]. { by case: M Hdim HF. }
+  rewrite (det_int_laplace_expand M n Hdim HF).
   rewrite (expand_det_row _ (@ord0 n)).
   apply: eq_bigr => j _.
   rewrite /cofactor.
@@ -557,33 +732,26 @@ Proof.
   have -> : row' (@ord0 n) (col' j (mat_int_to_rat M 1 n.+1))
           = mat_int_to_rat (minor_mat j M) 1 n.
   { by rewrite (mat_int_to_rat_minor M n j Hne Hj); congr row'. }
-  rewrite -IH; last by rewrite mat_dim_minor_mat Hdim.
+  rewrite -IH; last first.
+  { exact: (Forall_minor_mat M n j HF Hj). }
+  { by rewrite mat_dim_minor_mat Hdim. }
   rewrite add0n.
   by rewrite mulrCA mulrA.
 Qed.
 
 (* -------------------------------------------------------------------
-   The general Step B lemma, proved by induction on n using:
-     n = 0 : det_int_correct_zero (reused with det_int_laplace by
-             unfolding; see proof).
-     n = 1 : det_int_laplace_one + det_mx11.
-     n = 2 : det_int_laplace_correct_two_shape (for [[a;b];[c;d]]
-             shapes).  The general n = 2 case (arbitrary 2xN lists)
-             reduces to this via list shape analysis on row lengths,
-             but the badly-shaped cases require knowing the rows have
-             length 2, which [mat_dim M = 2] alone does not provide.
-     n >= 3: inductive step via [expand_det_row] / [minor_mat]
-             commutation lemma.  This is the main remaining obligation.
+   The general Step B lemma, proved by induction on n.
    -------------------------------------------------------------------- *)
 Lemma det_int_laplace_correct (M : mat) (n : nat) :
   mat_dim M = n ->
+  Forall (fun row => length row = n) M ->
   ((Z_to_int (det_int_laplace M))%:~R : rat)
   = (\det (mat_int_to_rat M 1 n))%R.
 Proof.
-  elim: n M => [|n IH] M Hdim.
-  - have hM : M = [::] by case: M Hdim => //=.
+  elim: n M => [|n IH] M Hdim HF.
+  - have hM : M = [::] by case: M Hdim HF => //=.
     rewrite hM /= det_mx00. reflexivity.
-  - exact: (det_int_laplace_correct_step n IH M Hdim).
+  - exact: (det_int_laplace_correct_step n IH M Hdim HF).
 Qed.
 
 (* ===================================================================
@@ -595,10 +763,11 @@ Qed.
     lifted matrix. *)
 Lemma det_int_correct (M : mat) (n : nat) :
   mat_dim M = n ->
+  Forall (fun row => length row = n) M ->
   ((Z_to_int (det_int M))%:~R : rat)
   = (\det (mat_int_to_rat M 1 n))%R.
 Proof.
-  move=> sq.
+  move=> sq HF.
   rewrite -(det_int_laplace_eq_det_int M n sq).
   exact: det_int_laplace_correct.
 Qed.
@@ -613,26 +782,18 @@ Qed.
     MathComp matrix lies in [unitmx].  The proof reuses
     [det_int_correct] to transport the nonzero-ness from Z to rat. *)
 Lemma mat_int_to_rat_unitmx
-  (M : mat) (n : nat) (sq : mat_dim M = n) :
+  (M : mat) (n : nat) (sq : mat_dim M = n)
+  (HF : Forall (fun row => length row = n) M) :
   det_int M <> BinInt.Z0 ->
   mat_int_to_rat M 1 n \in unitmx.
 Proof.
   move=> hnz.
-  (* An integer m <> 0 maps to a nonzero rat under [m%:~R], so the
-     determinant on the rat side is nonzero, and this is exactly
-     membership in [unitmx] for a field-valued matrix.
-
-     Plumbing used:
-       unitmxE    : (A \in unitmx) = (\det A \is a GRing.unit)
-       unitfE     : (x \is a GRing.unit) = (x != 0)   [field]
-       det_int_correct : bridges det_int / \det across mat_int_to_rat. *)
   rewrite unitmxE unitfE.
-  rewrite -(det_int_correct M n sq).
+  rewrite -(det_int_correct M n sq HF).
   apply/eqP => H.
   apply hnz.
   have H2 : (Z_to_int (det_int M))%R = 0%R.
   { apply/eqP. move: H => /eqP. by rewrite intr_eq0. }
-  (* A nonzero Z cannot map to 0 in [int] under [Z_to_int]. *)
   destruct (det_int M) as [|p|p] eqn:Hd; [reflexivity| |].
   - rewrite Z_to_int_pos_pos_loc in H2.
     have Hp := Pos2Nat.is_pos p.
