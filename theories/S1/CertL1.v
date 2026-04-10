@@ -22,7 +22,6 @@
 (*    chain_lc_nz       — leading coefficients nonzero (realalg)        *)
 (*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
 (*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
-(*    chain_is_mods     — lifted chain = abstract mods                  *)
 (*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
 (*                         (derived from no_root_at_cb)                 *)
 (*                                                                      *)
@@ -30,6 +29,8 @@
 (*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
 (*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
 (*    no_root_at_cb     — no chain poly roots >= cauchy_bound           *)
+(*    chain_is_mods     — lifted chain = abstract mods (moved from      *)
+(*                         Bridge.v; strict equality unprovable there)  *)
 (* ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -247,17 +248,18 @@ Proof.
 Qed.
 
 (* 4d. The lifted Sturm chain equals the abstract mods chain.
-   This is mods_int_morph applied to (charpoly_int, pderiv charpoly_int),
-   combined with pderiv_morph. *)
+   Previously derived from Bridge.v's `mods_int_morph`, which has been
+   removed (the strict chain equality is unprovable: chains differ by
+   polynomial scalars).  This is now a standalone hypothesis (Admitted).
+   Closing it requires either (a) proving that our Brown-Traub PRS
+   chain exactly matches MathComp's `mods` chain entry-by-entry, or
+   (b) refactoring the downstream consumer to use a weaker form. *)
 Lemma chain_is_mods :
   List.map pol_to_polyralg (BrownTraub.sturm_chain charpoly_int)
   = mods (pol_to_polyralg charpoly_int)
          ((pol_to_polyralg charpoly_int)^`()).
 Proof.
-  unfold sturm_chain.
-  rewrite mods_int_morph pderiv_morph.
-  reflexivity.
-Qed.
+Admitted.
 
 (* 4e. No chain polynomial has a root weakly above the Cauchy bound.
    Follows from the Cauchy bound dominating all roots. *)
@@ -314,9 +316,9 @@ Qed.
 (*  the existence of a realalg root of charpoly_int above 4/105.        *)
 (*                                                                      *)
 (*  Proven facts used: den_pos, chain_nz, chain_lc_nz, chain_th_nz,    *)
-(*                     chain_cb_nz, threshold_lt_cb, chain_is_mods,     *)
+(*                     chain_cb_nz, threshold_lt_cb,                    *)
 (*                     sturm_count_above_charpoly_pos.                  *)
-(*  Admitted facts used: no_root_at_cb,                                 *)
+(*  Admitted facts used: no_root_at_cb, chain_is_mods,                  *)
 (*                       signs_at_x0_agree, signs_at_inf_agree.         *)
 (* ================================================================== *)
 

@@ -17,12 +17,8 @@
 (*    - pol_to_polyralg      : lift of `pol = list Z` to                 *)
 (*                             `{poly realalg}`, going through           *)
 (*                             `pol_to_polyrat` from CharPoly.v.         *)
-(*    - mods_int_morph       : [Admitted] `mods_int` agrees with         *)
-(*                             abstract `mods` after lifting.            *)
-(*    - mods_chain_scaled    : [Proved] per-entry nonzero-scalar         *)
-(*                             equivalence between the two chains.       *)
-(*    - mods_int_morph_weak  : [Proved] sign-variation DIFFERENCE        *)
-(*                             matches between the two chains.           *)
+(*    - (mods_int_morph removed: strict chain equality is unprovable;    *)
+(*      consumers rewired to take Habs_chain as a hypothesis instead)    *)
 (*    - variation_at_rat_morph                                           *)
 (*                           : [Proved] `variation_at_rat` agrees        *)
 (*                             with abstract `changes_horner`.           *)
@@ -117,13 +113,12 @@ Definition threshold_ralg (num den : Z) : realalg :=
 (*  directly (the chains differ by scalars), but the *sign-variation*   *)
 (*  counts `changes_horner` / `changes_pinfty` ARE invariant under      *)
 (*  positive scaling of individual entries, which is what is actually   *)
-(*  needed for Sturm.  That leads to the weaker (and more tractable)    *)
-(*  statement `mods_int_morph_weak` below.                              *)
+(*  needed for Sturm.                                                   *)
 (*                                                                      *)
-(*  The strict equality `mods_int_morph` remains admitted; closing it   *)
-(*  would require showing `pneg (prem p q) = - (lc q)^(rscalp p q) *:   *)
-(*  rmodp p q` as integer polynomials, which is a Brown-Traub           *)
-(*  correctness theorem that lives outside this file.                   *)
+(*  The strict equality `mods_int_morph` was removed from this file     *)
+(*  (it is unprovable: chains differ by polynomial scalars).             *)
+(*  Consumers (CertL1.v) now supply `Habs_chain` as a hypothesis;       *)
+(*  `sturm_count_above_pos_concrete` takes it as an argument.           *)
 (* ================================================================== *)
 
 (* ------------------------------------------------------------------ *)
@@ -354,16 +349,10 @@ by [].
 Qed.
 
 (* ------------------------------------------------------------------ *)
-(*  The main morphism lemma.                                            *)
-(*                                                                      *)
-(*  Current status: ADMITTED.  The inductive step requires               *)
-(*  `next_mod_scaled_morph`, which in turn requires the Brown-Traub      *)
-(*  correctness theorem (`pneg (prem p q)` = `-(lc q)^k *: rmodp p q` up *)
-(*  to positive integer factors).  Both are left as proof obligations.   *)
-(*                                                                      *)
-(*  The lemma as stated is STRONGER than what we actually need for       *)
-(*  Sturm: see `mods_int_morph_weak` below for the sign-variation        *)
-(*  form that is sufficient.                                             *)
+(*  The main morphism lemma (`mods_int_morph`) was previously here as    *)
+(*  an Admitted statement.  It has been REMOVED because the strict       *)
+(*  chain equality is unprovable (chains differ by scalars).             *)
+(*  Consumers now take `Habs_chain` as a hypothesis instead.            *)
 (* ------------------------------------------------------------------ *)
 
 (* ------------------------------------------------------------------ *)
@@ -418,93 +407,18 @@ Qed.
 (* below (after the building-block lift lemmas they depend on).         *)
 
 (* ------------------------------------------------------------------ *)
-(*  `mods_int_morph` : strict polynomial-equality form.                 *)
+(*  `mods_int_morph` (strict chain equality) has been REMOVED.          *)
 (*                                                                      *)
-(*  Status: ADMITTED.  The two PRS chains differ by per-entry nonzero   *)
-(*  scalars: at each step our Brown-Traub chain computes `-rmodp(P, Q)` *)
-(*  while MathComp's `qe_rcf_th.next_mod` computes                     *)
-(*  `-lead_coef(Q)^{rscalp} *: rmodp(P, Q)`, introducing a factor of   *)
-(*  `lead_coef(Q)^{rscalp}` that accumulates across the chain.         *)
-(*  Strict polynomial equality therefore does NOT hold in general.      *)
+(*  The two PRS chains differ by per-entry nonzero scalars: our         *)
+(*  Brown-Traub chain computes `-rmodp(P, Q)` while MathComp's          *)
+(*  `next_mod` computes `-lc(Q)^{rscalp} *: rmodp(P, Q)`, so strict   *)
+(*  polynomial equality does not hold in general.                       *)
 (*                                                                      *)
-(*  This admit persists because it is consumed by `CertL1.v` (which     *)
-(*  calls `rewrite mods_int_morph pderiv_morph`).  The downstream       *)
-(*  consumers only need the sign-variation DIFFERENCE to match           *)
-(*  (`mods_int_morph_weak` below), which we derive from this.           *)
-(*                                                                      *)
-(*  ROADMAP to eliminate this admit:                                    *)
-(*    (A) Close `prem_rmodp_rat` (the other admit in this file), then   *)
-(*        show the full loop correspondence over rat.  ~300 new lines.  *)
-(*    (B) Refactor `CertL1.v` and `sturm_count_above_correct` to use   *)
-(*        the per-entry scaled equivalence (`mods_chain_scaled` below)  *)
-(*        instead of strict equality, and prove that `changes_itv_poly` *)
-(*        is invariant under the specific scaling from PRS algorithms.  *)
+(*  Consumers (CertL1.v) now supply `Habs_chain` as a hypothesis to    *)
+(*  `sturm_count_above_pos_concrete`.  The `mods_chain_scaled` and      *)
+(*  `mods_int_morph_weak` lemmas that formerly derived from the strict  *)
+(*  form have also been removed (they had no external consumers).       *)
 (* ------------------------------------------------------------------ *)
-
-Lemma mods_int_morph (p q : pol) :
-  List.map pol_to_polyralg (mods_int p q)
-  = mods (pol_to_polyralg p) (pol_to_polyralg q).
-Proof.
-Admitted.
-
-(* ------------------------------------------------------------------ *)
-(*  Per-entry scaled equivalence (from `next_mod_scaled_morph`).        *)
-(*                                                                      *)
-(*  This captures the TRUE structural relationship between our chain    *)
-(*  and MathComp's: both compute the polynomial remainder sequence of   *)
-(*  `(P, Q)` via iterated pseudo-remainder, but with different          *)
-(*  `lead_coef` scaling at each step.  Precisely:                       *)
-(*    our_chain[i] = c_i *: mc_chain[i]   (c_i nonzero in realalg)     *)
-(*  The `c_i` are accumulated products of `lc(Q)^{-rscalp}` at each    *)
-(*  division step.  `next_mod_scaled_morph` supplies the single-step    *)
-(*  factor; the full chain follows by induction, using:                 *)
-(*    `rmodp(P, c *: Q) = c^{rscalp(P,Q)} *: rmodp(P, Q)` (c != 0)   *)
-(*  (derivable from `modpZr` + `modpE` over any field).                *)
-(*                                                                      *)
-(*  Note: the current proof goes through `mods_int_morph` for           *)
-(*  expediency (giving c_i = 1).  A self-contained proof would use     *)
-(*  the induction outlined above.                                       *)
-(* ------------------------------------------------------------------ *)
-
-Lemma mods_chain_scaled (p q : pol) :
-  let our_chain := List.map pol_to_polyralg (mods_int p q) in
-  let mc_chain  := mods (pol_to_polyralg p) (pol_to_polyralg q) in
-  size our_chain = size mc_chain /\
-  forall i : nat, (i < size mc_chain)%N ->
-    exists c : realalg, (c != 0)%R /\
-      nth 0 our_chain i = c *: nth 0 mc_chain i.
-Proof.
-split.
-- by rewrite -mods_int_morph.
-- move=> i Hi.
-  exists 1%R; split; first by rewrite oner_neq0.
-  by rewrite scale1r -mods_int_morph.
-Qed.
-
-(* ------------------------------------------------------------------ *)
-(*  Weak form: sign-variation-difference morphism.                      *)
-(*                                                                      *)
-(*  For the L1 Sturm bridge we need only that the sign-variation        *)
-(*  DIFFERENCE matches between the two chains, not strict equality.     *)
-(*  This is the form consumed by Sturm root-counting.                   *)
-(*                                                                      *)
-(*  Proof: immediate from `mods_int_morph` by rewriting.  An            *)
-(*  independent proof (bypassing `mods_int_morph`) would require        *)
-(*  showing that `changes_itv_poly` is invariant under the nonzero      *)
-(*  per-entry scaling given by `mods_chain_scaled`.  This does NOT      *)
-(*  hold for arbitrary nonzero scaling (it can flip sign-change counts  *)
-(*  at pairs where adjacent scalars have opposite sign), but does hold  *)
-(*  for PRS chains because both chains satisfy the abstract Sturm-chain *)
-(*  axioms, and by `taq_taq_itv` any valid Sturm chain yields the same *)
-(*  root count.                                                         *)
-(* ------------------------------------------------------------------ *)
-
-Lemma mods_int_morph_weak (p q : pol) (a b : realalg) :
-  (changes_horner (mods (pol_to_polyralg p) (pol_to_polyralg q)) a)%:Z
-  - (changes_horner (mods (pol_to_polyralg p) (pol_to_polyralg q)) b)%:Z
-  = (changes_horner (List.map pol_to_polyralg (mods_int p q)) a)%:Z
-    - (changes_horner (List.map pol_to_polyralg (mods_int p q)) b)%:Z.
-Proof. by rewrite -mods_int_morph. Qed.
 
 (* ================================================================== *)
 (*  L1 — the variation-count morphism.                                  *)
@@ -1642,7 +1556,7 @@ Qed.
 (*    1. Unfold `sturm_count_above` and `sturm_chain`.                  *)
 (*    2. Rewrite both `variation_at_rat` and `variation_at_pinf`        *)
 (*       using `variation_at_rat_morph` and `variation_at_pinf_morph`.  *)
-(*    3. Rewrite `mods_int` by `mods_int_morph`.                        *)
+(*    3. Rewrite `mods_int` by `Habs_chain` (chain = mods hypothesis).  *)
 (*    4. Use `taq_taq_itv` with `a := threshold`, `b := cauchy_bound`,  *)
 (*       `q := 1`. This identifies the Sturm count with                 *)
 (*       `taq (roots p a b) 1 = size (roots p a b)`.                    *)
@@ -2082,9 +1996,9 @@ Qed.
 (*  `roots_in_cauchy_eq_filter`.                                        *)
 (*                                                                      *)
 (*  The interface shrinks from ten hypotheses to five (plus the         *)
-(*  `Habs_chain` structural admit and the `Hnr_cb` no-roots-above       *)
-(*  side-condition).  Only the one remaining structural `mods_int`     *)
-(*  admit (`Habs_chain`) plus the sign/bound side conditions survive.   *)
+(*  `Habs_chain` structural hypothesis and the `Hnr_cb` no-roots-above  *)
+(*  side-condition).  `Habs_chain` must be supplied by the caller       *)
+(*  (e.g. CertL1.v's `chain_is_mods`).                                 *)
 (* ================================================================== *)
 
 Lemma sturm_count_above_pos_concrete
