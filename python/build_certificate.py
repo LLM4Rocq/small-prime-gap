@@ -253,6 +253,16 @@ def prem_int(A_p, B_p):
     Returns R such that lc(B)^(deg A - deg B + 1) * A = Q*B + R, deg R < deg B.
     Standard Knuth pseudo-division algorithm; stays in Z when inputs are in Z.
     """
+    Q, R = prem_int_with_quotient(A_p, B_p)
+    return R
+
+
+def prem_int_with_quotient(A_p, B_p):
+    """Pseudo-division of A by B as Python lists (low-to-high).
+    Returns (Q, R) such that lc(B)^d * A = Q*B + R, deg R < deg B,
+    where d = deg(A) - deg(B) + 1.
+    Standard Knuth pseudo-division algorithm; stays in Z when inputs are in Z.
+    """
     A_p = list(A_p)
     B_p = list(B_p)
     while A_p and A_p[-1] == 0:
@@ -264,10 +274,12 @@ def prem_int(A_p, B_p):
     m = len(A_p) - 1
     n = len(B_p) - 1
     if m < n:
-        return A_p
+        return [0], A_p
     d = m - n + 1
     lcB = B_p[-1]
     A_p = [c * (lcB ** d) for c in A_p]
+    # Q has degree m - n, so d = m - n + 1 coefficients.
+    Q_p = [0] * d
     while len(A_p) - 1 >= n:
         lcA = A_p[-1]
         if lcA == 0:
@@ -276,12 +288,18 @@ def prem_int(A_p, B_p):
         q_term, rem = divmod(lcA, lcB)
         assert rem == 0, "pseudo-div leading not exact (bug in d)"
         shift = (len(A_p) - 1) - n
+        Q_p[shift] = q_term
         for i, bc in enumerate(B_p):
             A_p[shift + i] -= q_term * bc
         # Strip trailing zeros that may have appeared.
         while A_p and A_p[-1] == 0:
             A_p.pop()
-    return A_p
+    # Strip trailing zeros from Q.
+    while Q_p and Q_p[-1] == 0:
+        Q_p.pop()
+    if not Q_p:
+        Q_p = [0]
+    return Q_p, A_p
 
 def deg_of(p):
     p = list(p)
@@ -352,17 +370,48 @@ print(f"  Brown-Traub done in {time.time() - t0:.2f} s; chain length = {len(chai
 assert len(betas) == len(chain) - 2
 
 # Self-check: ∀ i ≥ 1, prem(chain[i-1], chain[i]) == betas[i-1] * chain[i+1].
-print("[6b/10] Verifying every PRS step in pure Python…", flush=True)
+# Also collect pseudo-quotients Q_i for each step.
+print("[6b/10] Verifying every PRS step and collecting quotients…", flush=True)
 def pad(p, n):
     return list(p) + [0] * (n - len(p))
+prs_quotients = []
 for i in range(1, len(chain) - 1):
-    R     = prem_int(chain[i - 1], chain[i])
+    Q_i, R = prem_int_with_quotient(chain[i - 1], chain[i])
     beta_i = betas[i - 1]
     expected = [c * beta_i for c in chain[i + 1]]
     n = max(len(R), len(expected))
     assert pad(R, n) == pad(expected, n), \
         f"PRS audit FAILED at step {i}"
-print(f"  ✓ all {len(chain) - 2} PRS steps verified")
+    # Verify the quotient identity: lc(chain[i])^d * chain[i-1] = Q_i * chain[i] + R
+    # (This is guaranteed by the algorithm, but let's be explicit.)
+    d_step = deg_of(chain[i - 1]) - deg_of(chain[i]) + 1
+    lc_i = lc_of(chain[i])
+    lhs = [c * (lc_i ** d_step) for c in chain[i - 1]]
+    # Compute Q_i * chain[i] + R
+    def poly_mul(a, b):
+        if not a or not b:
+            return [0]
+        result = [0] * (len(a) + len(b) - 1)
+        for ia, ca in enumerate(a):
+            for ib, cb in enumerate(b):
+                result[ia + ib] += ca * cb
+        return result
+    def poly_add(a, b):
+        n_len = max(len(a), len(b))
+        return [
+            (a[j] if j < len(a) else 0) + (b[j] if j < len(b) else 0)
+            for j in range(n_len)
+        ]
+    rhs = poly_add(poly_mul(Q_i, chain[i]), R)
+    n2 = max(len(lhs), len(rhs))
+    assert pad(lhs, n2) == pad(rhs, n2), \
+        f"Quotient identity FAILED at step {i}"
+    prs_quotients.append(Q_i)
+print(f"  ✓ all {len(chain) - 2} PRS steps and quotient identities verified")
+max_quot_bits = [max((abs(c).bit_length() for c in q), default=0) for q in prs_quotients]
+max_quot_degs = [deg_of(q) for q in prs_quotients]
+print(f"  quotient max coef bits: max={max(max_quot_bits)}, "
+      f"degrees: max={max(max_quot_degs)}")
 
 # ----------------------------------------------------------------------
 # 7. Sign vectors at 4/105 and at +∞.
@@ -479,6 +528,10 @@ out_chain = {
         for i, p in enumerate(chain)
     ],
     "betas": [str(b) for b in betas],  # one per step i ≥ 1; len = chain_len - 2
+    "prs_quotients": [
+        {"i": i + 1, "deg": deg_of(q), "coefs_low_to_high": [str(c) for c in q]}
+        for i, q in enumerate(prs_quotients)
+    ],  # Q_i for step i = 1..chain_len-2; lc(chain[i])^d * chain[i-1] = Q_i * chain[i] + prem
 }
 
 CERT = ROOT / "certificate.json"
