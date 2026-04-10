@@ -18,7 +18,7 @@
 From Stdlib Require Import Uint63 ZArith List Bool Lia.
 From Bignums Require Import BigZ.
 Import ListNotations.
-From PrimeGapS1 Require Import WitnessChain.
+From PrimeGapS1 Require Import IntPoly WitnessChain.
 
 (* ============================================================== *)
 (*  Section 1: BigZ -> Uint63 modular reduction                     *)
@@ -253,16 +253,104 @@ Proof. vm_compute. reflexivity. Qed.
 (*  c ≡ 0 (mod p_1*...*p_k), and |c| < p_1*...*p_k/2 implies c=0. *)
 (* ============================================================== *)
 
-(* Placeholder for the product-of-primes bound.
-   With 6700 primes of size ~2^30 each, the product exceeds 2^(30*6700)
-   = 2^201000, which is larger than 2 * max_coefficient (< 2^200000). *)
+(* --- Convert BigZ polynomial data to IntPoly's list Z ---------- *)
+
+Definition bigZ_to_Z_poly (p : list BigZ.t_) : pol :=
+  List.map BigZ.to_Z p.
+
+(* --- Maximum absolute coefficient of a list Z polynomial ------- *)
+
+Definition max_abs_coeff (p : pol) : Z :=
+  List.fold_left (fun acc c => Z.max acc (Z.abs c)) p 0%Z.
+
+(* --- PRS identity residual for one step over Z ------------------ *)
+(*  Given A, B, Q, beta, C, the residual polynomial is:             *)
+(*    lc(B)^d * A - (Q * B + beta * C)                              *)
+(*  where d = psize(A) - psize(B) + 1 (Knuth pseudo-division).     *)
+
+Definition prs_residual_Z (A B Q : pol) (beta : Z) (C : pol) : pol :=
+  let lc_B := plead B in
+  let d := S (Nat.sub (psize A) (psize B)) in
+  let lc_pow := Z.pow lc_B (Z.of_nat d) in
+  psub (pscale lc_pow A) (padd (pmul Q B) (pscale beta C)).
+
+(* --- Check that all PRS steps yield zero residual over Z -------- *)
+
+Fixpoint all_prs_residuals_zero (chain : list pol)
+    (quotients : list pol) (betas : list Z) : Prop :=
+  match chain, quotients, betas with
+  | A :: ((B :: rest_chain) as BC), Q :: rest_Q, beta :: rest_B =>
+      let C := match rest_chain with c :: _ => c | [] => [] end in
+      pnorm (prs_residual_Z A B Q beta C) = []
+      /\ all_prs_residuals_zero BC rest_Q rest_B
+  | _, _, _ => True
+  end.
+
+(* --- Product of CRT primes as a Z value ------------------------- *)
+
+Definition crt_primes_Z : list Z :=
+  List.map Uint63.to_Z crt_primes.
+
+Definition crt_product : Z :=
+  List.fold_left Z.mul crt_primes_Z 1%Z.
+
+(* --- Concrete product bound ------------------------------------- *)
+(*  The product of our 10 primes (each ~2^30) exceeds 2^299.        *)
+(*  This is the threshold: if every coefficient of the residual     *)
+(*  has absolute value < crt_product / 2, then the residual is 0.   *)
+
 Definition primes_product_bound : Prop :=
-  True.  (* TODO: state the concrete bound once we scale to 6700 primes *)
+  (crt_product > 2 ^ 299)%Z.
+
+(* Machine-verify the product bound. *)
+Lemma primes_product_bound_verified : primes_product_bound.
+Proof. vm_compute. reflexivity. Qed.
+
+(* --- Max coefficient bound assumption --------------------------- *)
+(*  For CRT to apply, we need: for every PRS step, the max absolute *)
+(*  coefficient of the residual polynomial (over Z) is less than    *)
+(*  crt_product / 2.  This is an external assumption that depends   *)
+(*  on the actual coefficient sizes in the Maynard chain.           *)
+
+Fixpoint max_coeff_below_half_product
+    (chain : list pol) (quotients : list pol) (betas : list Z) : Prop :=
+  match chain, quotients, betas with
+  | A :: ((B :: rest_chain) as BC), Q :: rest_Q, beta :: rest_B =>
+      let C := match rest_chain with c :: _ => c | [] => [] end in
+      (2 * max_abs_coeff (prs_residual_Z A B Q beta C) < crt_product)%Z
+      /\ max_coeff_below_half_product BC rest_Q rest_B
+  | _, _, _ => True
+  end.
+
+(* ============================================================== *)
+(*  The CRT correctness theorem:                                    *)
+(*                                                                  *)
+(*  If (1) every PRS identity holds modulo each prime in            *)
+(*  crt_primes (check_full_prs_chain_mod = true), and               *)
+(*  (2) the product of crt_primes exceeds twice the maximum         *)
+(*  absolute coefficient of any residual polynomial, then           *)
+(*  every PRS identity holds exactly over Z.                        *)
+(* ============================================================== *)
 
 Lemma crt_correctness :
   check_full_prs_chain_mod = true ->
   primes_product_bound ->
-  (* The PRS identity lc(B)^d * A = Q*B + beta*C holds over Z
-     for every step in the Sturm chain. *)
-  True.  (* TODO: state the precise conclusion using IntPoly *)
-Proof. intros _ _. exact I. Qed.
+  max_coeff_below_half_product
+    (List.map bigZ_to_Z_poly sturm_chain_bigZ)
+    (List.map bigZ_to_Z_poly prs_quotients_bigZ)
+    (List.map BigZ.to_Z sturm_betas_bigZ) ->
+  all_prs_residuals_zero
+    (List.map bigZ_to_Z_poly sturm_chain_bigZ)
+    (List.map bigZ_to_Z_poly prs_quotients_bigZ)
+    (List.map BigZ.to_Z sturm_betas_bigZ).
+Proof.
+  (* The proof is a standard CRT argument:
+     For each coefficient c of each residual polynomial:
+     - check_full_prs_chain_mod = true implies c ≡ 0 (mod p_i)
+       for every p_i in crt_primes.
+     - Since the p_i are pairwise coprime (they are distinct primes),
+       CRT gives c ≡ 0 (mod crt_product).
+     - The max_coeff_below_half_product hypothesis gives
+       |c| < crt_product / 2, so c = 0.
+     - Since every coefficient is 0, pnorm of the residual is []. *)
+Admitted.

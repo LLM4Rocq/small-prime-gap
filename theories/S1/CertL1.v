@@ -26,14 +26,19 @@
 (*    chain_lc_nz       — leading coefficients nonzero (realalg)        *)
 (*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
 (*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
+(*    no_root_at_cb     — no chain poly has a root >= cauchy_bound      *)
+(*                         (via ge_cauchy_bound + cauchy_bound_le)      *)
 (*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
 (*                         (derived from no_root_at_cb)                 *)
 (*                                                                      *)
 (*  Remaining admitted obligations (future work):                       *)
-(*    shipped_chain_eq  — shipped chain = computed chain (Z-level)      *)
-(*    no_root_at_cb     — no chain poly roots >= cauchy_bound           *)
-(*    chain_is_mods     — lifted chain = abstract mods (moved from      *)
-(*                         Bridge.v; strict equality unprovable there)  *)
+(*    shipped_chain_eq    — shipped chain = computed chain (Z-level)    *)
+(*    chain_is_mods       — lifted chain = abstract mods (moved from   *)
+(*                           Bridge.v; strict equality)                *)
+(*    cauchy_bound_le_of_chain — Cauchy-bound comparison for chain     *)
+(*                           entries (numerically verified at BigZ      *)
+(*                           level in CauchyCheck.all_chain_cb_le;     *)
+(*                           bridge to realalg pending)                *)
 (* ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -276,8 +281,71 @@ Lemma chain_is_mods :
 Proof.
 Admitted.
 
+(* ---------- Cauchy-bound comparison infrastructure ---------- *)
+
+(* BigZ-level computation to verify that every chain entry has a
+   Cauchy bound <= that of the head polynomial.  We work entirely
+   in BigZ to avoid the expensive BigZ -> Stdlib Z conversion. *)
+Module CauchyCheck.
+From Bignums Require Import BigZ.
+
+Definition sum_abs (p : list BigZ.t_) : BigZ.t_ :=
+  List.fold_right (fun c acc => BigZ.add (BigZ.abs c) acc)
+    0%bigZ p.
+
+Fixpoint lc_aux (p : list BigZ.t_) (acc : BigZ.t_) : BigZ.t_ :=
+  match p with
+  | nil => acc
+  | x :: xs =>
+    if BigZ.eqb x 0%bigZ then lc_aux xs acc else lc_aux xs x
+  end.
+
+Definition lc (p : list BigZ.t_) : BigZ.t_ := lc_aux p 0%bigZ.
+
+Definition cb_le (q p : list BigZ.t_) : bool :=
+  BigZ.leb (BigZ.mul (sum_abs q) (BigZ.abs (lc p)))
+           (BigZ.mul (sum_abs p) (BigZ.abs (lc q))).
+
+Definition all_cb_le (chain : list (list BigZ.t_))
+                     (p : list BigZ.t_) : bool :=
+  List.forallb (fun q => cb_le q p) chain.
+
+Lemma all_chain_cb_le :
+  all_cb_le WitnessChain.sturm_chain_bigZ
+    (List.nth 0 WitnessChain.sturm_chain_bigZ nil) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+End CauchyCheck.
+
+(* Bridge: the BigZ-level Cauchy-bound comparison
+   (`CauchyCheck.all_chain_cb_le`, proven by vm_compute) implies the
+   realalg inequality `cauchy_bound (pol_to_polyralg q)
+   <= cauchy_bound (pol_to_polyralg P)` for every chain entry `q`.
+
+   Proof sketch (fully formalizable via MathComp lemmas):
+   - `cauchy_bound p = 1 + |lc p|^{-1} * sum_i |p`_i|`.
+   - For `p = pol_to_polyralg q`:
+       * `lc p = (Z_to_int (plead q))%:~R`    (lead_coef_pol_to_polyralg)
+       * `|lc p| = (|Z_to_int (plead q)|)%:~R` (normrMz)
+       * `p`_i = (Z_to_int (nth i q 0))%:~R`   (coeff of map_poly of ratr)
+       * `|p`_i| = (|Z_to_int (nth i q 0)|)%:~R`
+       * `sum_i |p`_i| = (sum |q[i]|_Z)%:~R`   (sumr of integer norms)
+   - So `cauchy_bound p = 1 + (sum_abs_Z q / |plead q|_Z)%:~R`.
+   - The comparison `cb_q <= cb_P` reduces to
+       `sum_abs_Z(q) * |plead(P)|_Z <= sum_abs_Z(P) * |plead(q)|_Z`,
+     a Z inequality verified by `CauchyCheck.all_chain_cb_le`. *)
+Lemma cauchy_bound_le_of_chain :
+  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+    (cauchy_bound (pol_to_polyralg q)
+       <= cauchy_bound (pol_to_polyralg charpoly_int))%R.
+Proof.
+Admitted.
+
 (* 4e. No chain polynomial has a root weakly above the Cauchy bound.
-   Follows from the Cauchy bound dominating all roots. *)
+   Proof: each chain entry r = pol_to_polyralg q is nonzero, so
+   ge_cauchy_bound gives noroot on [cauchy_bound r, +oo[.
+   Since cauchy_bound P >= cauchy_bound r (by cauchy_bound_le_of_chain),
+   [cauchy_bound P, +oo[ ⊆ [cauchy_bound r, +oo[, giving the result. *)
 Lemma no_root_at_cb :
   forall r : {poly realalg},
     r \in mods (pol_to_polyralg charpoly_int)
@@ -285,7 +353,37 @@ Lemma no_root_at_cb :
     {in `[cauchy_bound (pol_to_polyralg charpoly_int), +oo[,
        forall y : realalg, ~~ root r y}.
 Proof.
-Admitted.
+move=> r Hr y Hy.
+set P := pol_to_polyralg charpoly_int.
+(* r is in mods P P', so by chain_is_mods it is pol_to_polyralg q
+   for some q in the concrete chain. *)
+have Hin : r \in List.map pol_to_polyralg (BrownTraub.sturm_chain charpoly_int)
+  by rewrite chain_is_mods.
+(* Extract a witness q from the List.map membership. *)
+have [q [Hq Heqr]] : exists q, List.In q (BrownTraub.sturm_chain charpoly_int)
+                                /\ pol_to_polyralg q = r.
+{ move: Hin. rewrite /List.map.
+  elim: (BrownTraub.sturm_chain charpoly_int) => [|a l IH] //=.
+  rewrite inE. case/orP => [/eqP -> | Htl].
+  - by exists a; split; [left|].
+  - case: (IH Htl) => q [Hql Heq].
+    by exists q; split; [right|]. }
+subst r.
+(* pol_to_polyralg q is nonzero (from chain_lc_nz) *)
+have Hlc : (lead_coef (pol_to_polyralg q) != 0)%R := chain_lc_nz q Hq.
+have Hnz : pol_to_polyralg q != 0.
+{ by apply/eqP => Heq; rewrite Heq lead_coef0 eqxx in Hlc. }
+(* ge_cauchy_bound gives: no root of q above cauchy_bound q *)
+have Hge := ge_cauchy_bound Hnz.
+(* cauchy_bound P >= cauchy_bound q *)
+have Hle := cauchy_bound_le_of_chain q Hq.
+(* y is in [cauchy_bound P, +oo[, so y >= cauchy_bound P >= cauchy_bound q *)
+have Hy2 : y \in `[cauchy_bound (pol_to_polyralg q), +oo[.
+{ rewrite !in_itv /= in Hy *.
+  case/andP: Hy => Hcb _. apply/andP; split=> //.
+  exact: (order.Order.POrderTheory.le_trans Hle Hcb). }
+exact: Hge Hy2.
+Qed.
 
 (* Helper: List.In q l implies pol_to_polyralg q is in the
    mathcomp seq (List.map pol_to_polyralg l). *)
@@ -334,7 +432,8 @@ Qed.
 (*                     chain_cb_nz, threshold_lt_cb,                    *)
 (*                     sturm_count_above_charpoly_pos,                  *)
 (*                     signs_at_x0_agree, signs_at_inf_agree.           *)
-(*  Admitted facts used: shipped_chain_eq, no_root_at_cb, chain_is_mods.*)
+(*  Admitted facts used: shipped_chain_eq, chain_is_mods,               *)
+(*                       cauchy_bound_le_of_chain.                      *)
 (* ================================================================== *)
 
 Lemma maynard_L1_concrete :
