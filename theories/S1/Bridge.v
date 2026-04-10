@@ -781,6 +781,166 @@ transitivity (\sum_(x <- z) (1%R : int)).
 - by rewrite big_const_seq count_predT iter_addr_0 natr_to_Posz.
 Qed.
 
+(* ================================================================== *)
+(*  Wave 8 bridge: three standalone generic facts used by              *)
+(*  `sturm_count_above_correct`.                                       *)
+(*                                                                      *)
+(*  (1) `pderiv_morph`: our Z-level `pderiv` commutes with              *)
+(*      `pol_to_polyralg` and mathcomp's formal derivative `^`()`.      *)
+(*  (2) `changes_pinfty_eq_at_cauchy_bound`: mathcomp's                 *)
+(*      `changes_pinfty` on `mods q q^`()` agrees with `changes_horner` *)
+(*      evaluated at `cauchy_bound q`, provided no chain entry has a    *)
+(*      root ≥ `cauchy_bound q`.                                        *)
+(*  (3) `roots_in_cauchy_eq_filter`: the (semi-open) root list of       *)
+(*      `q` on `]θ, cauchy_bound q[` equals the filter of `rootsR q`    *)
+(*      by `> θ`.                                                       *)
+(* ================================================================== *)
+
+(* (1) pderiv-morphism. *)
+
+Lemma pderiv_aux_morph (p : pol) (k : Z) :
+  pol_to_polyralg (pderiv_aux p k)
+  = ((Z_to_int k)%:~R : realalg) *: (pol_to_polyralg p)
+    + 'X * (pol_to_polyralg p)^`().
+Proof.
+elim: p k => [|x p IH] k.
+- by rewrite /= pol_to_polyralg_nil scaler0 deriv0 mulr0 addr0.
+- rewrite [pderiv_aux _ _]/=.
+  rewrite pol_to_polyralg_cons.
+  rewrite (IH (BinInt.Z.add k 1)).
+  rewrite pol_to_polyralg_cons derivMXaddC.
+  set P := pol_to_polyralg p.
+  set kr : realalg := ((Z_to_int k)%:~R)%R.
+  set k1r : realalg := ((Z_to_int (BinInt.Z.add k 1))%:~R)%R.
+  set cr : realalg := ((Z_to_int x)%:~R)%R.
+  rewrite Z_to_int_mul intrM /= -/kr -/cr.
+  have Hk1 : k1r = (kr + 1)%R.
+  { rewrite /k1r Z_to_int_add_ralg -/kr.
+    have -> : ((Z_to_int (BinInt.Zpos 1))%:~R : realalg) = 1%R
+      by rewrite /Z_to_int /=.
+    by []. }
+  rewrite Hk1.
+  rewrite !mulrDl !mulrDr.
+  rewrite scalerDl scale1r.
+  rewrite mulrDl.
+  rewrite -scalerAl.
+  rewrite scalerDr.
+  rewrite scalerAl.
+  have Hcr : kr *: cr%:P = (kr * cr)%:P.
+  { by apply/polyP => i; rewrite coefZ !coefC; case: i => //=; rewrite mulr0. }
+  rewrite -Hcr.
+  rewrite -!addrA.
+  congr (_ + _).
+  rewrite mulrA.
+  rewrite [in RHS]addrCA.
+  rewrite [P * 'X]mulrC.
+  congr (_ + _).
+  by rewrite addrC.
+Qed.
+
+Lemma pderiv_morph (p : pol) :
+  pol_to_polyralg (pderiv p) = (pol_to_polyralg p)^`().
+Proof.
+case: p => [|x p] /=.
+- by rewrite pol_to_polyralg_nil deriv0.
+- rewrite pol_to_polyralg_cons derivMXaddC.
+  rewrite (pderiv_aux_morph p 1).
+  by rewrite /Z_to_int /= scale1r mulrC.
+Qed.
+
+(* (2) Generic helper: mathcomp's `changes` only depends on the pointwise *)
+(*     sign pattern of the two lists.                                     *)
+
+Lemma changes_sg_eq (R : rcfType) (s1 s2 : seq R) :
+  size s1 = size s2 ->
+  (forall i, (i < size s1)%N -> Num.sg (nth 0 s1 i) = Num.sg (nth 0 s2 i)) ->
+  changes s1 = changes s2.
+Proof.
+elim: s1 s2 => [|a1 s1' IH] [|a2 s2'] //= [Hsz] Hsgr.
+have Hsg1 : Num.sg a1 = Num.sg a2 by have := Hsgr 0%N; apply.
+have Hhead : Num.sg (head 0 s1') = Num.sg (head 0 s2').
+{ case: s1' s2' Hsz Hsgr {IH} => [|b1 t1] [|b2 t2] //=.
+  move=> _ Hsgr'. by have := Hsgr' 1%N; apply => /=. }
+have HIH : changes s1' = changes s2'.
+{ apply: IH => //.
+  by move=> i Hi; have := Hsgr i.+1; apply; rewrite ltnS. }
+rewrite HIH; congr (_ + _)%N.
+have Hpm : (a1 * head 0 s1' < 0) = (a2 * head 0 s2' < 0).
+{ rewrite -(sgr_cp0 (a1 * _)) -(sgr_cp0 (a2 * _)).
+  by rewrite !sgrM Hsg1 Hhead. }
+by rewrite Hpm.
+Qed.
+
+(* Core bridge lemma: if no chain entry has a root in [x, +oo[, then *)
+(* `changes_horner` at `x` agrees with `changes_pinfty`.              *)
+
+Lemma changes_horner_pinfty_eq (R : rcfType) (c : seq {poly R}) (x : R) :
+  (forall p : {poly R}, p \in c ->
+     {in `[x, +oo[, forall y, ~~ root p y}) ->
+  changes_horner c x = changes_pinfty c.
+Proof.
+move=> H; rewrite /changes_horner /changes_pinfty.
+apply: changes_sg_eq; first by rewrite !size_map.
+move=> i Hi.
+rewrite size_map in Hi.
+rewrite !(nth_map 0) //.
+set p := nth 0 c i.
+have Hpin : p \in c by exact: mem_nth.
+have Hnoroot := H p Hpin.
+have Hxin : x \in `[x, +oo[
+  by rewrite in_itv /= order.Order.POrderTheory.lexx.
+by rewrite (sgp_pinftyP Hnoroot Hxin).
+Qed.
+
+(* Specialisation to `mods q q^`()` at `cauchy_bound q`, under the       *)
+(* generic hypothesis that no element of the Sturm chain has a root      *)
+(* weakly above `cauchy_bound q`.  This is the "no chain-root above"     *)
+(* side-condition that the consumer must discharge.                      *)
+
+Lemma changes_pinfty_eq_at_cauchy_bound (q : {poly realalg})
+  (Hnr : forall p : {poly realalg}, p \in mods q q^`() ->
+          {in `[cauchy_bound q, +oo[, forall y, ~~ root p y}) :
+  changes_pinfty (mods q q^`())
+  = changes_horner (mods q q^`()) (cauchy_bound q).
+Proof. by symmetry; exact: changes_horner_pinfty_eq Hnr. Qed.
+
+(* (3) Filter bridge: the semi-open root list of `q` on `]th, cb[`      *)
+(* coincides with the global `rootsR q` filtered by `> th`, provided    *)
+(* `th < cb` and `cb` is chosen larger than any root of `q`.            *)
+
+Lemma roots_in_cauchy_eq_filter (q : {poly realalg}) (xt : realalg) :
+  (xt < cauchy_bound q)%R ->
+  roots q xt (cauchy_bound q)
+  = List.filter (fun r : realalg => xt < r)%R (rootsR q).
+Proof.
+move=> Hlt.
+set cb := cauchy_bound q.
+have [Hq|Hq] := eqVneq q 0.
+{ rewrite Hq rootsR0 /= roots0. by []. }
+set s := [seq r <- rootsR q | (xt < r)%R].
+have Hsort_rootsR : sorted <%R (rootsR q) := sorted_roots _ _ q.
+have Hsort_s : sorted <%R s.
+{ apply: sorted_filter; last exact: Hsort_rootsR.
+  by apply: order.Order.POrderTheory.lt_trans. }
+have Hrall := roots_on_rootsR Hq.
+have Hron : roots_on q (Interval (BSide false xt) (BSide true cb)) s.
+{ move=> r.
+  rewrite /s mem_filter in_itv /=.
+  apply/idP/idP.
+  - case/andP => /andP[Hxtr Hrcb] Hr_root.
+    rewrite Hxtr /=.
+    apply: (root_roots_on Hrall); last exact: Hr_root.
+    by rewrite in_itv /=.
+  - case/andP => Hxtr Hrin.
+    have Hr_root : root q r := roots_on_root Hrall Hrin.
+    have Hr_lt_cb : (r < cb)%R.
+    { have Hrabs : (`|r| < cb)%R := cauchy_boundP Hq (eqP Hr_root).
+      by move: Hrabs; rewrite Num.Theory.ltr_norml => /andP[_]. }
+    by rewrite Hxtr Hr_lt_cb Hr_root. }
+symmetry.
+exact: (roots_uniq Hq Hron Hsort_s).
+Qed.
+
 (* NOTE (2026-04-09): the hypothesis `Hchain_nz` propagates the
    "no zero entries in the Sturm chain" invariant from the morphism
    lemmas above.  It is a semantically-trivial property of
@@ -1023,4 +1183,52 @@ have Hin : List.In r (List.filter
 case: (in_list_filter_inv _ _ _ Hin) => Hlt Hin2.
 split; last exact: Hlt.
 by apply: rootsR_in_root.
+Qed.
+
+(* ================================================================== *)
+(*  L1 consumer — concrete wrapper.                                     *)
+(*                                                                      *)
+(*  This wrapper collapses the three generic Sturm-bridge hypotheses    *)
+(*  of `sturm_count_above_pos` — `Hpd`, `Hpinf_eq`, `Hroots_filt` —     *)
+(*  by discharging them via the freshly-proved generic lemmas           *)
+(*  `pderiv_morph`, `changes_pinfty_eq_at_cauchy_bound` and             *)
+(*  `roots_in_cauchy_eq_filter`.                                        *)
+(*                                                                      *)
+(*  The interface shrinks from ten hypotheses to five (plus the         *)
+(*  `Habs_chain` structural admit and the `Hnr_cb` no-roots-above       *)
+(*  side-condition).  Only the one remaining structural `mods_int`     *)
+(*  admit (`Habs_chain`) plus the sign/bound side conditions survive.   *)
+(* ================================================================== *)
+
+Lemma sturm_count_above_pos_concrete
+  (p : pol) (num den : Z)
+  (Hd : BinInt.Z.lt BinInt.Z0 den)
+  (Hchain_nz : forall q, List.In q (sturm_chain p) -> q <> nil)
+  (Hlc_nz : forall q, List.In q (sturm_chain p) ->
+                      (lead_coef (pol_to_polyralg q) != 0)%R)
+  (Hth_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[threshold_ralg num den] != 0)%R)
+  (Hcb_nz : forall q, List.In q (sturm_chain p) ->
+                      ((pol_to_polyralg q).[
+                         cauchy_bound (pol_to_polyralg p)] != 0)%R)
+  (Hbnd : (threshold_ralg num den
+             < cauchy_bound (pol_to_polyralg p))%R)
+  (Habs_chain :
+     List.map pol_to_polyralg (sturm_chain p)
+     = mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()))
+  (Hnr_cb : forall r : {poly realalg},
+     r \in mods (pol_to_polyralg p) ((pol_to_polyralg p)^`()) ->
+     {in `[cauchy_bound (pol_to_polyralg p), +oo[,
+        forall y : realalg, ~~ root r y}) :
+  (0 < sturm_count_above (sturm_chain p) num den)%nat ->
+  exists r : realalg,
+    root (pol_to_polyralg p) r /\ (threshold_ralg num den < r)%R.
+Proof.
+apply: (sturm_count_above_pos p num den Hd Hchain_nz
+          (pderiv_morph p)
+          Habs_chain
+          Hlc_nz Hth_nz Hcb_nz Hbnd
+          (changes_pinfty_eq_at_cauchy_bound (pol_to_polyralg p) Hnr_cb)
+          (roots_in_cauchy_eq_filter (pol_to_polyralg p)
+             (threshold_ralg num den) Hbnd)).
 Qed.

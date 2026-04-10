@@ -315,6 +315,21 @@ Proof.
 Qed.
 
 (* -------------------------------------------------------------------
+   The concrete 3x3 Laplace determinant has the expected closed form.
+   -------------------------------------------------------------------- *)
+Lemma det_int_laplace_three (a b c d e f g h i : Z) :
+  det_int_laplace [[a; b; c]; [d; e; f]; [g; h; i]]
+  = BinInt.Z.add
+      (BinInt.Z.sub
+         (BinInt.Z.mul a (BinInt.Z.sub (BinInt.Z.mul e i) (BinInt.Z.mul f h)))
+         (BinInt.Z.mul b (BinInt.Z.sub (BinInt.Z.mul d i) (BinInt.Z.mul f g))))
+      (BinInt.Z.mul c (BinInt.Z.sub (BinInt.Z.mul d h) (BinInt.Z.mul e g))).
+Proof.
+  cbv - [BinInt.Z.mul BinInt.Z.add BinInt.Z.sub BinInt.Z.opp].
+  ring.
+Qed.
+
+(* -------------------------------------------------------------------
    A specialized 2x2 base case of [det_int_laplace_correct], stated
    directly on the concrete shape [[a;b];[c;d]].  The general
    [det_int_laplace_correct] for n = 2 then reduces to this one by
@@ -352,6 +367,57 @@ Proof.
   (* Evaluate the concrete mat_get calls on the list [[a;b];[c;d]]. *)
   rewrite /mat_get /nth_Z /=.
   by rewrite mulrN.
+Qed.
+
+(* -------------------------------------------------------------------
+   3x3 bridge on the concrete shape [[a;b;c];[d;e;f];[g;h;i]].
+   Same technique as the 2x2 case: unfold Laplace via the closed
+   form, expand the abstract determinant along row 0 with
+   [expand_det_row] three times (the outer 3x3 and each 2x2
+   minor), reduce the 1x1 sub-sub-minors via [det_mx11], and
+   match arithmetic.
+   -------------------------------------------------------------------- *)
+Lemma det_int_laplace_correct_three_shape
+  (a b c d e f g h i : Z) :
+  ((Z_to_int (det_int_laplace [[a; b; c]; [d; e; f]; [g; h; i]]))%:~R : rat)
+  = (\det (mat_int_to_rat [[a; b; c]; [d; e; f]; [g; h; i]] 1 3))%R.
+Proof.
+  (* LHS: closed-form the 3x3 Laplace integer determinant. *)
+  rewrite det_int_laplace_three.
+  rewrite Z_to_int_add_loc !Z_to_int_sub_loc !Z_to_int_mul_loc
+          !Z_to_int_sub_loc !Z_to_int_mul_loc.
+  rewrite intrD !intrB !intrM.
+  (* RHS: expand the abstract determinant along row 0 (3 terms),
+     then each 2x2 cofactor along its row 0 (2 inner terms each),
+     then reduce the 1x1 sub-minors via [det_mx11]. *)
+  rewrite (expand_det_row _ ord0).
+  rewrite big_ord_recl big_ord_recl big_ord_recl big_ord0 addr0.
+  rewrite /cofactor.
+  rewrite !(expand_det_row _ ord0).
+  rewrite !big_ord_recl !big_ord0 !addr0.
+  rewrite /cofactor !det_mx11 /mat_int_to_rat !mxE.
+  change (Z_to_int 1) with (1%R : int).
+  rewrite !divr1.
+  (* Evaluate concrete list-level [mat_get] calls, then reduce the
+     sign exponents ord0 + (lift^k ord0) at the nat level. *)
+  rewrite /mat_get /nth_Z /=.
+  rewrite !add0n /bump /=.
+  rewrite !expr0 !expr1 (exprS _ 1%N) expr1 mulrNN.
+  rewrite !mul1r !mulN1r.
+  rewrite !rmorphB !rmorphM /=.
+  (* With the arithmetic exposed on both sides, set the nine
+     atoms and finish with associativity/distributivity. *)
+  set A := ((Z_to_int a)%:~R : rat).
+  set B := ((Z_to_int b)%:~R : rat).
+  set C := ((Z_to_int c)%:~R : rat).
+  set D := ((Z_to_int d)%:~R : rat).
+  set E := ((Z_to_int e)%:~R : rat).
+  set F := ((Z_to_int f)%:~R : rat).
+  set G := ((Z_to_int g)%:~R : rat).
+  set H := ((Z_to_int h)%:~R : rat).
+  set I := ((Z_to_int i)%:~R : rat).
+  rewrite !mulrN !mulrDr.
+  by rewrite -!addrA.
 Qed.
 
 (* -------------------------------------------------------------------
@@ -405,20 +471,32 @@ Lemma mat_int_to_rat_unitmx
   mat_int_to_rat M 1 n \in unitmx.
 Proof.
   move=> hnz.
-  (* The plan:
-       (\det (mat_int_to_rat M 1 n) = (Z_to_int (det_int M))%:~R)
-     is [det_int_correct] above, symmetrised.  An integer m <> 0 maps
-     to a nonzero rational under [m%:~R], so the determinant on the
-     rat side is nonzero, and this is exactly membership in [unitmx]
-     for a matrix over a field.
+  (* An integer m <> 0 maps to a nonzero rat under [m%:~R], so the
+     determinant on the rat side is nonzero, and this is exactly
+     membership in [unitmx] for a field-valued matrix.
 
-     The plumbing step requires:
-       - Z_to_int_nz   : z <> 0 -> Z_to_int z <> 0
-       - intr_eq0      : (m%:~R == 0) = (m == 0)  (from MathComp)
-       - unitmxE       : (A \in unitmx) = (\det A != 0)  (field case)
-
-     Deferred. *)
-Admitted.
+     Plumbing used:
+       unitmxE    : (A \in unitmx) = (\det A \is a GRing.unit)
+       unitfE     : (x \is a GRing.unit) = (x != 0)   [field]
+       det_int_correct : bridges det_int / \det across mat_int_to_rat. *)
+  rewrite unitmxE unitfE.
+  rewrite -(det_int_correct M n sq).
+  apply/eqP => H.
+  apply hnz.
+  have H2 : (Z_to_int (det_int M))%R = 0%R.
+  { apply/eqP. move: H => /eqP. by rewrite intr_eq0. }
+  (* A nonzero Z cannot map to 0 in [int] under [Z_to_int]. *)
+  destruct (det_int M) as [|p|p] eqn:Hd; [reflexivity| |].
+  - rewrite Z_to_int_pos_pos_loc in H2.
+    have Hp := Pos2Nat.is_pos p.
+    have H3 : (Pos.to_nat p : int) = 0%R by exact H2.
+    move: H3 => /eqP; rewrite -[(0%R : int)]/(Posz 0) eqz_nat => /eqP ?; lia.
+  - rewrite Z_to_int_neg_pos_loc in H2.
+    have Hp := Pos2Nat.is_pos p.
+    have H3 : (Pos.to_nat p : int) = 0%R.
+    { apply/eqP; move: H2 => /eqP; by rewrite eqr_oppLR oppr0. }
+    move: H3 => /eqP; rewrite -[(0%R : int)]/(Posz 0) eqz_nat => /eqP ?; lia.
+Qed.
 
 (* ===================================================================
    Print-Assumptions hygiene note.
