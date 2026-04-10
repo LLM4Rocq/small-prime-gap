@@ -29,7 +29,7 @@ The original proof relies on an unrefereed Mathematica notebook
 
 | Fact | Method | Time | File |
 |---|---|---|---|
-| 42-step PRS chain recurrence | CRT over 9 776 Uint63 primes | **21 s** | CRTCheck.v |
+| 42-step PRS chain recurrence | CRT over 10 Uint63 primes (~300-bit coverage; see caveat below) | **21 s** | CRTCheck.v |
 | Sign vectors at 4/105 (43 entries) | BigZ Horner evaluation | **< 1 s** | CRTSigns.v |
 | Sign vectors at +∞ (43 entries) | BigZ leading-coef comparison | **< 1 s** | CRTSigns.v |
 | Variation counts: V(4/105) = 22, V(+∞) = 21 | IntPoly `variation` | **< 1 s** | CertL1.v |
@@ -60,8 +60,30 @@ The original proof relies on an unrefereed Mathematica notebook
 | `mat_int_to_rat_unitmx` | nonzero `det_int` → lifted matrix is invertible | IntMatProof.v |
 | `Z_to_int_mul`, `Z_to_int_add`, `Z_to_int_opp` | Z-to-int ring morphism properties | Bridge.v, CharPolyHelpers.v |
 
-**Bridge.v has 0 Admitted lemmas.** The entire L1 Sturm bridge from
-integer arithmetic to MathComp realalg is machine-checked.
+**Bridge.v has 0 Admitted lemmas.** The L1 Sturm bridge from integer
+arithmetic to MathComp realalg is machine-checked. Note however that
+the hard obligation (`chain_is_mods` = strict chain equality) was moved
+to CertL1.v where it remains Admitted; Bridge.v achieves 0 admits by
+parameterizing over this obligation.
+
+### CRT caveat
+
+The "42-step PRS chain verified" claim requires an important caveat:
+CRTCheck.v uses **10 primes** of ~30 bits each, giving a product of
+~2^300. The actual maximum coefficient across the PRS verification is
+**293,217 bits**, requiring ~9,776 primes for a complete CRT proof.
+With 10 primes, the check is a strong probabilistic sanity test (false
+positive probability ~2^{-300}) but NOT a mathematical proof. The
+`crt_correctness` lemma in CRTCheck.v proves `True` (a vacuous
+placeholder). Scaling to the full ~9,776 primes is blocked by
+`BigZ.modulo` performance (~6 hours estimated under `vm_compute`);
+see PLAN_42x42.md for alternatives.
+
+The sign vector verification (CRTSigns.v) is sound and fully proved
+(0 admits), BUT it verifies signs of the **shipped** chain data from
+WitnessChain.v, not the chain that BrownTraub.sturm_chain would
+compute. The bridge between shipped and computed data is
+`shipped_chain_eq` in CertL1.v, which is Admitted.
 
 ## The headline theorem
 
@@ -129,7 +151,6 @@ assembles from:
 |---|---|---|
 | Witness.v | 510 KB | M1_int, M2_int, A_int, char polys, signs, V counts |
 | WitnessChain.v | 13.6 MB | Brown-Traub PRS chain + quotients + betas in bigZ |
-| CRTPrimes.v | 211 KB | 9 776 primes for CRT verification |
 
 ### Computational layer (0 admits each)
 | File | Lines | Purpose |
