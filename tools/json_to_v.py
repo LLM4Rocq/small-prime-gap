@@ -252,6 +252,33 @@ def emit_witness_chain(heavy: dict) -> str:
     ))
     out.append("\n")
 
+    # Pseudo-quotients Q_i for each PRS step.
+    if "prs_quotients" in heavy:
+        out.append("\n(* ============================================================== *)\n")
+        out.append("(* Pseudo-quotients Q_i for each PRS step i = 1 .. chain_len - 2.  *)\n")
+        out.append("(* Identity: lc(chain_i)^d * chain_{i-1} = Q_i * chain_i + R_i     *)\n")
+        out.append("(* where d = deg(chain_{i-1}) - deg(chain_i) + 1, R_i = prem.       *)\n")
+        out.append("(* ============================================================== *)\n\n")
+
+        for qentry in heavy["prs_quotients"]:
+            i = qentry["i"]
+            coefs = qentry["coefs_low_to_high"]
+            out.append(f"(* quotient Q_{i}, degree {qentry['deg']}, {len(coefs)} coefs *)\n")
+            out.append(emit_definition(
+                f"prs_quot_{i}",
+                "list BigZ.t_",
+                list_bigz(coefs),
+            ))
+            out.append("\n")
+
+        # Assembled list of all quotients.
+        n_quots = len(heavy["prs_quotients"])
+        quot_refs = " ::\n    ".join(
+            f"prs_quot_{q['i']}" for q in heavy["prs_quotients"]
+        )
+        out.append("(* Full list of pseudo-quotients, one per PRS step. *)\n")
+        out.append(f"Definition prs_quotients_bigZ : list (list BigZ.t_) :=\n    {quot_refs} :: nil.\n\n")
+
     # Lazy stdlib-Z views of the chain & betas.  vm_compute will reduce
     # these on demand; the conversion is O(n log n) per element.
     out.append(textwrap.dedent("""\
@@ -259,6 +286,9 @@ def emit_witness_chain(heavy: dict) -> str:
         Definition sturm_chain : list (list Z) := lift_bigZ2 sturm_chain_bigZ.
         Definition sturm_betas : list Z        := lift_bigZ  sturm_betas_bigZ.
     """))
+
+    if "prs_quotients" in heavy:
+        out.append("Definition prs_quotients : list (list Z) := lift_bigZ2 prs_quotients_bigZ.\n")
 
     return "".join(out)
 
