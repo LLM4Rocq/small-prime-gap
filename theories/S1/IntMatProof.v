@@ -32,19 +32,34 @@
                                       Qed — this is the main new
                                       result of the scaffolding sprint)
 
+   Closed (Wave 10 — minor-commutes-with-lift sprint):
+     - nth_Z_drop_nth                (drop_nth/nth_Z bump shift, Qed)
+     - map_drop_nth_nth              (map (drop_nth j) commutes with
+                                      nth, Qed)
+     - mat_get_minor                 (list-level minor projection, Qed)
+     - mat_int_to_rat_minor          (the main minor-commutes-with-lift
+                                      lemma, Target A, Qed)
+     - mat_dim_minor_mat             (dimension of a minor, Qed)
+     - mat_int_to_rat_get            (pointwise read of the lift, Qed)
+     - det_int_laplace_correct_step  (Target B, the inductive step
+                                      assuming [det_int_laplace_expand]
+                                      and the IH, Qed)
+     - det_int_laplace_correct       (Target C, full induction on n,
+                                      now Qed; depends only on
+                                      [det_int_laplace_expand] which is
+                                      Admitted)
+     - det_int_correct               (main bridge, now Qed; depends on
+                                      [det_int_laplace_eq_det_int] and
+                                      [det_int_laplace_expand])
+     - mat_int_to_rat_unitmx         (downstream corollary, now Qed)
+
    Partial / Admitted:
      - det_int_laplace_eq_det_int    (Bareiss = Laplace, Admitted)
-     - det_int_laplace_correct       (Laplace = MathComp \det, Admitted;
-                                      cases n = 0 and n = 1 and the
-                                      shape-[[a;b];[c;d]] case of
-                                      n = 2 are closed as standalone
-                                      lemmas.  The remaining content
-                                      is the n >= 2 induction via
-                                      [expand_det_row]).
-     - det_int_correct               (main bridge, Admitted, derived
-                                      from the two lemmas above)
-     - mat_int_to_rat_unitmx         (downstream corollary, Admitted;
-                                      mechanical given det_int_correct)
+     - det_int_laplace_expand        (first-row Laplace expansion of
+                                      [det_int_laplace] in MathComp
+                                      \sum form, Admitted; the only
+                                      remaining piece needed by the
+                                      [det_int_laplace_correct] chain)
 
    =====================================================================
    Proof outline (Approach A — cofactor expansion)
@@ -421,6 +436,133 @@ Proof.
 Qed.
 
 (* -------------------------------------------------------------------
+   Target A: the minor-commutes-with-lift lemma.
+
+   This says that taking a list-level minor (drop row 0, drop column j)
+   and then lifting to a rat matrix is the same as lifting first and
+   then taking the MathComp-level minor (row' ord0 + col' j_ord).
+   It is the key ingredient in the inductive step of
+   [det_int_laplace_correct]: once minors on both sides are identified,
+   the induction hypothesis applies summand-wise in [expand_det_row].
+   -------------------------------------------------------------------- *)
+
+Lemma nth_nil_Z_loc (n : nat) (d : Z) : ListDef.nth n [::] d = d.
+Proof. by case: n. Qed.
+
+(** `drop_nth` commutes with `nth_Z` via the `bump` index shift. *)
+Lemma nth_Z_drop_nth (row : list Z) (j j' : nat) :
+  nth_Z (drop_nth j row) j' = nth_Z row (bump j j').
+Proof.
+  rewrite /nth_Z /bump.
+  elim: row j j' => [|x xs IH] j j'.
+  { rewrite (_ : drop_nth j [::] = [::]); last by case: j.
+    by rewrite !nth_nil_Z_loc. }
+  case: j => [|j] /=. { by rewrite add0n. }
+  case: j' => [|j'] /=. by [].
+  rewrite IH /=. by rewrite addnS.
+Qed.
+
+(** `map (drop_nth j)` commutes with `nth` at default `[::]`. *)
+Lemma map_drop_nth_nth (rest : list (list Z)) (j i' : nat) :
+  ListDef.nth i' (List.map (drop_nth j) rest) [::]
+  = drop_nth j (ListDef.nth i' rest [::]).
+Proof.
+  elim: rest i' => [|r rs IH] i'.
+  - simpl. case: i' => [|i''] /=. case: j => //. case: j => //.
+  - case: i' => [|i''] /=; first by []. by rewrite IH.
+Qed.
+
+(** List-level `mat_get` of a minor reduces to a `mat_get` of the
+    original matrix with indices shifted by 1 (row) and by `bump j`
+    (column). *)
+Lemma mat_get_minor (M : mat) (j i' j' : nat) :
+  M <> [::] ->
+  mat_get (minor_mat j M) i' j' = mat_get M i'.+1 (bump j j').
+Proof.
+  move=> Hne. rewrite /mat_get /minor_mat.
+  destruct M as [|row rest]; first by exfalso; apply Hne.
+  simpl (ListDef.nth i'.+1 (row :: rest) [::]).
+  rewrite map_drop_nth_nth. by rewrite nth_Z_drop_nth.
+Qed.
+
+(** **Target A** — the main minor-commutes-with-lift lemma.  Lifting a
+    list-level minor to a rat matrix is the same as taking the
+    MathComp-level minor (row' ord0 composed with col' at `Ordinal Hj`)
+    of the lifted matrix. *)
+Lemma mat_int_to_rat_minor (M : mat) (k : nat) (j : nat)
+  (Hne : M <> [::]) (Hj : (j < k.+1)%nat) :
+  mat_int_to_rat (minor_mat j M) 1 k
+  = row' ord0 (col' (Ordinal Hj) (mat_int_to_rat M 1 k.+1)).
+Proof.
+  apply/matrixP => i j'. rewrite !mxE /=.
+  by rewrite mat_get_minor.
+Qed.
+
+(** Dimension of a list-level minor: drop one row, drop one column. *)
+Lemma mat_dim_minor_mat (M : mat) (j : nat) :
+  mat_dim (minor_mat j M) = (mat_dim M).-1.
+Proof. rewrite /minor_mat /mat_dim. case: M => //= r rs. by rewrite length_map. Qed.
+
+(** Pointwise read of `mat_int_to_rat` at integer ordinals. *)
+Lemma mat_int_to_rat_get (M : mat) (k : nat) (i j : 'I_k) :
+  (mat_int_to_rat M 1 k) i j = ((Z_to_int (mat_get M i j))%:~R : rat).
+Proof.
+  rewrite mxE /=.
+  change (Z_to_int 1) with (1%R : int).
+  by rewrite divr1.
+Qed.
+
+(* -------------------------------------------------------------------
+   Target B step lemma — first row Laplace expansion of
+   `det_int_laplace`, in MathComp `\sum` form.
+
+   Sketch: unfold `det_int_laplace_fuel` on a non-empty matrix of
+   dimension `k.+1`, recognise the inner local fix as a list iteration
+   over the first row, and translate that iteration into a
+   `\sum_(j < k.+1)` MathComp big-op.  The proof would proceed by an
+   auxiliary `expand_from`-style lemma generalising the inner fix to
+   start at an arbitrary index.  For now we leave this lemma Admitted;
+   it is the only piece of arithmetic on the list representation that
+   the inductive step below depends on, and is independent of the
+   minor / cofactor bridging which is closed above. *)
+Lemma det_int_laplace_expand (M : mat) (k : nat) :
+  mat_dim M = k.+1 ->
+  ((Z_to_int (det_int_laplace M))%:~R : rat)
+  = (\sum_(j < k.+1)
+       ((-1)^+j * (Z_to_int (mat_get M 0 j))%:~R
+                * (Z_to_int (det_int_laplace (minor_mat j M)))%:~R) : rat)%R.
+Proof. Admitted.
+
+(** **Target B step** — the inductive step of [det_int_laplace_correct]:
+    given the IH at dimension `n`, lift it to dimension `n.+1`.
+
+    This uses [det_int_laplace_expand] to bring the LHS into a sum
+    matching MathComp's [expand_det_row], [mat_int_to_rat_minor] (Target
+    A) to identify the minors on both sides, and the IH applied to each
+    minor to close the induction. *)
+Lemma det_int_laplace_correct_step (n : nat)
+  (IH : forall M : mat, mat_dim M = n ->
+        ((Z_to_int (det_int_laplace M))%:~R : rat) = (\det (mat_int_to_rat M 1 n))%R) :
+  forall M : mat, mat_dim M = n.+1 ->
+    ((Z_to_int (det_int_laplace M))%:~R : rat) = (\det (mat_int_to_rat M 1 n.+1))%R.
+Proof.
+  move=> M Hdim.
+  have Hne : M <> [::]. { by case: M Hdim. }
+  rewrite (det_int_laplace_expand M n Hdim).
+  rewrite (expand_det_row _ (@ord0 n)).
+  apply: eq_bigr => j _.
+  rewrite /cofactor.
+  rewrite mat_int_to_rat_get.
+  have Hj : (nat_of_ord j < n.+1)%nat by apply: ltn_ord.
+  have -> : row' (@ord0 n) (col' j (mat_int_to_rat M 1 n.+1))
+          = mat_int_to_rat (minor_mat j M) 1 n.
+  { by rewrite (mat_int_to_rat_minor M n j Hne Hj); congr row'. }
+  rewrite -IH; last by rewrite mat_dim_minor_mat Hdim.
+  rewrite add0n.
+  by rewrite mulrCA mulrA.
+Qed.
+
+(* -------------------------------------------------------------------
    The general Step B lemma, proved by induction on n using:
      n = 0 : det_int_correct_zero (reused with det_int_laplace by
              unfolding; see proof).
@@ -437,7 +579,12 @@ Lemma det_int_laplace_correct (M : mat) (n : nat) :
   mat_dim M = n ->
   ((Z_to_int (det_int_laplace M))%:~R : rat)
   = (\det (mat_int_to_rat M 1 n))%R.
-Proof. Admitted.
+Proof.
+  elim: n M => [|n IH] M Hdim.
+  - have hM : M = [::] by case: M Hdim => //=.
+    rewrite hM /= det_mx00. reflexivity.
+  - exact: (det_int_laplace_correct_step n IH M Hdim).
+Qed.
 
 (* ===================================================================
    Main bridge lemma — derived from Steps A and B.
