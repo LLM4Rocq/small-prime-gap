@@ -28,6 +28,14 @@ From PrimeGapS1 Require Import IntPoly IntMat CharPoly CharPolyHelpers.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
+
+(* Local placeholder definitions for the FL loop state readers.
+   These were formerly in CharPoly.v but were removed to clean up
+   dead code. They are used ONLY by the Admitted wrapper lemmas
+   fl_invariant_L2 and fl_divisibility_L2 below. Once the genuine
+   iterative definitions are developed, these will be replaced. *)
+Definition fl_M_int_k (_ : mat) (_ : nat) : mat := [::].
+Definition fl_c_int_k (_ : mat) (_ : nat) : Z := Z0.
 Unset Printing Implicit Defensive.
 
 (* ==================================================================
