@@ -6,7 +6,7 @@
 (*  Given a subresultant PRS chain[0..n] and pseudo-quotients       *)
 (*  Q[0..n-2], verify each step:                                    *)
 (*                                                                  *)
-(*    lc(chain_i)^d * chain_{i-1} = Q_i * chain_i + chain_{i+1}    *)
+(*    lc(chain_i)^d * chain_{i-1} = Q_i * chain_i + beta_i * chain_{i+1}  *)
 (*                                                                  *)
 (*  where d = psize(chain_{i-1}) - psize(chain_i).                  *)
 (*                                                                  *)
@@ -31,26 +31,40 @@ Fixpoint list_eqb {A : Type} (eqb : A -> A -> bool) (l1 l2 : list A) : bool :=
 (* ---------- Single PRS step checker ---------- *)
 
 (* Check one PRS step: verify the pseudo-division identity
-     lc(B)^d * A = Q * B + R
-   where d = psize A - psize B.
+     lc(B)^d * A = Q * B + beta * C
+   where d = psize A - psize B, and C is the next chain entry.
    Returns true iff the identity holds on normalized forms. *)
-Definition check_prs_step (A B Q R : pol) : bool :=
-  let d := Nat.sub (psize A) (psize B) in
+Definition check_prs_step_d (A B Q : pol) (d : nat) (beta : Z) (C : pol) : bool :=
   let lc_B := plead B in
   let lhs := pscale (Z.pow lc_B (Z.of_nat d)) A in
-  let rhs := padd (pmul Q B) R in
+  let rhs := padd (pmul Q B) (pscale beta C) in
   list_eqb Z.eqb (pnorm lhs) (pnorm rhs).
+
+(* Convenience: when beta = 1, reduces to the original form. *)
+(* Standard form: d = psize A - psize B (matches the toy chain convention). *)
+Definition check_prs_step (A B Q : pol) (beta : Z) (C : pol) : bool :=
+  check_prs_step_d A B Q (Nat.sub (psize A) (psize B)) beta C.
+
+(* Legacy form: beta = 1, for chains without subresultant beta-division. *)
+Definition check_prs_step_no_beta (A B Q R : pol) : bool :=
+  check_prs_step A B Q 1 R.
+
+(* Knuth form: d = psize A - psize B + 1 (standard pseudo-division). *)
+Definition check_prs_step_knuth (A B Q : pol) (beta : Z) (C : pol) : bool :=
+  check_prs_step_d A B Q (S (Nat.sub (psize A) (psize B))) beta C.
 
 (* ---------- Full chain checker ---------- *)
 
-(* Check an entire chain: given chain[0..n] and quotients[0..n-2],
-   verify every step. *)
-Fixpoint check_all_prs_steps (chain : list pol) (quotients : list pol) : bool :=
-  match chain, quotients with
-  | A :: ((B :: rest_chain) as BC), Q :: rest_Q =>
-      let R := match rest_chain with r :: _ => r | [] => [] end in
-      check_prs_step A B Q R && check_all_prs_steps BC rest_Q
-  | _, _ => true  (* ran out of chain or quotients -- vacuously true *)
+(* Check an entire chain: given chain[0..n], quotients[0..n-2], and
+   betas[0..n-2], verify every step of the Brown-Traub PRS:
+     lc(chain_i)^d * chain_{i-1} = Q_i * chain_i + beta_i * chain_{i+1}  *)
+Fixpoint check_all_prs_steps (chain : list pol) (quotients : list pol)
+                              (betas : list Z) : bool :=
+  match chain, quotients, betas with
+  | A :: ((B :: rest_chain) as BC), Q :: rest_Q, beta :: rest_B =>
+      let C := match rest_chain with c :: _ => c | [] => [] end in
+      check_prs_step A B Q beta C && check_all_prs_steps BC rest_Q rest_B
+  | _, _, _ => true  (* ran out of chain/quotients/betas — vacuously true *)
   end.
 
 (* ============================================================== *)
@@ -81,21 +95,21 @@ Definition toy_quotients : list pol :=
 
 (* Individual step checks *)
 Example toy_step0 :
-  check_prs_step [-6; 11; -6; 1] [11; -12; 3] [-2; 1] [4; -2] = true.
+  check_prs_step_no_beta [-6; 11; -6; 1] [11; -12; 3] [-2; 1] [4; -2] = true.
 Proof. vm_compute. reflexivity. Qed.
 
 Example toy_step1 :
-  check_prs_step [11; -12; 3] [4; -2] [-6; 3] [2] = true.
+  check_prs_step_no_beta [11; -12; 3] [4; -2] [-6; 3] [2] = true.
 Proof. vm_compute. reflexivity. Qed.
 
 (* Full chain check *)
 Example toy_chain_check :
-  check_all_prs_steps toy_chain toy_quotients = true.
+  check_all_prs_steps toy_chain toy_quotients [1; 1] = true.
 Proof. vm_compute. reflexivity. Qed.
 
 (* Negative test: wrong quotient should fail *)
 Example toy_bad_quotient :
-  check_prs_step [-6; 11; -6; 1] [11; -12; 3] [-2; 2] [4; -2] = false.
+  check_prs_step_no_beta [-6; 11; -6; 1] [11; -12; 3] [-2; 2] [4; -2] = false.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ============================================================== *)
@@ -119,10 +133,10 @@ Definition perf_R : pol :=
 
 (* The main performance test: verify one PRS step with ~100-bit input coefficients *)
 Example perf_step_check :
-  check_prs_step perf_A perf_B perf_Q perf_R = true.
+  check_prs_step_no_beta perf_A perf_B perf_Q perf_R = true.
 Proof. vm_compute. reflexivity. Qed.
 
 (* Also test as a 3-entry chain with 1 quotient *)
 Example perf_chain_check :
-  check_all_prs_steps [perf_A; perf_B; perf_R] [perf_Q] = true.
+  check_all_prs_steps [perf_A; perf_B; perf_R] [perf_Q] [1] = true.
 Proof. vm_compute. reflexivity. Qed.
