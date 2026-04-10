@@ -93,17 +93,21 @@ Qed.
 
 (* ------------------------------------------------------------------
    L4 — Maynard bridge: existence of an eigenvalue > 4/105 implies
-   M_{105} > 4. Not used to prove the headline below, but stated
-   here for completeness of the architecture. It is scaffolding for
-   a future satellite lemma; we keep it as `True` to avoid pinning
-   a premature definition of `M_k`.
+   the existence of an eigenvalue λ with 4 < 105 * λ, i.e., M_{105} > 4.
+   This is an elementary rescaling of the bound.
    ------------------------------------------------------------------ *)
 Lemma maynard_bridge_L4 :
   (exists lambda : realalg,
       eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
       /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda) ->
-  True.   (* TODO: refine to `105 * lambda_max(M2, M1) > 4` *)
-Admitted.
+  exists lambda : realalg,
+      eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
+      /\ (4%:R < 105%:R * lambda :> realalg).
+Proof.
+  case=> [lambda [Heig Hlt]]; exists lambda; split=> //.
+  rewrite mulrC -ltr_pdivrMr; last by rewrite ltr0n.
+  by rewrite (_ : (4 / 105 : realalg) = ratr (4%:~R / 105%:~R)).
+Qed.
 
 (* ------------------------------------------------------------------
    The headline S1 theorem. Proof assembles L1, L2, L3.
