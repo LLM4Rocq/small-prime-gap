@@ -23,11 +23,12 @@
 (*    chain_th_nz       — chain evals at 4/105 nonzero (realalg)        *)
 (*    threshold_lt_cb   — 4/105 < cauchy_bound (lift charpoly_int)      *)
 (*    chain_is_mods     — lifted chain = abstract mods                  *)
+(*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
+(*                         (derived from no_root_at_cb)                 *)
 (*                                                                      *)
 (*  Remaining admitted obligations (future work):                       *)
 (*    signs_at_x0_agree — witness signs = sign_at_rat on the chain      *)
 (*    signs_at_inf_agree — witness signs = sign_at_pinf on the chain    *)
-(*    chain_cb_nz       — chain evals at cauchy_bound nonzero           *)
 (*    no_root_at_cb     — no chain poly roots >= cauchy_bound           *)
 (* ================================================================== *)
 
@@ -230,16 +231,7 @@ Proof.
   unfold Z.eq in Heq2. rewrite Heq2 in Hall. discriminate.
 Qed.
 
-(* 4c. All chain entries evaluate to nonzero at the Cauchy bound
-   after lifting to realalg. *)
-Lemma chain_cb_nz :
-  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
-    ((pol_to_polyralg q).[
-       cauchy_bound (pol_to_polyralg charpoly_int)] != 0)%R.
-Proof.
-Admitted.
-
-(* 4d. The threshold 4/105 is below the Cauchy bound. The Cauchy
+(* 4c. The threshold 4/105 is below the Cauchy bound. The Cauchy
    bound of the degree-42 polynomial with huge coefficients is
    vastly larger than 4/105 ~ 0.038. *)
 Lemma threshold_lt_cb :
@@ -254,7 +246,7 @@ Proof.
     apply: sumr_ge0 => i _; apply: normr_ge0.
 Qed.
 
-(* 4e. The lifted Sturm chain equals the abstract mods chain.
+(* 4d. The lifted Sturm chain equals the abstract mods chain.
    This is mods_int_morph applied to (charpoly_int, pderiv charpoly_int),
    combined with pderiv_morph. *)
 Lemma chain_is_mods :
@@ -267,7 +259,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* 4f. No chain polynomial has a root weakly above the Cauchy bound.
+(* 4e. No chain polynomial has a root weakly above the Cauchy bound.
    Follows from the Cauchy bound dominating all roots. *)
 Lemma no_root_at_cb :
   forall r : {poly realalg},
@@ -278,6 +270,43 @@ Lemma no_root_at_cb :
 Proof.
 Admitted.
 
+(* Helper: List.In q l implies pol_to_polyralg q is in the
+   mathcomp seq (List.map pol_to_polyralg l). *)
+Local Lemma list_in_to_mem (q : pol) (l : list pol) :
+  List.In q l -> pol_to_polyralg q \in List.map pol_to_polyralg l.
+Proof.
+  elim: l => [//|a tl IH] /=.
+  case=> [<-|Htl].
+  - by rewrite inE eqxx.
+  - by rewrite inE (IH Htl) orbT.
+Qed.
+
+(* 4f. All chain entries evaluate to nonzero at the Cauchy bound
+   after lifting to realalg.
+   Derived from no_root_at_cb: if no chain polynomial has a root
+   at or above cauchy_bound P, then evaluating at cauchy_bound P
+   gives a nonzero result. *)
+Lemma chain_cb_nz :
+  forall q, List.In q (BrownTraub.sturm_chain charpoly_int) ->
+    ((pol_to_polyralg q).[
+       cauchy_bound (pol_to_polyralg charpoly_int)] != 0)%R.
+Proof.
+  intros q Hq.
+  set P := pol_to_polyralg charpoly_int.
+  set r := pol_to_polyralg q.
+  (* r is in mods P P^`() by chain_is_mods *)
+  have Hin : r \in mods P P^`().
+  { rewrite -chain_is_mods. exact: list_in_to_mem Hq. }
+  (* no_root_at_cb gives: noroot r on [cauchy_bound P, +oo[ *)
+  have Hnoroot := no_root_at_cb r Hin.
+  (* cauchy_bound P is in the interval *)
+  have Hcbin : cauchy_bound P \in `[cauchy_bound P, +oo[.
+  { by rewrite in_itv /= order.Order.POrderTheory.lexx. }
+  have Hnr := Hnoroot _ Hcbin.
+  (* ~~ root r (cauchy_bound P) means r.[cauchy_bound P] != 0 *)
+  by rewrite /root in Hnr; apply/eqP => Heq; rewrite Heq eqxx in Hnr.
+Qed.
+
 (* ================================================================== *)
 (*  Section 5: The headline L1 lemma.                                   *)
 (*                                                                      *)
@@ -285,9 +314,9 @@ Admitted.
 (*  the existence of a realalg root of charpoly_int above 4/105.        *)
 (*                                                                      *)
 (*  Proven facts used: den_pos, chain_nz, chain_lc_nz, chain_th_nz,    *)
-(*                     threshold_lt_cb, chain_is_mods,                  *)
+(*                     chain_cb_nz, threshold_lt_cb, chain_is_mods,     *)
 (*                     sturm_count_above_charpoly_pos.                  *)
-(*  Admitted facts used: chain_cb_nz, no_root_at_cb,                    *)
+(*  Admitted facts used: no_root_at_cb,                                 *)
 (*                       signs_at_x0_agree, signs_at_inf_agree.         *)
 (* ================================================================== *)
 

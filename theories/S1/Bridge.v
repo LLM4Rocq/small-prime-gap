@@ -1220,27 +1220,25 @@ have Hsize_Bq : List.length Bq = size (pol_to_polyrat Bq)
   by rewrite -length_pnorm_eq_size HBn.
 have Hld_Bq : len_deg Bq = (size (pol_to_polyrat Bq)).-1
   by rewrite /len_deg -Hsize_Bq; case: (List.length Bq).
-(* Strong induction *)
+(* Strong induction on fuel; both prem_loop and redivp_rec use fuel *)
 suff Hloop : forall fuel (A : pol),
   pnorm A = A ->
   List.length A = size (pol_to_polyrat A) ->
   (List.length A <= fuel)%coq_nat ->
   pol_to_polyrat
     (if Nat.ltb (len_deg A) (len_deg Bq) then A
-     else prem_loop A Bq (S (List.length A)))
+     else prem_loop A Bq (S fuel))
   = (Pdiv.Ring.redivp_rec (R:=rat_rat__canonical__GRing_Field)
-       (pol_to_polyrat Bq) 0 0 (pol_to_polyrat A) (List.length A)).2.
+       (pol_to_polyrat Bq) 0 0 (pol_to_polyrat A) fuel).2.
 { move=> A0 HA0n HsA0. apply: (Hloop (List.length A0) A0 HA0n HsA0). lia. }
 elim => [|fuel IHfuel] A0 HA0n HsA0 Hle.
 - (* fuel = 0, so length A0 = 0, A0 = [] *)
   have HA00 : A0 = [::] by destruct A0 => //; simpl in Hle; lia.
   subst A0. rewrite /= /len_deg /=.
-  (* If len_deg Bq = 0, falls to else; else falls to then *)
   case: (Nat.ltb 0 (len_deg Bq)).
   + rewrite /pol_to_polyrat /= size_poly0 HBqsz. by [].
   + rewrite /= /pol_to_polyrat /= size_poly0 HBqsz. by [].
 - (* fuel = S fuel' *)
-  (* Handle A0 = [] *)
   destruct A0 as [|a0_hd a0_tl] eqn:HA0shape.
   { rewrite /= /len_deg /=.
     case: (Nat.ltb 0 (len_deg Bq)).
@@ -1259,47 +1257,96 @@ elim => [|fuel IHfuel] A0 HA0n HsA0 Hle.
     by []. }
   rewrite Nat_ltb_ltn Hld_cmp.
   have HlenAA : List.length AA = (List.length a0_tl).+1 by rewrite /AA /=.
-  rewrite HlenAA /=.
   case Hlt : (size (pol_to_polyrat AA) < size (pol_to_polyrat Bq))%N.
-  + by [].
-  + (* AA >= Bq: one step *)
-    simpl. rewrite Nat_ltb_ltn Hld_cmp Hlt.
+  + by rewrite /= Hlt.
+  + (* AA >= Bq: one step of prem_loop and redivp_rec *)
+    rewrite /= Hlt.
     set A' := prem_step AA Bq.
     have HA'n : pnorm A' = A' by rewrite /A' /prem_step pnorm_idem.
     have HsA' : List.length A' = size (pol_to_polyrat A')
       by rewrite -length_pnorm_eq_size HA'n.
+    (* Rewrite the RHS via redivp_rec_snd_indep to reset accumulators *)
+    rewrite (redivp_rec_snd_indep _ _ 0 _ 0).
+    have Hrstep2 : pol_to_polyrat A' =
+      pol_to_polyrat AA * (lead_coef (pol_to_polyrat Bq))%:P -
+      lead_coef (pol_to_polyrat AA) *:
+      'X^(size (pol_to_polyrat AA) - size (pol_to_polyrat Bq)) *
+      pol_to_polyrat Bq.
+    { rewrite /A' prem_step_lift_rat.
+      congr (_ - _ * _). congr (_ *: 'X^ _).
+      rewrite Hld_AA Hld_Bq.
+      move: HAsz0 HBqsz;
+        case: (size (pol_to_polyrat AA)) => [//|sa] _;
+        case: (size (pol_to_polyrat Bq)) => [//|sb] _ //. }
+    rewrite -Hrstep2.
+    (* Size decrease for IH application *)
     have Hle' : (List.length A' <= fuel)%coq_nat.
     { suff : (size (pol_to_polyrat A') < size (pol_to_polyrat AA))%N.
       { rewrite -HsA' -HsA0. move/ltP => ?. lia. }
       set rr := pol_to_polyrat AA.
       set qq := pol_to_polyrat Bq.
-      have Hrstep : pol_to_polyrat A' = rr * (lead_coef qq)%:P
-        - lead_coef rr *: 'X^((size rr).-1 - (size qq).-1) * qq.
-      { rewrite /A' prem_step_lift_rat -/rr -/qq.
-        congr (_ - _ * _). congr (_ *: 'X^ _).
-        by rewrite Hld_AA Hld_Bq. }
+      rewrite Hrstep2.
       have HBqnz : qq != 0.
       { rewrite /qq /Bq -HBe /B pol_to_polyrat_pnorm.
         exact: pol_to_polyrat_pnorm_ne0 _ Hq. }
-      have HAnz : rr != 0 by rewrite /rr -size_poly_eq0; apply/eqP => HH; move: HAsz0; rewrite HH.
-      have Hge : (size qq <= size rr)%N by move/negbT: Hlt; rewrite -leqNgt.
-      rewrite Hrstep.
-      (* size (rr * lc(qq)%:P - lc(rr) *: X^d * qq) < size rr *)
-      (* Both terms have size = size rr, and leading coefficients cancel. *)
+      have HAnz : rr != 0
+        by rewrite /rr -size_poly_eq0; apply/eqP => HH;
+           move: HAsz0; rewrite HH.
+      have Hge : (size qq <= size rr)%N
+        by move/negbT: Hlt; rewrite -leqNgt.
       have Hlcq_nz : lead_coef qq != 0 by rewrite lead_coef_eq0.
       have Hlcr_nz : lead_coef rr != 0 by rewrite lead_coef_eq0.
       set t1 := rr * (lead_coef qq)%:P.
-      set t2 := lead_coef rr *: 'X^((size rr).-1 - (size qq).-1) * qq.
-      (* Size decrease: standard fact that pseudo-division step reduces size *)
-      (* Both t1 and t2 have size = size rr, and their leading terms cancel *)
-      (* (lead_coef t1 = lead_coef rr * lead_coef qq = lead_coef t2) *)
-      (* so size (t1 - t2) < size rr *)
-      admit. }
-    (* IH applies to A' with smaller fuel *)
-    (* The goal after simpl has unfolded prem_loop; need to refold *)
-    (* and match against redivp_rec step *)
-    admit.
-Admitted.
+      set t2 := lead_coef rr *: 'X^(_ - _) * qq.
+      have Hcnz : (lead_coef qq)%:P != (0 : {poly rat})
+        by rewrite polyC_eq0.
+      have Hst1 : size t1 = size rr.
+      { rewrite /t1 (size_mul HAnz Hcnz) size_polyC Hlcq_nz.
+        by rewrite addn1. }
+      have Hst2 : size t2 = size rr.
+      { rewrite /t2 -scalerAl size_scale // (size_mul _ HBqnz);
+          last by rewrite expf_neq0 // polyX_eq0.
+        rewrite size_polyXn.
+        move: HAsz0 HBqsz Hge;
+          case: (size rr) => [//|sr] _;
+          case: (size qq) => [//|sq] _;
+          rewrite ltnS => Hle''.
+        change (((sr - sq).+1 + sq.+1).-1 = sr.+1).
+        rewrite addSn /= addnS subnK //. }
+      have Hlc_eq : lead_coef t1 = lead_coef t2.
+      { rewrite /t1 /t2 lead_coefM lead_coefC
+                -scalerAl lead_coefZ lead_coefM lead_coefXn mul1r.
+        by []. }
+      rewrite -Hst1.
+      apply: (leq_ltn_trans (n := (size t1).-1)).
+      { apply/leq_sizeP => j Hj.
+        rewrite coefB.
+        case: (leqP (size t1) j) => Hjj.
+        { have /leq_sizeP Ht1z := Hjj.
+          rewrite (Ht1z j (leqnn _)).
+          have Hjj2 : (size t2 <= j)%N by rewrite Hst2 -Hst1.
+          have /leq_sizeP Ht2z := Hjj2.
+          rewrite (Ht2z j (leqnn _)).
+          by rewrite subrr. }
+        { have Hjeq : j = (size t1).-1
+            by apply/eqP; rewrite eqn_leq Hj /= -ltnS prednK ?Hjj // Hst1.
+          subst j.
+          have -> : t1`_(size t1).-1 = lead_coef t1 by rewrite lead_coefE.
+          have -> : t2`_(size t1).-1 = lead_coef t2
+            by rewrite lead_coefE Hst2 -Hst1.
+          by rewrite Hlc_eq subrr. } }
+      rewrite prednK ?Hst1 //. }
+    (* Apply IH then show the prem_loop expressions match *)
+    rewrite -(IHfuel A' HA'n HsA' Hle').
+    congr (pol_to_polyrat _).
+    rewrite Nat_ltb_ltn Hld_cmp Hlt.
+    case Hlt' : (Nat.ltb (len_deg A') (len_deg Bq)).
+    { by []. }
+    rewrite /prem_loop -/prem_loop.
+    destruct A' as [|a' atl'] eqn:HA'shape.
+    { by case: (Nat.ltb _ _). }
+    by rewrite Hlt'.
+Qed.
 
 Lemma prem_rmodp_eq (p q : pol) :
   pnorm q <> [] ->
