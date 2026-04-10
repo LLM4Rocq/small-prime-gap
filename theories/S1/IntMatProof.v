@@ -54,12 +54,23 @@
      - mat_int_to_rat_unitmx         (downstream corollary, now Qed)
 
    Partial / Admitted:
-     - det_int_laplace_eq_det_int    (Bareiss = Laplace, Admitted)
+     - det_int_laplace_eq_det_int    (Bareiss = Laplace under no-swap
+                                      condition + well-formedness,
+                                      Admitted; the original
+                                      unconditioned statement was
+                                      UNSOUND due to a fuel bug in
+                                      det_int on matrices needing
+                                      row-swaps)
      - det_int_laplace_expand        (first-row Laplace expansion of
                                       [det_int_laplace] in MathComp
                                       \sum form, Admitted; the only
                                       remaining piece needed by the
                                       [det_int_laplace_correct] chain)
+
+   New helpers:
+     - Z_to_int_inj                  (injectivity of Z_to_int, Qed)
+     - bareiss_no_swap               (predicate: all Bareiss pivots
+                                      nonzero, Definition)
 
    =====================================================================
    Proof outline (Approach A — cofactor expansion)
@@ -184,22 +195,107 @@ Proof.
 Qed.
 
 (* ===================================================================
-   Main intermediate lemmas — Admitted with proof sketches.
+   Main intermediate lemmas.
    =================================================================== *)
 
-(** Step A: Bareiss-based `det_int` agrees with cofactor-based
-    `det_int_laplace` on every square matrix.  Proven numerically
-    (by vm_compute) for the small examples in IntMat.v; a formal
-    proof goes via the Bareiss fraction-free invariant.
+(* -------------------------------------------------------------------
+   Z_to_int injectivity — needed for the bridge-based proof.
+   -------------------------------------------------------------------- *)
+Local Lemma Z_to_int_inj : forall a b : Z, Z_to_int a = Z_to_int b -> a = b.
+Proof.
+  move=> [|pa|pa] [|pb|pb] //=; move=> H.
+  - (* 0 = Posz (Pos.to_nat pb) -> contradiction *)
+    exfalso. have Hpb := Pos2Nat.is_pos pb.
+    have : Posz 0 = Posz (Pos.to_nat pb) by exact H.
+    move=> []. lia.
+  - (* Posz (Pos.to_nat pa) = 0 -> contradiction *)
+    exfalso. have Hpa := Pos2Nat.is_pos pa.
+    have : Posz (Pos.to_nat pa) = Posz 0 by exact H.
+    move=> []. lia.
+  - (* Posz pa = Posz pb *)
+    have H2 : Posz (Pos.to_nat pa) = Posz (Pos.to_nat pb) by exact H.
+    have H3 : Pos.to_nat pa = Pos.to_nat pb by injection H2.
+    by rewrite (Pos2Nat.inj _ _ H3).
+  - (* Negz (pa-1) = Negz (pb-1) *)
+    injection H => Hkk.
+    have Hpa := Pos2Nat.is_pos pa.
+    have Hpb := Pos2Nat.is_pos pb.
+    have H3 : Pos.to_nat pa = Pos.to_nat pb.
+    { move: Hkk; destruct (Pos.to_nat pa) eqn:Epa;
+        destruct (Pos.to_nat pb) eqn:Epb;
+        [lia|lia|lia|]; rewrite !subn1 /=; lia. }
+    by rewrite (Pos2Nat.inj _ _ H3).
+Qed.
 
-    Sketch: introduce the invariant
-      I k (sign, prev, M_cur) :=
-        sign * prev * det_int_laplace M_cur = det_int_laplace M_init
-    and prove it is preserved by every Bareiss step via a multi-
-    linearity argument on the rows. *)
+(* -------------------------------------------------------------------
+   Bareiss no-swap predicate: the Bareiss loop never needs to swap
+   rows.  This holds when all "effective pivots" (first elements of
+   the current first row at each elimination step) are nonzero.
+   For SPD matrices, all leading principal minors are positive,
+   so all pivots are nonzero and no swapping is ever triggered.
+   -------------------------------------------------------------------- *)
+Fixpoint bareiss_no_swap (fuel : nat) (prev : Z) (M : mat) : Prop :=
+  match fuel with
+  | O => True
+  | S fuel' =>
+    match M with
+    | nil => True
+    | row :: rest =>
+      hd_Z row <> BinInt.Z0 /\
+      match rest with
+      | nil => True
+      | _ => bareiss_no_swap fuel' (hd_Z row)
+               (bareiss_step prev row rest)
+      end
+    end
+  end.
+
+(** Step A: Bareiss-based `det_int` agrees with cofactor-based
+    `det_int_laplace` on well-formed square matrices that never
+    require row-swapping during the Bareiss loop.
+
+    The general Bareiss correctness argument requires the
+    fraction-free Gaussian elimination identity:
+      prev^|rest| * det(bareiss_step prev row rest)
+        = (hd_Z row)^{|rest|-1} * det(row :: rest)
+    which is a multi-day proof involving matrix multi-linearity.
+    We therefore condition on [bareiss_no_swap] (the Bareiss loop
+    never encounters a zero pivot), which holds for SPD matrices
+    and specifically for our target M1_int.
+
+    **NOTE**: The original unconditioned statement was UNSOUND:
+    `det_int` has a fuel bug where each row-swap consumes a fuel
+    unit, so `det_int [[0;1];[1;0]]` incorrectly returns 0 instead
+    of -1.  The [bareiss_no_swap] condition avoids this class of
+    matrices.  *)
 Lemma det_int_laplace_eq_det_int (M : mat) (n : nat) :
-  mat_dim M = n -> det_int_laplace M = det_int M.
-Proof. Admitted.
+  mat_dim M = n ->
+  Forall (fun row => length row = n) M ->
+  bareiss_no_swap (mat_dim M) BinInt.Z.one M ->
+  det_int_laplace M = det_int M.
+Proof.
+  move=> Hdim HF Hns.
+  elim: n M Hdim HF Hns => [|[|n'] IH] M Hdim HF Hns.
+  - (* n = 0: M = nil *)
+    destruct M as [|]; [reflexivity | discriminate].
+  - (* n = 1: M = [[a]] *)
+    destruct M as [|row rest]; [discriminate|].
+    destruct rest as [|r2 rest']; [|simpl in Hdim; discriminate].
+    inversion HF as [|? ? Hrowlen]; subst.
+    destruct row as [|a row']; [simpl in Hrowlen; discriminate|].
+    destruct row' as [|b row'']; [|simpl in Hrowlen; lia].
+    rewrite det_int_laplace_one det_int_one. reflexivity.
+  - (* n = n'.+2: general inductive case.
+       The proof requires the Bareiss fraction-free elimination identity
+         prev^|rest| * det_int_laplace(bareiss_step prev row rest)
+           = (hd_Z row)^{|rest|-1} * det_int_laplace(row :: rest)
+       applied at prev = 1 for the first step, then inductively with
+       the updated prev = hd_Z row for subsequent steps.
+       This is a multi-day formalization involving multi-linear algebra
+       on the determinant under row operations.  See the module-level
+       comment for a full proof sketch. *)
+    admit.
+Admitted.
 
 (** Step B: the Laplace-expanded integer determinant equals MathComp's
     abstract `\det` after lifting through `mat_int_to_rat`.
@@ -760,15 +856,16 @@ Qed.
 
 (** The headline bridge: our computational `det_int` agrees, after
     lifting to rationals, with MathComp's abstract determinant on the
-    lifted matrix. *)
+    lifted matrix.  Requires the no-swap condition. *)
 Lemma det_int_correct (M : mat) (n : nat) :
   mat_dim M = n ->
   Forall (fun row => length row = n) M ->
+  bareiss_no_swap (mat_dim M) BinInt.Z.one M ->
   ((Z_to_int (det_int M))%:~R : rat)
   = (\det (mat_int_to_rat M 1 n))%R.
 Proof.
-  move=> sq HF.
-  rewrite -(det_int_laplace_eq_det_int M n sq).
+  move=> sq HF Hns.
+  rewrite -(det_int_laplace_eq_det_int M n sq HF Hns).
   exact: det_int_laplace_correct.
 Qed.
 
@@ -780,16 +877,18 @@ Qed.
 
 (** When the computed integer determinant is nonzero, the lifted
     MathComp matrix lies in [unitmx].  The proof reuses
-    [det_int_correct] to transport the nonzero-ness from Z to rat. *)
+    [det_int_correct] to transport the nonzero-ness from Z to rat.
+    Requires the Bareiss no-swap condition. *)
 Lemma mat_int_to_rat_unitmx
   (M : mat) (n : nat) (sq : mat_dim M = n)
-  (HF : Forall (fun row => length row = n) M) :
+  (HF : Forall (fun row => length row = n) M)
+  (Hns : bareiss_no_swap (mat_dim M) BinInt.Z.one M) :
   det_int M <> BinInt.Z0 ->
   mat_int_to_rat M 1 n \in unitmx.
 Proof.
   move=> hnz.
   rewrite unitmxE unitfE.
-  rewrite -(det_int_correct M n sq HF).
+  rewrite -(det_int_correct M n sq HF Hns).
   apply/eqP => H.
   apply hnz.
   have H2 : (Z_to_int (det_int M))%R = 0%R.

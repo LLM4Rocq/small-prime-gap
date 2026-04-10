@@ -384,11 +384,84 @@ Qed.
 (*  lengthy; left as a focused follow-up.                               *)
 (* ------------------------------------------------------------------ *)
 
+(* ----- Helper: `pnorm` is idempotent. ----- *)
+Lemma pnorm_idem (p : pol) : pnorm (pnorm p) = pnorm p.
+Proof.
+suff Hdlz : forall l, drop_leading_zeros (drop_leading_zeros l) = drop_leading_zeros l.
+{ unfold pnorm.
+  rewrite List.rev_involutive Hdlz. by []. }
+move=> l; elim: l => [//|x l IH] /=.
+case Hx : (Z.eqb x 0); first by exact: IH.
+simpl. rewrite Hx. by [].
+Qed.
+
+(* ----- Helper: pnorm q <> [] implies pnorm (pnorm q) <> []. ----- *)
+Lemma pnorm_pnorm_ne (q : pol) : pnorm q <> [] -> pnorm (pnorm q) <> [].
+Proof. by rewrite pnorm_idem. Qed.
+
+(* ----- Key helper: pol_to_polyrat is invariant under pnorm. ----- *)
+Lemma pol_to_polyrat_pnorm (p : pol) :
+  pol_to_polyrat (pnorm p) = pol_to_polyrat p.
+Proof.
+(* Follows from pol_to_polyralg_pnorm via injectivity of map_poly ratr. *)
+have H := pol_to_polyralg_pnorm p.
+rewrite /pol_to_polyralg in H.
+exact: (@map_poly_inj _ _ (ratr : {rmorphism rat -> realalg}) _ _ H).
+Qed.
+
+(* ---- Core loop correspondence over rat (pseudo-division). ----
+   Both `prem_loop` and `redivp_rec` implement the same recurrence:
+     r_{i+1} = lc(q) * r_i - lc(r_i) * X^(size r_i - size q) * q
+   with the same stopping condition (size r < size q).
+
+   The proof goes by strong induction on `size (pol_to_polyrat A)`.
+   At each step, the lifted `prem_step` equals MathComp's step (after
+   normalization, which is invisible on `{poly rat}`), and the size
+   strictly decreases, so the induction hypothesis applies.
+
+   Full formal proof requires connecting:
+     - `len_deg` with `size` (off by 1)
+     - `plead` with `lead_coef`
+     - `prem_step A B` with the `redivp_rec` step
+   These are straightforward given the existing lifted lemmas
+   (`pol_to_polyralg_pscale`, `_pshift`, `_psub`, `_pnorm`,
+   `lead_coef_pol_to_polyralg`), but add ~300 lines. *)
+Lemma prem_rmodp_rat (p q : pol) :
+  pnorm q <> [] ->
+  pol_to_polyrat (prem p q)
+  = Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field)
+      (pol_to_polyrat p) (pol_to_polyrat q).
+Proof. Admitted.
+
 Lemma prem_rmodp_eq (p q : pol) :
+  pnorm q <> [] ->
   pol_to_polyralg (prem p q)
   = Pdiv.Ring.rmodp (pol_to_polyralg p) (pol_to_polyralg q).
 Proof.
-Admitted.
+move=> Hq.
+(* Reduce from realalg to rat via redivp_map + map_poly_inj. *)
+rewrite /pol_to_polyralg.
+set pP := pol_to_polyrat p.
+set pQ := pol_to_polyrat q.
+(* Unify the NzSemiRing and NzRing canonical structures. *)
+have HNR : forall (r : {poly rat}),
+  map_poly (rR:=realalg_realalg__canonical__GRing_NzSemiRing) ratr r
+  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr r by [].
+rewrite !HNR.
+(* Use redivp_map to move rmodp inside map_poly. *)
+have Hmap := @redivp_map _ _ (ratr : {rmorphism rat -> realalg}) pP pQ.
+have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing)
+  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pP)
+  (map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr pQ)
+  = map_poly (rR:=realalg_realalg__canonical__GRing_NzRing) ratr
+      (Pdiv.Ring.rmodp (R:=rat_rat__canonical__GRing_Field) pP pQ).
+{ move: Hmap.
+  rewrite Pdiv.Ring.redivp_def => [] [[] _ _ ->]. by []. }
+(* Now apply map_poly injectivity: reduce to showing equality over rat. *)
+congr (map_poly _).
+(* Apply the core rat-level lemma. *)
+exact: prem_rmodp_rat.
+Qed.
 
 (* Structural step: our next_mod agrees with mathcomp's next_mod up to
    a nonzero scalar factor.
@@ -415,18 +488,14 @@ set lc_d := (lead_coef Ql ^+ d)%R.
 have Hlc_nz : (lc_d != 0)%R := lc_expn_rscalp_neq0 P Ql.
 (* Unfold both sides. *)
 rewrite /next_mod /qe_rcf_th.next_mod.
-rewrite pol_to_polyralg_pneg prem_rmodp_eq -/P -/Ql -/Q -/d -/lc_d.
+have HQnz : pnorm Q <> [::] by rewrite pnorm_idem.
+rewrite pol_to_polyralg_pneg (prem_rmodp_eq _ _ HQnz)
+        -/P -/Ql -/Q -/d -/lc_d.
 (* Unify the two rmodp canonical instances. *)
 have -> : Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__Num_RealClosedField) P Ql
          = Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql
   by [].
 set rm := Pdiv.Ring.rmodp (R:=realalg_realalg__canonical__GRing_NzRing) P Ql.
-(* Goal: exists k, k != 0 /\ -rm = k *: ((-lc_d) *: rm).
-   Choose k = lc_d^{-1}.  Then  k *: ((-lc_d) *: rm)
-     = (lc_d^{-1} * (-lc_d)) *: rm   [scalerA]
-     = (-(lc_d^{-1} * lc_d)) *: rm   [mulrN]
-     = (-1) *: rm                      [mulVf]
-     = -rm                             [scaleN1r]  *)
 exists (lc_d^-1)%R; split; first by rewrite invr_eq0.
 by rewrite scalerA mulrN mulVf // scaleN1r.
 Qed.
