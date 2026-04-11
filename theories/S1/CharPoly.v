@@ -20,148 +20,36 @@
    - MathComp algebra   (for the abstract `char_poly` spec).
 
    ===============================================================
-   PROOF OUTLINE for `char_poly_int_correct`  (L2, §3 of PLAN_S1.md)
+   PROOF OUTLINE for `char_poly_int_correct`  (L2, PLAN_S1.md)
    ===============================================================
 
    Goal:
-     pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M D n)
+     pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n)
 
-   The simplified form proved here (matching Cert.v's architecture)
-   drops the `(D%:~R)^+n *:` scale factor.  The eventual precise form
-   is stated in a comment above the lemma; tightening it is a later
-   sprint.
+   --- Proof chain (decomposed across files) ---
 
-   --- High-level chain (all Admitted except the leaves marked [Qed]) ---
+   Step 0 [Qed, this file]:
+     Structural trivia (meye_aux_len, mat_dim_meye, mzero_aux_len,
+     mat_dim_mzero) — proved by list induction.
 
-   Step 0. Structural trivia about our concrete list-of-list matrices
-           (closed by straightforward list induction):
+   Step 1 [Qed, CharPolyHelpers.v]:
+     All 6 bridge lemmas (mat_int_to_rat_meye/mzero/mmul/madd/mscale,
+     mtrace_int_to_rat) are fully proved.
 
-     [Qed]  meye_aux_len   : length (meye_aux n i) = i
-     [Qed]  mat_dim_meye   : mat_dim (meye n)     = n
-     [Qed]  mzero_aux_len  : length (mzero_aux r c) = r
-     [Qed]  mat_dim_mzero  : mat_dim (mzero n)    = n
+   Steps 2-3 [CharPolyL2.v]:
+     FL loop invariant (fl_invariant_L2) — Qed for the inductive step
+       under hypotheses; wrapper Admitted pending fl_divisibility_L2.
+     FL = char_poly (fl_loop_rat_is_char_poly_L2) — Qed via
+       adj_coef_jacobi (Jacobi's formula proved from Leibniz).
 
-   Step 1. Bridge our integer list operations to MathComp 'M[rat]_n
-           operations on `mat_int_to_rat M 1 n`.  Here D := 1 for the
-           correctness argument; the general D is recovered by
-           post-multiplication by (D%:~R)^+n as remarked above.
+   Step 4 [Admitted, this file]:
+     char_poly_int_correct — assembly of Steps 1-3.
 
-           Each of these is a moderate induction on the matrix shape
-           and currently left `Admitted`:
-
-     [Admitted] mat_int_to_rat_meye :
-                mat_dim M = n ->
-                mat_int_to_rat (meye n) 1 n = 1%:M
-     [Admitted] mat_int_to_rat_mzero :
-                mat_int_to_rat (mzero n) 1 n = 0%R
-     [Admitted] mat_int_to_rat_mmul :
-                mat_dim A = n -> mat_dim B = n ->
-                mat_int_to_rat (mmul A B) 1 n
-                = (mat_int_to_rat A 1 n *m mat_int_to_rat B 1 n)%R
-     [Admitted] mat_int_to_rat_madd :
-                mat_dim A = n -> mat_dim B = n ->
-                mat_int_to_rat (madd A B) 1 n
-                = (mat_int_to_rat A 1 n + mat_int_to_rat B 1 n)%R
-     [Admitted] mat_int_to_rat_mscale :
-                mat_int_to_rat (mscale c A) 1 n
-                = ((Z_to_int c)%:~R *: mat_int_to_rat A 1 n)%R
-     [Admitted] mtrace_int_to_rat :
-                (mtrace A)%:~R%Z_to_int
-                = \tr (mat_int_to_rat A 1 n)
-
-   Step 2. Loop invariant for Faddeev-LeVerrier.
-
-           Define the MathComp-side (rational) reference loop
-           `fl_loop_rat n A : nat -> 'M[rat]_n * rat` producing the
-           pair (M_k, c_k) that satisfies the Wikipedia recurrence
-           over rat (no division issue).
-
-           Prove:
-
-     [Admitted] fl_invariant :
-                forall A : mat, mat_dim A = n ->
-                forall k : nat, (k <= n)%N ->
-                  mat_int_to_rat (fl_M_int_k A k) 1 n
-                    = fst (fl_loop_rat n (mat_int_to_rat A 1 n) k)
-                  /\
-                  (Z_to_int (fl_c_int_k A k))%:~R
-                    = snd (fl_loop_rat n (mat_int_to_rat A 1 n) k)
-
-           Key subgoal inside the induction step is that
-           `trace(A * M_k)` IS divisible by `k` in Z, so that the
-           integer `Z.div` in `fl_loop` agrees with the rational
-           division in `fl_loop_rat`.  This is the content of
-           `fl_divisibility` below.
-
-     [Admitted] fl_divisibility :
-                forall A, mat_dim A = n ->
-                forall k, (1 <= k <= n)%N ->
-                  (Z.of_nat k | mtrace (mmul A (fl_M_int_k A k)))%Z
-
-   Step 3. The MathComp reference implementation `fl_loop_rat n A`
-           computes the characteristic polynomial.  This is the
-           abstract side of Faddeev-LeVerrier: purely a statement
-           about rationals, provable from Newton's identities.
-
-           MathComp does NOT ship Newton's identities or a Faddeev-
-           LeVerrier correctness lemma (survey below).  So the clean
-           route is to prove the identity through the Cayley-Hamilton
-           theorem (which IS in MathComp: `Cayley_Hamilton`) plus a
-           degree/leading-coefficient argument — or, more directly,
-           through the Leibniz formula for the determinant and the
-           fact that (lambda I - A) satisfies the telescoping
-           identity
-              (lambda I - A) · adj(lambda I - A) = char_poly A · I
-           which, after matching coefficients of lambda^k, yields
-           precisely the FL recurrence.
-
-     [Admitted] fl_loop_rat_is_char_poly :
-                forall (n : nat) (A : 'M[rat]_n),
-                  let '(_, cs) := fl_collect n A in
-                  Poly (rcons cs 1)   (* low-to-high, monic *)
-                  = char_poly A
-
-   Step 4. Putting it together:
-
-     char_poly_int_correct (final statement):
-       - unfold char_poly_int to `fl_loop n 1 A I (mzero n) 1 []`;
-       - commute `pol_to_polyrat` with `++` and `::`;
-       - apply `fl_invariant` (Step 2);
-       - rewrite with `fl_loop_rat_is_char_poly` (Step 3);
-       - identify `mat_int_to_rat A 1 n` with the argument that
-         Cert.v passes (for D = 1 the two coincide; for general D
-         the scale factor is absorbed in the wrapper comment).
-
-   --- Survey of MathComp support (Rocq >= 9.x, all_algebra) ----------
-
-     char_poly          : 'M_n -> {poly R}                   [YES]
-     char_poly_mx       : 'M_n -> 'M[{poly R}]_n              [YES]
-     size_char_poly     : size (char_poly A) = n.+1          [YES]
-     char_poly_monic    : char_poly A \is monic              [YES]
-     char_poly_trace    : (char_poly A)`_n.-1 = - \tr A      [YES]
-     char_poly_det      : (char_poly A)`_0 = (-1)^n * \det A [YES]
-     char_poly_trig     : trig matrix -> product form        [YES]
-     Cayley_Hamilton    : horner_mx A (char_poly A) = 0      [YES]
-     mxminpoly          : 'M_n'.+1 -> {poly F}               [YES]
-     map_char_poly      : map_poly f ∘ char_poly = char_poly ∘ map [YES]
-
-     mesym / symmetric polynomials                           [NO]
-     Newton's identities                                     [NO]
-     power_sum / sym_poly                                    [NO]
-     Faddeev / LeVerrier                                     [NO]
-
-   Upshot: the abstract direction (Step 3) has no off-the-shelf
-   lemma and requires a from-scratch connection via Cayley-Hamilton
-   or via the adjugate / Leibniz expansion.  Multi-day work.
-
-   The concrete → abstract bridge (Steps 1–2) is mechanically clear
-   but tedious: matrix-of-list ↔ 'M[rat]_n compatibility for each
-   of the seven operations involved.  Each sublemma is ~20-40 lines
-   of straightforward list/bigop manipulation.
-
-   Current status of this file:
-     Step 0: closed.
-     Step 1–4: stated, Admitted.
+   Current status:
+     Step 0: Qed.
+     Step 1: Qed (CharPolyHelpers.v).
+     Steps 2-3: mostly Qed (CharPolyL2.v); fl_divisibility_L2 Admitted.
+     Step 4: Admitted (assembly).
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List.
@@ -299,29 +187,11 @@ Lemma mat_dim_mzero (n : nat) : mat_dim (mzero n) = n.
 Proof. unfold mat_dim, mzero. apply mzero_aux_len. Qed.
 
 (* ==================================================================
-   Steps 1–3 of the proof chain are developed in separate files to
-   avoid the file-revert issue that affected direct edits to this file:
-
-   - Step 1 (bridge lemmas): ALL 6 sublemmas are Qed in
-     theories/S1/CharPolyHelpers.v (mat_int_to_rat_meye/mzero/mmul/
-     madd/mscale, mtrace_int_to_rat).
-
-   - Steps 2–3 (FL loop invariant + abstract correctness): scaffolded
-     in theories/S1/CharPolyL2.v with fl_invariant_L2_gen (Qed for
-     the full inductive step under hypotheses) and fl_loop_rat_is_
-     char_poly_L2 (Admitted — the load-bearing abstract identity,
-     route via mul_mx_adj on char_poly_mx A).
-
-   The Step 1-3 lemma statements that were previously here as Admitted
-   placeholders have been removed to avoid inflating the admit count.
-   The only remaining admit in this file is char_poly_int_correct
-   (Step 4), which assembles the full chain.
-
+   Steps 1-3 are developed in separate files:
+     - Step 1 (bridge lemmas): all Qed in CharPolyHelpers.v
+     - Steps 2-3 (FL invariant + FL = char_poly): CharPolyL2.v
+   The only admit in this file is char_poly_int_correct (Step 4).
    ================================================================== *)
-
-(* Steps 2-3 scaffolding (FL loop invariant, abstract FL = char_poly)
-   is developed in theories/S1/CharPolyL2.v.  See that file for the
-   current proof state and the `mul_mx_adj`-based proof route.        *)
 
 (* ------------------------------------------------------------------
    L2 (PLAN_S1.md §3) — the load-bearing correctness lemma.

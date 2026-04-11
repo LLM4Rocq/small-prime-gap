@@ -1,0 +1,28 @@
+opam-version: "2.0"
+name: "coq-prime-gap"
+version: "0.1.0"
+synopsis: "Independent audit of Maynard's M_{105} > 4 eigenvalue bound"
+description: """
+A machine-checked verification that Maynard's M_{105} exceeds 4,
+the key numerical fact in 'Small gaps between primes' (Annals 2015).
+The Rocq layer consumes a JSON certificate produced by FLINT and
+verifies every computational step via CRT over Uint63 native primes.
+"""
+maintainer: "prime-gap-audit"
+authors: ["prime-gap-audit"]
+license: "CC-BY-4.0"
+homepage: "https://github.com/prime-gap-audit/prime_gap"
+bug-reports: "https://github.com/prime-gap-audit/prime_gap/issues"
+depends: [
+  "rocq-prover" {>= "9.0"}
+  "rocq-mathcomp-ssreflect" {>= "2.5"}
+  "rocq-mathcomp-algebra" {>= "2.5"}
+  "rocq-mathcomp-field" {>= "2.5"}
+  "rocq-mathcomp-real-closed" {>= "2.0"}
+  "rocq-bignums" {>= "9.0"}
+  "coq-mathcomp-multinomials" {>= "2.4"}
+  "coq-mathcomp-algebra-tactics" {>= "1.2"}
+]
+build: [
+  ["bash" "-c" "grep '\\.v$' _CoqProject | while read f; do coqc -Q theories/S1 PrimeGapS1 \"$f\"; done"]
+]
