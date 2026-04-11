@@ -610,11 +610,24 @@ Proof.
     have Hmma := mul_mx_adj P.
     have : ((P *m \adj P)%R i j = ((\det P)%:M)%R i j)%R by rewrite Hmma.
     rewrite !mxE.
-    (* (P *m adj P)_{ij} = \sum_l P_{il} * (adj P)_{lj} *)
-    (* = \sum_l (delta_{il}*X - B_{il}%:P) * (adj P)_{lj} *)
-    (* = X * (adj P)_{ij} - \sum_l B_{il} * (adj P)_{lj} *)
-    (* coeff k+1: (adj P)_{ij}`_k - \sum_l B_{il} * (adj P)_{lj}`_{k+1} = delta_{ij} * cp_{k+1} *)
-    admit. }
+    move=> Hprod.
+    have Hcoef := congr1 (coefp k.+1) Hprod.
+    rewrite /= in Hcoef.
+    rewrite coef_sum coefMn in Hcoef.
+    have HP : forall i0 j0 : 'I_n.+1, P i0 j0 = ((i0 == j0)%:R *: 'X - (B i0 j0)%:P)%R.
+    { move=> i0 j0. rewrite /P /char_poly_mx mxE !mxE. by rewrite scaler_nat. }
+    have Hcoef2 : forall i0 : 'I_n.+1,
+      ((P i i0 * ((\adj P)%R) i0 j)`_k.+1 =
+       (i == i0)%:R * (((\adj P)%R) i0 j)`_k - B i i0 * (((\adj P)%R) i0 j)`_k.+1)%R.
+    { move=> i0. rewrite (HP i i0) mulrBl coefB -scalerAl coefZ coefXM /= coefCM.
+      done. }
+    rewrite (eq_bigr _ (fun i0 _ => Hcoef2 i0)) sumrB in Hcoef.
+    rewrite mulr_natr -Hcoef.
+    congr (_ - _)%R.
+    - rewrite (bigD1 i) //= eqxx mul1r big1 ?addr0.
+      + by rewrite mxE.
+      + move=> i0 /negbTE Hi. by rewrite eq_sym Hi mul0r.
+    - apply eq_bigr => i0 _. by rewrite /Q mxE. }
   (* Q n = I (leading coefficient of adjugate is I) *)
   have HQn : Q n = (1%:M)%R.
   { apply/matrixP => i j. rewrite /Q mxE !mxE /cofactor.
@@ -627,7 +640,10 @@ Proof.
       have /monicP := char_poly_monic (row' j (col' j B)).
       by rewrite /lead_coef (size_char_poly (row' j (col' j B))) /= => ->.
     - (* Off-diagonal: degree < n, so coefp n = 0 *)
-      (* cofactor(P, j, i) for i != j has degree < n *)
+      (* cofactor(P, j, i) for i != j has degree <= n-1 *)
+      (* Proof: use Hcoef_eq at k=n to show Q n - B * Q(n+1) = I,
+         and Q(n+1) i j = coefp(n+1) of degree-<=n cofactor = 0.
+         Then (Q n)_{ij} = I_{ij} = 0 for i != j. *)
       admit. }
   (* By induction: Q(n - l') = adj_coef l' for l' <= n *)
   have Hadj_eq : forall l' : nat, (l' <= n)%N ->
