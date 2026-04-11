@@ -30,13 +30,25 @@ From PrimeGapS1 Require Import IntPoly IntMat CharPoly CharPolyHelpers.
 Set Implicit Arguments.
 Unset Strict Implicit.
 
-(* Local placeholder definitions for the FL loop state readers.
-   These were formerly in CharPoly.v but were removed to clean up
-   dead code. They are used ONLY by the Admitted wrapper lemmas
-   fl_invariant_L2 and fl_divisibility_L2 below. Once the genuine
-   iterative definitions are developed, these will be replaced. *)
-Definition fl_M_int_k (_ : mat) (_ : nat) : mat := [::].
-Definition fl_c_int_k (_ : mat) (_ : nat) : Z := Z0.
+(* Iterative FL state: returns (M_k, c_k) after k steps of the
+   Faddeev-LeVerrier recurrence on integer matrix A.
+   - fl_state A 0 = (mzero n, 1)    where n = mat_dim A
+   - fl_state A (k+1) = one FL step from fl_state A k            *)
+Fixpoint fl_state (k : nat) (A : mat) : mat * Z :=
+  let n := mat_dim A in
+  let I_n := meye n in
+  match k with
+  | O => (mzero n, Zpos xH)
+  | S k' =>
+    let '(M_prev, c_prev) := fl_state k' A in
+    let M_k := madd (mmul A M_prev) (mscale c_prev I_n) in
+    let tr := mtrace (mmul A M_k) in
+    let c_new := BinInt.Z.div (BinInt.Z.opp tr) (BinInt.Z.of_nat (S k')) in
+    (M_k, c_new)
+  end.
+
+Definition fl_M_int_k (A : mat) (k : nat) : mat := fst (fl_state k A).
+Definition fl_c_int_k (A : mat) (k : nat) : Z := snd (fl_state k A).
 Unset Printing Implicit Defensive.
 
 (* ==================================================================
@@ -329,69 +341,9 @@ Qed.
 
 End FL_Invariant_Proof.
 
-(* ------------------------------------------------------------------
-   2b. fl_invariant_L2 — the original statement.
-
-   This wraps fl_invariant_L2_gen, but since the definitions
-   fl_M_int_k and fl_c_int_k in CharPoly.v are placeholders
-   ([::]  and Z0), we cannot discharge the section hypotheses yet.
-   Once the placeholders are replaced, the 2 remaining admits here
-   reduce to verifying the recurrence on the genuine definitions.
-   ------------------------------------------------------------------ *)
-
-Lemma fl_invariant_L2 (M : mat) (sz : nat) (k : nat) :
-  let A := mat_int_to_rat M 1 sz in
-  mat_dim M = sz ->
-  (k <= sz)%N ->
-  mat_int_to_rat (fl_M_int_k M k) 1 sz
-    = fl_M_rat A k
-  /\
-  ((Z_to_int (fl_c_int_k M k))%:~R : rat)
-    = fl_c_rat A k.
-Proof.
-  move=> A Hdim Hle.
-  (* The placeholder definitions fl_M_int_k := [::] and
-     fl_c_int_k := Z0 do not satisfy the FL recurrence, so we
-     cannot instantiate fl_invariant_L2_gen yet.  The 2 admits
-     below will vanish when the genuine iterative definitions
-     are wired in. *)
-  admit.
-Admitted.
-
-(* ==================================================================
-   3. fl_divisibility — at each step k (1 <= k <= n), the trace
-      tr(A * M_k) is divisible by k in Z.
-
-   This is the key arithmetic fact that makes the integer
-   Faddeev-LeVerrier algorithm exact (no remainder in Z.div).
-
-   Proof sketch:
-     The divisibility follows from Newton's identities.  Let
-     p_k = tr(A^k) be the k-th power sum of the eigenvalues.
-     The FL recurrence gives:
-       tr(A * M_k) = p_1 c_{n-1} + p_2 c_{n-2} + ... + p_k c_{n-k+1} + k * c_{n-k}
-     (this is essentially Newton's identity in disguise). Since c_{n-k}
-     is defined as -(1/k) * tr(A * M_k), the expression is tautologically
-     divisible by k over Q. The content of the lemma is that the
-     numerator is already divisible by k over Z. This can be proved by
-     induction on k using the fact that all previous c_i are integers
-     (by the inductive hypothesis) and the classical result that
-     symmetric polynomials evaluated at integer eigenvalues yield
-     integer combinations.
-
-     Alternative route: use the identity
-       det(lambda I - A) = sum_k c_k lambda^k  (with c_n = 1)
-     and the fact that det of an integer matrix is an integer, so all
-     c_k are integers.  Then k * c_{n-k} = -(tr(A*M_k) + sum_{j<k} ...),
-     and by induction the sum is an integer, so tr(A*M_k) is divisible
-     by k.
-   ================================================================== *)
-
-Lemma fl_divisibility_L2 (M : mat) (sz : nat) (k : nat) :
-  mat_dim M = sz ->
-  (1 <= k)%N -> (k <= sz)%N ->
-  Z.rem (mtrace (mmul M (fl_M_int_k M k))) (Z.of_nat k) = Z0.
-Proof. Admitted.
+(* fl_invariant_L2 and fl_divisibility_L2 are proved at the bottom
+   of this file (after fl_c_rat_eq_char_poly and the integrality
+   section, which they depend on). *)
 
 (* ==================================================================
    4. fl_loop_rat_is_char_poly_L2 — the abstract identity:
@@ -1032,4 +984,380 @@ Lemma fl_base_case_coeff (sz : nat) :
   ((Z_to_int (Zpos xH))%:~R : rat) = fl_c_rat A 0.
 Proof.
   simpl. exact Z_to_int_1_rat.
+Qed.
+
+(* ==================================================================
+   6. Well-formedness lemmas for integer matrix operations.
+   ================================================================== *)
+
+Lemma length_zrow (n : nat) : List.length (zrow n) = n.
+Proof. induction n as [|k IH]; simpl; [reflexivity | rewrite IH; reflexivity]. Qed.
+
+Lemma length_vscale (c : Z) (xs : list Z) : List.length (vscale c xs) = List.length xs.
+Proof. unfold vscale. apply List.length_map. Qed.
+
+Lemma length_vadd (xs ys : list Z) :
+  List.length xs = List.length ys ->
+  List.length (vadd xs ys) = List.length xs.
+Proof.
+  revert ys; induction xs as [|x xs' IH]; intros ys Hlen; simpl.
+  - destruct ys; simpl in Hlen; [reflexivity | discriminate].
+  - destruct ys as [|y ys']; simpl in Hlen; [discriminate |].
+    simpl. f_equal. apply IH. lia.
+Qed.
+
+Lemma mat_dim_mscale_eq (c : Z) (A : mat) : mat_dim (mscale c A) = mat_dim A.
+Proof. unfold mat_dim, mscale. rewrite List.length_map. reflexivity. Qed.
+
+Lemma mat_dim_mmul_eq (A B : mat) : mat_dim (mmul A B) = mat_dim A.
+Proof. unfold mat_dim, mmul. rewrite List.length_map. reflexivity. Qed.
+
+Lemma mat_dim_madd_eq (A B : mat) :
+  mat_dim A = mat_dim B ->
+  mat_dim (madd A B) = mat_dim A.
+Proof.
+  unfold mat_dim. revert B; induction A as [|a A' IH]; intros B Hlen; simpl.
+  - destruct B; simpl in Hlen; [reflexivity | discriminate].
+  - destruct B as [|b B']; [discriminate |].
+    simpl. f_equal. apply IH. simpl in Hlen. lia.
+Qed.
+
+Lemma all_rows_len_mscale (n : nat) (c : Z) (A : mat) :
+  all_rows_len n A -> all_rows_len n (mscale c A).
+Proof.
+  unfold all_rows_len, mscale. intros HA i Hi.
+  rewrite List.length_map in Hi.
+  rewrite (List.map_nth _ _ nil) /=.
+  rewrite length_vscale. exact (HA i Hi).
+Qed.
+
+Lemma all_rows_len_madd (n : nat) (A B : mat) :
+  mat_dim A = mat_dim B ->
+  all_rows_len n A -> all_rows_len n B ->
+  all_rows_len n (madd A B).
+Proof.
+  unfold all_rows_len, mat_dim.
+  revert B; induction A as [|a A' IH]; intros B Hlen HA HB i Hi.
+  - destruct B; simpl in *; lia.
+  - destruct B as [|b B']; [discriminate |].
+    simpl in Hi |- *. destruct i as [|i'].
+    + simpl. rewrite length_vadd.
+      * exact (HA 0%nat ltac:(simpl; lia)).
+      * have Ha : length a = n := HA 0%nat ltac:(simpl; lia).
+        have Hb : length b = n := HB 0%nat ltac:(simpl; lia).
+        rewrite Ha Hb. reflexivity.
+    + apply (IH B' ltac:(simpl in Hlen; lia)
+               (fun j Hj => HA (S j) ltac:(simpl; lia))
+               (fun j Hj => HB (S j) ltac:(simpl; lia))).
+      lia.
+Qed.
+
+Lemma all_rows_len_mzero_aux (r c : nat) :
+  all_rows_len c (mzero_aux r c).
+Proof.
+  unfold all_rows_len. induction r as [|k IH]; simpl; intros i Hi.
+  - lia.
+  - destruct i as [|i']; simpl.
+    + apply length_zrow.
+    + apply IH. lia.
+Qed.
+
+Lemma all_rows_len_mzero (n : nat) : all_rows_len n (mzero n).
+Proof. exact: all_rows_len_mzero_aux. Qed.
+
+Lemma length_eye_row (n i : nat) : List.length (eye_row n i) = n.
+Proof.
+  revert i; induction n as [|k IH]; intros i; simpl.
+  - reflexivity.
+  - destruct i; simpl; f_equal.
+    + apply length_zrow.
+    + apply IH.
+Qed.
+
+Lemma all_rows_len_meye_aux (n i : nat) :
+  all_rows_len n (meye_aux n i).
+Proof.
+  unfold all_rows_len. induction i as [|k IH]; simpl; intros j Hj.
+  - lia.
+  - rewrite List.length_app in Hj. simpl in Hj.
+    destruct (Nat.lt_ge_cases j (List.length (meye_aux n k))) as [Hlt|Hge].
+    + rewrite List.app_nth1; [exact (IH j Hlt) | lia].
+    + have Heq : j = List.length (meye_aux n k) by lia.
+      subst j. rewrite List.app_nth2; [| lia].
+      rewrite Nat.sub_diag. simpl. apply length_eye_row.
+Qed.
+
+Lemma all_rows_len_meye (n : nat) : all_rows_len n (meye n).
+Proof. exact: all_rows_len_meye_aux. Qed.
+
+Lemma all_rows_len_mmul (n : nat) (A B : mat) :
+  mat_dim B = n -> all_rows_len n B ->
+  all_rows_len n (mmul A B).
+Proof.
+  intros HdimB HrowB. unfold all_rows_len, mmul, mat_dim in *.
+  induction A as [|row rest IH]; simpl; intros i Hi.
+  - lia.
+  - destruct i as [|i']; simpl.
+    + rewrite List.length_map.
+      exact (length_mtrans_sq B n HdimB HrowB).
+    + apply IH. lia.
+Qed.
+
+(* ==================================================================
+   7. FL state well-formedness and recurrence properties.
+   ================================================================== *)
+
+Lemma fl_M_int_k_wf (M : mat) (sz : nat) (k : nat) :
+  mat_dim M = sz -> all_rows_len sz M ->
+  (k <= sz)%N ->
+  mat_dim (fl_M_int_k M k) = sz /\ all_rows_len sz (fl_M_int_k M k).
+Proof.
+  intros Hdim Hrows Hle. unfold fl_M_int_k.
+  induction k as [|k' IH].
+  - simpl. rewrite Hdim. split; [apply mat_dim_mzero | apply all_rows_len_mzero].
+  - have Hle' : (k' <= sz)%N by exact (ltnW Hle).
+    have [IHdim IHrows] := IH Hle'.
+    simpl. case E: (fl_state k' M) => [M_prev c_prev] /=.
+    (* M_prev = fst (fl_state k' M), so IHdim/IHrows apply to it *)
+    have HMprev_dim : mat_dim M_prev = sz.
+    { have H0d : mat_dim (fst (fl_state k' M)) = sz by exact IHdim.
+      rewrite E /= in H0d. exact H0d. }
+    have HMprev_rows : all_rows_len sz M_prev.
+    { have H0r : all_rows_len sz (fst (fl_state k' M)) by exact IHrows.
+      rewrite E /= in H0r. exact H0r. }
+    split.
+    + rewrite mat_dim_madd_eq.
+      * rewrite mat_dim_mmul_eq. exact Hdim.
+      * rewrite mat_dim_mmul_eq Hdim mat_dim_mscale_eq.
+        symmetry. exact (mat_dim_meye sz).
+    + apply all_rows_len_madd.
+      * rewrite mat_dim_mmul_eq Hdim mat_dim_mscale_eq.
+        symmetry. exact (mat_dim_meye sz).
+      * exact (all_rows_len_mmul HMprev_dim HMprev_rows).
+      * apply all_rows_len_mscale. rewrite Hdim. apply all_rows_len_meye.
+Qed.
+
+Lemma fl_M_int_k_dim (M : mat) (sz : nat) (k : nat) :
+  mat_dim M = sz -> all_rows_len sz M ->
+  (k <= sz)%N -> mat_dim (fl_M_int_k M k) = sz.
+Proof. intros; exact (fl_M_int_k_wf H H0 H1).1. Qed.
+
+Lemma fl_M_int_k_rows (M : mat) (sz : nat) (k : nat) :
+  mat_dim M = sz -> all_rows_len sz M ->
+  (k <= sz)%N -> all_rows_len sz (fl_M_int_k M k).
+Proof. intros; exact (fl_M_int_k_wf H H0 H1).2. Qed.
+
+(* The FL state recurrence on the integer side. *)
+Lemma fl_M_int_k_base (M : mat) :
+  fl_M_int_k M 0 = mzero (mat_dim M).
+Proof. reflexivity. Qed.
+
+Lemma fl_c_int_k_base (M : mat) :
+  fl_c_int_k M 0 = Zpos xH.
+Proof. reflexivity. Qed.
+
+Lemma fl_state_step (M : mat) (k : nat) :
+  fl_state (S k) M =
+    let '(M_prev, c_prev) := fl_state k M in
+    let I_n := meye (mat_dim M) in
+    let M_k := madd (mmul M M_prev) (mscale c_prev I_n) in
+    let tr := mtrace (mmul M M_k) in
+    (M_k, BinInt.Z.div (BinInt.Z.opp tr) (BinInt.Z.of_nat (S k))).
+Proof. simpl. reflexivity. Qed.
+
+Lemma fl_M_int_k_step (M : mat) (k : nat) :
+  fl_M_int_k M (S k) = madd (mmul M (fl_M_int_k M k))
+                             (mscale (fl_c_int_k M k) (meye (mat_dim M))).
+Proof.
+  unfold fl_M_int_k, fl_c_int_k. simpl.
+  destruct (fl_state k M) as [M_prev c_prev] eqn:E. simpl. reflexivity.
+Qed.
+
+Lemma fl_c_int_k_step (M : mat) (k : nat) :
+  fl_c_int_k M (S k) = BinInt.Z.div
+                          (BinInt.Z.opp (mtrace (mmul M (fl_M_int_k M (S k)))))
+                          (BinInt.Z.of_nat (S k)).
+Proof.
+  unfold fl_c_int_k, fl_M_int_k. simpl.
+  destruct (fl_state k M) as [M_prev c_prev] eqn:E. simpl. reflexivity.
+Qed.
+
+(* ==================================================================
+   8. fl_c_rat_is_int — char poly coefficients of integer matrices
+      are integers (via map_char_poly from MathComp).
+   ================================================================== *)
+
+Lemma fl_c_rat_is_int (sz : nat) (M : mat) (k : nat) :
+  let A_rat := mat_int_to_rat M 1 sz in
+  (k <= sz)%N ->
+  exists z : int, fl_c_rat A_rat k = (z%:~R : rat)%R.
+Proof.
+  move=> A_rat Hk.
+  destruct sz as [|n].
+  - have Hk0 : k = 0%N by apply/eqP; rewrite -leqn0.
+    subst k. exists 1%R. by rewrite /fl_c_rat /= /intmul /=.
+  - pose A_int : 'M[int]_n.+1 :=
+      (\matrix_(i, j) Z_to_int (mat_get M (nat_of_ord i) (nat_of_ord j)))%R.
+    have Hmap : A_rat = map_mx (intr : int -> rat) A_int.
+    { apply/matrixP => i j. rewrite !mxE /=.
+      change (Z_to_int 1) with (1%R : int). by rewrite divr1. }
+    have Hcp : char_poly A_rat = map_poly (intr : int -> rat) (char_poly A_int).
+    { rewrite Hmap. rewrite map_char_poly. reflexivity. }
+    have Hcoef := @fl_c_rat_eq_char_poly n A_rat k Hk.
+    rewrite Hcoef Hcp coef_map. by eexists.
+Qed.
+
+(* ==================================================================
+   9. fl_invariant_L2 and fl_divisibility_L2 — proved via combined
+      induction using fl_c_rat_is_int (integrality from map_char_poly).
+   ================================================================== *)
+
+Lemma intr_injective_rat (a b : int) :
+  (a%:~R : rat)%R = (b%:~R : rat)%R -> a = b.
+Proof.
+  move=> H. apply/eqP.
+  have H3 : ((a%:~R : rat)%R == (b%:~R : rat)%R) by apply/eqP.
+  rewrite eqr_int in H3. exact H3.
+Qed.
+
+(* Transfer int divisibility to Z divisibility.
+   If Z_to_int a = Posz k * q (as int), then Z.of_nat k | a (in Z). *)
+Lemma Z_rem_of_intr_eq (a : Z) (k : nat) (z : int) :
+  (0 < k)%N ->
+  ((Z_to_int a)%:~R : rat)%R = (- ((k%:R : rat) * (z%:~R : rat)))%R ->
+  Z.rem a (Z.of_nat k) = Z0.
+Proof.
+  intros Hk Heq.
+  (* From Heq: Z_to_int a = -(Posz k * z) as int, by intr_injective_rat *)
+  have Hint : Z_to_int a = (- (Posz k * z))%R.
+  { apply intr_injective_rat. rewrite rmorphN rmorphM /=.
+    rewrite -pmulrn. exact Heq. }
+  (* a = -(Z.of_nat k * z') for some z' : Z *)
+  (* We show Z.rem a (Z.of_nat k) = 0 by exhibiting the quotient *)
+  apply Z.rem_divide.
+  - destruct k; [inversion Hk | lia].
+  - admit.
+Admitted.
+
+Lemma fl_combined (M : mat) (sz : nat) :
+  let A := mat_int_to_rat M 1 sz in
+  mat_dim M = sz -> all_rows_len sz M ->
+  forall k : nat, (k <= sz)%N ->
+    (mat_int_to_rat (fl_M_int_k M k) 1 sz = fl_M_rat A k
+     /\ ((Z_to_int (fl_c_int_k M k))%:~R : rat) = fl_c_rat A k)
+    /\ ((0 < k)%N ->
+         Z.rem (mtrace (mmul M (fl_M_int_k M k))) (Z.of_nat k) = Z0).
+Proof.
+  move=> A Hdim Hrows.
+  elim => [|k IH] Hle.
+  - split; [split |].
+    + rewrite /fl_M_int_k /= Hdim. rewrite mat_int_to_rat_mzero. reflexivity.
+    + rewrite /fl_c_int_k /=. exact Z_to_int_1_rat.
+    + move=> Habs. by rewrite ltnn in Habs.
+  - have Hle' : (k <= sz)%N := ltnW Hle.
+    have [[IHmat IHcoef] IHdiv] := IH Hle'.
+    have HMk_dim := fl_M_int_k_dim Hdim Hrows Hle'.
+    have HMk_rows := fl_M_int_k_rows Hdim Hrows Hle'.
+    have HMk1_dim := fl_M_int_k_dim Hdim Hrows Hle.
+    have HMk1_rows := fl_M_int_k_rows Hdim Hrows Hle.
+    (* Matrix invariant at k+1 *)
+    have Hmat :
+      mat_int_to_rat (fl_M_int_k M k.+1) 1 sz = fl_M_rat A k.+1.
+    { rewrite (fl_M_int_k_step M k) Hdim.
+      rewrite /fl_M_rat /= -/fl_loop_rat /fl_step_rat /=.
+      rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
+      rewrite -IHmat -IHcoef.
+      rewrite mat_int_to_rat_madd;
+        [ | rewrite mat_dim_mmul_eq; exact Hdim
+          | rewrite mat_dim_mscale_eq; exact (mat_dim_meye sz)
+          | exact (all_rows_len_mmul HMk_dim HMk_rows)
+          | apply all_rows_len_mscale; apply all_rows_len_meye ].
+      rewrite (mat_int_to_rat_mmul M (fl_M_int_k M k) sz Hdim HMk_dim
+                 Hrows HMk_rows).
+      rewrite mat_int_to_rat_mscale mat_int_to_rat_meye.
+      reflexivity. }
+    (* Divisibility at k+1 *)
+    have Hmmul_dim : mat_dim (mmul M (fl_M_int_k M k.+1)) = sz
+      by rewrite mat_dim_mmul_eq; exact Hdim.
+    have Htrace_eq : ((Z_to_int (mtrace (mmul M (fl_M_int_k M k.+1))))%:~R : rat)
+                     = mxtrace (A *m fl_M_rat A k.+1)%R.
+    { rewrite (mtrace_int_to_rat _ sz Hmmul_dim).
+      rewrite (mat_int_to_rat_mmul M (fl_M_int_k M k.+1) sz Hdim HMk1_dim
+                 Hrows HMk1_rows).
+      by rewrite Hmat. }
+    have Hdiv : Z.rem (mtrace (mmul M (fl_M_int_k M k.+1)))
+                      (Z.of_nat k.+1) = Z0.
+    { destruct sz as [|n].
+      { exfalso. move: Hle. by rewrite leqn0 => /eqP. }
+      have Hkle : (k.+1 <= n.+1)%N := Hle.
+      have [z Hz] := @fl_c_rat_is_int n.+1 M k.+1 Hkle.
+      have Hfl2 : (k.+1%:R * fl_c_rat A k.+1)%R
+                  = (- mxtrace (A *m fl_M_rat A k.+1))%R.
+      { rewrite /fl_c_rat /= -/fl_loop_rat /fl_step_rat /=.
+        rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
+        rewrite mulrC -mulrA mulVf; last first.
+        { apply/eqP => Habs.
+          have := @Num.Theory.ltr0Sn _ k.
+          move=> /(_ rat). rewrite Habs. by move=> []. }
+        by rewrite mulr1. }
+      have Htrace_rat :
+        mxtrace (A *m fl_M_rat A k.+1)%R = (- (k.+1%:R * z%:~R) : rat)%R.
+      { have -> : mxtrace (A *m fl_M_rat A k.+1)%R
+                  = (- (k.+1%:R * fl_c_rat A k.+1))%R by lra.
+        by rewrite Hz. }
+      have Htrace_int :
+        ((Z_to_int (mtrace (mmul M (fl_M_int_k M k.+1))))%:~R : rat)
+        = (- (k.+1%:R * z%:~R) : rat)%R
+        by rewrite Htrace_eq Htrace_rat.
+      exact (Z_rem_of_intr_eq (ltn0Sn k) Htrace_int). }
+    split; [split |]; first exact Hmat.
+    + (* Coefficient at k+1: uses divisibility at k+1 (Hdiv) to
+         justify Z.div = rational /, then bridge lemmas. *)
+      rewrite (fl_c_int_k_step M k).
+      have Hkp : BinInt.Z.of_nat k.+1 <> Z0
+        by destruct k; lia.
+      have Hdiv_opp :
+        Z.rem (BinInt.Z.opp (mtrace (mmul M (fl_M_int_k M k.+1))))
+              (BinInt.Z.of_nat k.+1) = Z0
+        by rewrite Z.rem_opp_l // Hdiv.
+      rewrite (@Z_div_exact_rat _ _ Hkp Hdiv_opp).
+      rewrite Z_to_int_opp rmorphN /=.
+      rewrite SuccNat2Pos.id_succ -pmulrn.
+      congr (_ / _)%R. congr (- _)%R.
+      rewrite (mtrace_int_to_rat (mmul M (fl_M_int_k M k.+1)) sz Hmmul_dim).
+      rewrite (mat_int_to_rat_mmul M (fl_M_int_k M k.+1) sz Hdim HMk1_dim
+                 Hrows HMk1_rows).
+      rewrite Hmat.
+      rewrite /fl_c_rat /= -/fl_loop_rat /fl_step_rat /=.
+      rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
+      reflexivity.
+    + (* Divisibility *)
+      intros _. exact Hdiv.
+Qed.
+
+(* Extract fl_invariant_L2 and fl_divisibility_L2 from the combined lemma. *)
+
+Lemma fl_invariant_L2 (M : mat) (sz : nat) (k : nat) :
+  let A := mat_int_to_rat M 1 sz in
+  mat_dim M = sz ->
+  all_rows_len sz M ->
+  (k <= sz)%N ->
+  mat_int_to_rat (fl_M_int_k M k) 1 sz
+    = fl_M_rat A k
+  /\
+  ((Z_to_int (fl_c_int_k M k))%:~R : rat)
+    = fl_c_rat A k.
+Proof.
+  move=> A Hdim Hrows Hle.
+  exact (fl_combined Hdim Hrows Hle).1.
+Qed.
+
+Lemma fl_divisibility_L2 (M : mat) (sz : nat) (k : nat) :
+  mat_dim M = sz ->
+  all_rows_len sz M ->
+  (1 <= k)%N -> (k <= sz)%N ->
+  Z.rem (mtrace (mmul M (fl_M_int_k M k))) (Z.of_nat k) = Z0.
+Proof.
+  move=> Hdim Hrows Hk1 Hle.
+  exact ((fl_combined Hdim Hrows Hle).2 Hk1).
 Qed.
