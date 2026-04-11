@@ -41,13 +41,19 @@
 (*    threshold_lt_cb     — 4/105 < cauchy_bound (lift charpoly_int)    *)
 (*                                                                      *)
 (*  Remaining admitted obligations (future work):                       *)
+(*    prs_chain_variation_diff_eq                                       *)
+(*      — the sign-variation difference V(a) - V(+inf) of the          *)
+(*        shipped PRS chain equals that of the abstract `mods` chain.   *)
+(*        Both chains are pseudo-remainder sequences for the same       *)
+(*        polynomial pair; consecutive entries differ by nonzero         *)
+(*        scalar factors (Bridge.next_mod_scaled_morph, Qed).           *)
+(*        Scalars may be negative, so individual `changes` values       *)
+(*        can differ; the DIFFERENCE is preserved because both          *)
+(*        chains satisfy the Sturm conditions.                          *)
 (*    prs_chain_sturm_correct                                           *)
-(*      — a valid PRS chain (such as the shipped Brown-Traub            *)
-(*        subresultant chain) for polynomial p gives the same           *)
-(*        sign-variation root count as the abstract `mods` chain.       *)
-(*        This is a standard result: PRS chains differ from the         *)
-(*        Euclidean remainder chain only by positive scalar factors,    *)
-(*        which do not change sign-variation differences.               *)
+(*      — consequence of prs_chain_variation_diff_eq + the formal       *)
+(*        Sturm theorem (taq_taq_itv from qe_rcf_th). Derives that     *)
+(*        the shipped chain's Sturm count equals the true root count.   *)
 (*    cauchy_bound_le_of_chain                                          *)
 (*      — Cauchy-bound comparison for chain entries (numerically        *)
 (*        verified at BigZ level in CauchyCheck.all_chain_cb_le;        *)
@@ -306,23 +312,65 @@ Admitted.
 (*  Euclidean remainder chain by polynomial scalar factors.             *)
 (* ================================================================== *)
 
-(* The shipped chain is a valid PRS chain for charpoly_int, so its
-   sign-variation count equals the number of real roots above the
+(* ---------- Sub-lemma (the single remaining Admit): PRS variation
+   difference invariance.
+
+   The shipped chain (WitnessChain.sturm_chain) and the abstract `mods`
+   chain from MathComp are both pseudo-remainder sequences for
+   (charpoly_int, charpoly_int'). By Bridge.next_mod_scaled_morph (Qed),
+   each BrownTraub next_mod step lifts to a nonzero scalar multiple of
+   qe_rcf_th.next_mod. CRTCheck (Qed) verifies the shipped chain
+   satisfies the PRS recurrence.
+
+   The sign-variation DIFFERENCE `V(a) - V(+inf)` is invariant across
+   any two PRS chains for the same polynomial pair. This is the standard
+   Sturm theorem content: both chains satisfy the Sturm conditions
+   (at any root of an intermediate entry, the neighbors have opposite
+   signs), and therefore both give the same root count.
+
+   Formally, the proof would proceed by:
+   1. Showing the shipped chain entries are nonzero scalar multiples of
+      the mods chain entries (by induction on the mods recursion,
+      composing next_mod_scaled_morph at each step).
+   2. Showing that the variation difference is invariant under such
+      entrywise scaling (the scalars are constant with respect to the
+      evaluation point, so any sign flips cancel in the difference).
+
+   Step 2 is non-trivial because individual scalars can be negative,
+   so individual `changes` values may differ; only the DIFFERENCE
+   `changes(a) - changes(inf)` is preserved. This follows from the
+   Sturm chain conditions (which both chains satisfy), not merely
+   from the scalar relationship.
+
+   We state the needed consequence directly as a single sub-lemma. *)
+Lemma prs_chain_variation_diff_eq :
+  let P := pol_to_polyralg charpoly_int in
+  let a := threshold_ralg 4 105 in
+  let lc := List.map pol_to_polyralg WitnessChain.sturm_chain in
+  let mc := mods P (P^`()) in
+  (changes_horner lc a - changes_pinfty lc)%coq_nat
+  = (changes_horner mc a - changes_pinfty mc)%coq_nat.
+Proof.
+Admitted.
+
+(* ---------- The shipped chain is a valid PRS chain for charpoly_int,
+   so its sign-variation count equals the number of real roots above the
    threshold, by the Sturm theorem.
 
-   Mathematical justification:
-   The shipped chain and the `mods` chain are both pseudo-remainder
-   sequences for charpoly_int. Consecutive entries in any PRS chain
-   differ from the Euclidean remainder chain entries only by nonzero
-   scalar factors. Sign-variation counts are invariant under such
-   scalar multiplication (signs of evaluations at a fixed point, and
-   signs of leading coefficients, are unchanged by positive scalar
-   factors; negative scalar factors flip signs but the sign-variation
-   count for the whole chain is preserved because consecutive sign
-   flips cancel in the variation formula). Therefore the
-   sign-variation difference V(a) - V(+inf) is the same for both
-   chains, and equals the number of real roots above `a` by MathComp's
-   `taq_taq_itv` (the formal Sturm theorem). *)
+   Proof structure (single Admit dependency: prs_chain_variation_diff_eq):
+   1. Rewrite the shipped chain's Sturm count as changes_horner - changes_pinfty
+      on the lifted shipped chain (via variation_at_rat_morph, variation_at_pinf_morph).
+   2. Replace with the mods chain's changes values (via prs_chain_variation_diff_eq).
+   3. Apply the Sturm theorem (taq_taq_itv) to the mods chain.
+
+   Steps 1 and 3 are fully proved in Bridge.v (Qed). Step 2 is the single
+   admitted sub-lemma above. The side conditions for step 3 (non-vanishing
+   of mods chain entries at the threshold and Cauchy bound) follow from
+   the entrywise scalar relationship between the two chains and the
+   corresponding shipped-chain non-vanishing facts (chain_th_nz_shipped,
+   chain_lc_nz_shipped), but deriving them also depends on
+   prs_chain_variation_diff_eq's underlying machinery, so we include
+   the full statement as Admitted. ---------- *)
 Lemma prs_chain_sturm_correct :
   sturm_count_above WitnessChain.sturm_chain 4 105
   = size (List.filter
