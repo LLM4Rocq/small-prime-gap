@@ -22,6 +22,7 @@ Import ListNotations.
 Open Scope Z_scope.
 
 From mathcomp Require Import all_boot all_algebra.
+From mathcomp.algebra_tactics Require Import ring lra.
 Import GRing.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly CharPolyHelpers.
@@ -547,7 +548,31 @@ Qed.
 Lemma adj_coef_formula (l : nat) :
   (l <= n.+1)%N ->
   adj_coef l = (\sum_(m < l.+1) (cp)`_(n.+1 - l + m) *: B ^+ m)%R.
-Proof. admit. Admitted.
+Proof.
+  elim: l => [|l IH] Hl.
+  - by rewrite big_ord_recl big_ord0 /= subn0 addn0 Hlead_cp expr0 addr0
+               scale1r.
+  - rewrite /= (IH (ltnW Hl)) mulmx_sumr.
+    have Hpos : (0 < n.+1 - l)%N by rewrite subn_gt0.
+    have Heq : (n.+1 - l).-1 = (n - l)%N by rewrite -subnS.
+    rewrite big_ord_recl /= addn0 expr0.
+    rewrite [RHS]big_ord_recl /= addn0 expr0.
+    have -> : (n.+1 - l.+1)%N = (n - l)%N by rewrite subnS -Heq.
+    rewrite [LHS]addrC addrA -[LHS]addrA.
+    congr (_ + _)%R.
+    rewrite [RHS]big_ord_recl /= /bump /= addn0.
+    have -> : (n - l + 1)%N = (n.+1 - l)%N.
+    { rewrite addn1 -Heq. by rewrite prednK. }
+    congr (_ + _)%R.
+    { by rewrite -scalemxAr mulmx1. }
+    apply eq_bigr => [[m Hm]] _ /=.
+    rewrite -scalemxAr.
+    change (B *m B ^+ (1 + m))%R with (B * B ^+ (1 + m))%R.
+    rewrite -exprS.
+    have -> : (n - l + (1 + (1 + m)))%N = (n.+1 - l + (1 + m))%N.
+    { by rewrite addnA addn1 -Heq prednK. }
+    done.
+Qed.
 
 (* Trace of adj_coef *)
 Lemma adj_coef_trace (l : nat) :
@@ -570,25 +595,82 @@ Lemma adj_coef_jacobi (l : nat) :
   mxtrace (adj_coef l) = ((n.+1 - l)%:R * (cp)`_(n.+1 - l))%R.
 Proof.
   move=> Hl.
-  (* From jacobi_char_poly: cp' = \sum_i char_poly(B_{[i]})
-     The k-th coefficient of cp' is (k+1)*cp_{k+1}.
-     The k-th coefficient of \sum_i char_poly(B_{[i]}) is
-     \sum_i (char_poly(B_{[i]}))`_k.
-     Setting k = n - l:
-     (n-l+1)*cp_{n-l+1} = \sum_i (char_poly(B_{[i]}))`_{n-l}
-
-     But tr(adj_coef l) = (n-l+1)-th coefficient of tr(adj(char_poly_mx B))
-     = (n-l+1)-th coefficient of cp' = (n-l+1)*cp_{n-l+1} = (n+1-l)*cp_{n+1-l}.
-
-     More precisely: the coefficients of adj(char_poly_mx B) define the N_k
-     and their traces give the coefficients of cp'.
-     Since adj(char_poly_mx B)_{i,i} = cofactor(char_poly_mx B, i, i) = char_poly(B_{[i]}),
-     tr(adj(char_poly_mx B)) = \sum_i char_poly(B_{[i]}) = cp' (by Jacobi).
-     The l-th coefficient from the top (i.e., coefficient of x^{n-l}) is tr(adj_coef l).
-     And (cp')_{n-l} = (n-l+1)*cp_{n-l+1} = (n+1-l)*cp_{n+1-l}. *)
-  (* This requires connecting adj_coef to the actual adjugate matrix,
-     which is non-trivial. Let me use the recurrence verification instead. *)
-  admit.
+  (* Reduce to: tr(adj_coef l) = (cp')_{n-l} *)
+  suff Hsuff : (mxtrace (adj_coef l) = (deriv cp)`_(n - l))%R.
+  { rewrite Hsuff coef_deriv.
+    have Hnl2 : (n - l).+1 = (n.+1 - l)%N by lia.
+    by rewrite Hnl2 mulr_natl. }
+  set P := char_poly_mx B.
+  (* Q k = k-th coefficient matrix of adj(P) *)
+  pose Q := fun k : nat => map_mx (coefp k) (\adj P)%R : 'M[rat]_(n.+1).
+  (* Coefficient recurrence from mul_mx_adj: Q k - B * Q(k+1) = cp_{k+1} *: I *)
+  have Hcoef_eq : forall k : nat, (k <= n)%N ->
+    (Q k - B *m Q k.+1 = cp`_k.+1 *: 1%:M :> 'M_(n.+1))%R.
+  { move=> k Hk. apply/matrixP => i j. rewrite !mxE.
+    have Hmma := mul_mx_adj P.
+    have : ((P *m \adj P)%R i j = ((\det P)%:M)%R i j)%R by rewrite Hmma.
+    rewrite !mxE.
+    (* (P *m adj P)_{ij} = \sum_l P_{il} * (adj P)_{lj} *)
+    (* = \sum_l (delta_{il}*X - B_{il}%:P) * (adj P)_{lj} *)
+    (* = X * (adj P)_{ij} - \sum_l B_{il} * (adj P)_{lj} *)
+    (* coeff k+1: (adj P)_{ij}`_k - \sum_l B_{il} * (adj P)_{lj}`_{k+1} = delta_{ij} * cp_{k+1} *)
+    admit. }
+  (* Q n = I (leading coefficient of adjugate is I) *)
+  have HQn : Q n = (1%:M)%R.
+  { apply/matrixP => i j. rewrite /Q mxE !mxE /cofactor.
+    case Hij: (i == j).
+    - (* Diagonal: coefp n (char_poly(minor_i B)) = 1 *)
+      rewrite (eqP Hij).
+      have -> : ((-1 : {poly rat}) ^+ (j + j) = 1)%R
+        by rewrite addnn -mul2n mulnC exprM sqrr_sign.
+      rewrite mul1r row'_col'_char_poly_mx -/(char_poly _).
+      have /monicP := char_poly_monic (row' j (col' j B)).
+      by rewrite /lead_coef (size_char_poly (row' j (col' j B))) /= => ->.
+    - (* Off-diagonal: degree < n, so coefp n = 0 *)
+      (* cofactor(P, j, i) for i != j has degree < n *)
+      admit. }
+  (* By induction: Q(n - l') = adj_coef l' for l' <= n *)
+  have Hadj_eq : forall l' : nat, (l' <= n)%N ->
+    Q (n - l')%N = adj_coef l' :> 'M_(n.+1).
+  { elim => [|l' IHl'] Hl'.
+    - by rewrite subn0 HQn.
+    - have Hl'n : (l' <= n)%N := ltnW Hl'.
+      have Hk : (n - l'.+1 <= n)%N by lia.
+      (* From Hcoef_eq at k = n - l'.+1:
+         Q(n - l'.+1) - B * Q(n - l'.+1 + 1) = cp_{n - l'.+1 + 1} *: I
+         Q(n - l'.+1) = B * Q(n - l') + cp_{n - l'} *: I
+                      = B * adj_coef l' + cp_{n - l'} *: I  (by IH)
+                      = adj_coef l'.+1 *)
+      have Hstep := Hcoef_eq (n - l'.+1)%N Hk.
+      have Hsucc : (n - l'.+1).+1 = (n - l')%N by lia.
+      have Hcp_idx : (n - l'.+1).+1 = (n - l')%N by lia.
+      rewrite Hsucc (IHl' Hl'n) in Hstep.
+      (* Hstep already has (n-l') indices from Hsucc rewrite *)
+      (* Hstep: Q(n-l'.+1) - B * adj_coef l' = cp_{n-l'} *: I *)
+      (* So Q(n-l'.+1) = B * adj_coef l' + cp_{n-l'} *: I = adj_coef l'.+1 *)
+      have -> : adj_coef l'.+1 = (B *m adj_coef l' + cp`_(n - l') *: 1%:M)%R by done.
+      by rewrite -Hstep addrC addrNK. }
+  (* Jacobi's formula: deriv(det P) = \sum_k det(row' k (col' k P)) *)
+  have jacobi : (deriv (\det P) = \sum_(k : 'I_n.+1) \det (row' k (col' k P)))%R.
+  { (* Follows from: det = \sum_s sign(s) \prod_i P_{i,s(i)},
+       linearity of deriv, and the product derivative rule
+       specialized to char_poly_mx entries (derivative is 0 or 1). *)
+    admit. }
+  (* Diagonal of adjugate = char_poly of minor *)
+  have Hdiag : forall k : 'I_n.+1,
+    ((\adj P) k k = char_poly (row' k (col' k B)))%R.
+  { move=> k. rewrite mxE /cofactor.
+    have -> : ((-1 : {poly rat}) ^+ (k + k) = 1)%R
+      by rewrite addnn -mul2n mulnC exprM sqrr_sign.
+    by rewrite mul1r /char_poly row'_col'_char_poly_mx. }
+  (* Assemble the proof *)
+  have -> : cp = (\det P)%R by done.
+  rewrite jacobi coef_sum /mxtrace.
+  apply eq_bigr => k _.
+  rewrite row'_col'_char_poly_mx /char_poly.
+  (* Goal: adj_coef l k k = (det(char_poly_mx(minor_k B)))_{n-l} *)
+  rewrite -(Hadj_eq l Hl) /Q mxE.
+  by rewrite Hdiag /char_poly.
 Admitted.
 
 Lemma char_poly_newton (k : nat) :
@@ -624,27 +706,56 @@ Proof.
     { move=> Hsum. by rewrite -(eq_bigr _ (fun i _ => H i)) Hsum. }
     move=> i. by rewrite -scalemxAl mxtraceZ exprD. }
   case: (ltnP k n.+1) => Hk.
-  - (* k < n+1, use adjugate + Jacobi *)
+  - (* k < n+1, use adjugate trace + Jacobi *)
     have Hkn : (k <= n)%N by rewrite -ltnS.
     have Hkn1 : (k <= n.+1)%N := Hkle.
     have HNt := adj_coef_trace Hkn1.
     have HNj := adj_coef_jacobi Hkn.
-    (* tr(adj_coef k) = \sum_{m < k+1} cp_{n+1-k+m} * tr(B^m) *)
-    (* tr(adj_coef k) = (n+1-k) * cp_{n+1-k} *)
-    (* Combining: \sum_{m<k+1} cp_{n+1-k+m}*tr(B^m) = (n+1-k)*cp_{n+1-k}
-       Split off m=0: cp_{n+1-k}*(n+1) + \sum_{m=1}^k cp_{n+1-k+m}*tr(B^m) = (n+1-k)*cp_{n+1-k}
-       Rearrange: \sum_{m=1}^k cp_{n+1-k+m}*tr(B^m) = -k*cp_{n+1-k}
-       Reindex j = k-m: \sum_{j<k} cp_{n+1-j}*tr(B^{k-j}) = -k*cp_{n+1-k} *)
-    admit.
+    (* Combine HNt and HNj *)
+    have Hcomb : (\sum_(m < k.+1) cp`_(n.+1 - k + m) * \tr (B ^+ m))%R
+                 = ((n.+1 - k)%:R * cp`_(n.+1 - k))%R
+      by rewrite -HNj HNt.
+    rewrite big_ord_recl /= expr0 mxtrace_scalar addn0 in Hcomb.
+    (* Extract the inner sum *)
+    have Hsum : (\sum_(i < k) cp`_(n.+1 - k + bump 0 i)
+                    * \tr (B ^+ bump 0 i))%R
+                = (- (k%:R * cp`_(n.+1 - k)))%R.
+    { apply (addrI (cp`_(n.+1 - k) * n.+1%:R)%R).
+      rewrite Hcomb.
+      have -> : (k%:R * (cp`_(n.+1 - k) : rat))%R
+                = ((cp`_(n.+1 - k) : rat) * k%:R)%R by rewrite mulrC.
+      rewrite -mulrBr -natrB //.
+      by rewrite mulrC. }
+    (* Reindex to match the goal *)
+    rewrite -Hsum (reindex_inj rev_ord_inj).
+    apply eq_bigr => [[i Hi]] _ /=.
+    rewrite /bump /= !add1n.
+    have Hi3 : (i.+1 <= k)%N by done.
+    rewrite subKn // subnBA //.
+    congr (_ * _)%R. congr (cp`_ _)%R.
+    by rewrite addnC -addnBA // addnC.
   - (* k = n+1, use CH trace at m=0 *)
     have Hk_eq : k = n.+1 by apply/eqP; rewrite eqn_leq Hkle Hk.
     subst k.
-    (* Newton for k=n+1 is equivalent to CH_trace(0) after reindexing:
-       \sum_{i<n+2} cp_i*tr(B^i) = 0 becomes
-       cp_0*(n+1) + \sum_{i=1}^{n+1} cp_i*tr(B^i) = 0
-       i.e. \sum_{j<n+1} cp_{n+1-j}*tr(B^{n+1-j}) = -(n+1)*cp_0 *)
-    admit.
-Admitted.
+    have HCH0 := CH_trace 0%N.
+    rewrite big_ord_recr /= Hlead mul1r in HCH0.
+    rewrite big_ord_recl /= expr0 mxtrace_scalar addn0 in HCH0.
+    rewrite big_ord_recl /= Hlead mul1r subn0.
+    rewrite (reindex_inj rev_ord_inj).
+    have Hsum_eq :
+      (\sum_(j < n) cp`_(n.+1 - bump 0 (rev_ord j))
+          * \tr (B ^+ (n.+1 - bump 0 (rev_ord j))))%R
+      = (\sum_(i < n) cp`_(bump 0 i)
+            * \tr (B ^+ (bump 0 i + 0)))%R.
+    { apply eq_bigr => [[j Hj]] _ /=.
+      rewrite /bump /= !add1n addn0.
+      rewrite subnSK //.
+      rewrite subSn; last by apply leq_subr.
+      by rewrite subKn; last exact (ltnW Hj). }
+    rewrite Hsum_eq addrC.
+    apply (addrI (cp`_0 * n.+1%:R)%R).
+    by rewrite addrA HCH0 subnn mulrC subrr.
+Qed.
 
 (* ----- Sub-lemma: FL trace identity -------------------------------- *)
 
