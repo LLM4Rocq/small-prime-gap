@@ -700,12 +700,73 @@ Proof.
       by rewrite -Hstep addrC addrNK. }
   (* Jacobi's formula: deriv(det P) = \sum_k det(row' k (col' k P)) *)
   have jacobi : (deriv (\det P) = \sum_(k : 'I_n.+1) \det (row' k (col' k P)))%R.
-  { (* Jacobi's formula for char_poly_mx: deriv(det P) = tr(adj P).
-       This is equivalent to Newton's identities applied to the
-       characteristic polynomial. The proof requires either:
-       (a) the Leibniz product rule for fintype products, or
-       (b) an independent proof of Newton's identities from CH. *)
-    admit. }
+  { (* Jacobi's formula for char_poly_mx via Leibniz product rule. *)
+    (* Helper: derivative of a product indexed by a list *)
+    have deriv_prod_seq : forall (T : eqType) (s : seq T) (F : T -> {poly rat}),
+      uniq s ->
+      deriv (\prod_(i <- s) F i) =
+      (\sum_(k <- s) deriv (F k) * \prod_(i <- s | i != k) F i)%R.
+    { move=> T s F. elim: s => [|a s IHs] Huniq.
+      - by rewrite !big_nil derivC.
+      - have Ha : a \notin s by move: Huniq => /= /andP [].
+        have Hs : uniq s by move: Huniq => /= /andP [].
+        rewrite big_cons /= derivM (IHs Hs) [RHS]big_cons /=.
+        have Hfilt : (\prod_(j <- s | j != a) F j = \prod_(j <- s) F j)%R.
+          rewrite -big_filter. congr (\big[_/_]_(j <- _) F j)%R.
+          apply/all_filterP/allP => i Hi.
+          apply/negP => /eqP Habs. subst. by rewrite Hi in Ha.
+        have -> : (\prod_(i <- a :: s | i != a) F i)%R = (\prod_(j <- s) F j)%R
+          by rewrite big_cons /= eq_refl Hfilt.
+        congr (_ + _)%R.
+        rewrite big_distrr /= big_seq_cond [RHS]big_seq_cond.
+        apply eq_bigr => k /andP [Hkin _].
+        rewrite mulrCA. congr (_ * _)%R.
+        rewrite big_cons /=.
+        have -> : (a != k) = true by apply/eqP => Habs; subst; rewrite Hkin in Ha.
+        done. }
+    (* Step 1: Unfold det as Leibniz sum, push deriv through *)
+    rewrite /determinant raddf_sum /=.
+    (* Step 2: For each perm s, simplify deriv((-1)^s * prod) *)
+    under eq_bigr => s _.
+      rewrite derivM.
+      have -> : ((-1 : {poly rat}) ^+ perm.odd_perm s)^`()%R = 0%R.
+        by case: (perm.odd_perm s); rewrite /= ?expr1 ?expr0 ?derivN ?derivC ?oppr0.
+      rewrite mul0r add0r.
+      rewrite deriv_prod_seq; first last.
+        exact: index_enum_uniq.
+      rewrite mulr_sumr.
+      over.
+    (* Step 3: Exchange order of summation *)
+    rewrite exchange_big /=.
+    (* Step 4: For each k, use deriv of char_poly_mx entries *)
+    apply eq_bigr => k _.
+    have Hderiv_entry : forall i j : 'I_n.+1,
+      deriv (P i j) = ((i == j)%:R : rat)%:P%R.
+    { move=> i j. rewrite /P /char_poly_mx !mxE.
+      rewrite derivB derivC subr0 derivMn derivX.
+      by rewrite polyCMn polyC1. }
+    under eq_bigr => s _.
+      rewrite Hderiv_entry.
+      over.
+    (* Step 5: Filter -- only perms s with s(k) = k survive *)
+    rewrite (eq_bigr (fun s =>
+      if perm.fun_of_perm.body s k == k then
+        (-1) ^+ perm.odd_perm s * \prod_(i < n.+1 | i != k) P i (perm.fun_of_perm.body s i)
+      else 0))%R; last first.
+    { move=> s _.
+      case Hsk: (perm.fun_of_perm.body s k == k).
+      - by rewrite (eqP Hsk) eqxx /= polyC1 mul1r.
+      - have -> : (k == perm.fun_of_perm.body s k) = false by rewrite eq_sym Hsk.
+        by rewrite /= polyC0 mul0r mulr0. }
+    rewrite -big_mkcond /=.
+    (* Step 6: Recognize as cofactor P k k = det(row' k (col' k P)) *)
+    under eq_bigr => s Hs.
+      rewrite (eq_bigl (fun i0 => k != i0)); last by move=> x; rewrite eq_sym.
+      over.
+    rewrite -expand_cofactor /cofactor.
+    have -> : ((-1 : {poly rat}) ^+ (k + k) = 1)%R
+      by rewrite addnn -mul2n mulnC exprM sqrr_sign.
+    by rewrite mul1r. }
   (* Diagonal of adjugate = char_poly of minor *)
   have Hdiag : forall k : 'I_n.+1,
     ((\adj P) k k = char_poly (row' k (col' k B)))%R.
@@ -721,7 +782,7 @@ Proof.
   (* Goal: adj_coef l k k = (det(char_poly_mx(minor_k B)))_{n-l} *)
   rewrite -(Hadj_eq l Hl) /Q mxE.
   by rewrite Hdiag /char_poly.
-Admitted.
+Qed.
 
 Lemma char_poly_newton (k : nat) :
   (1 <= k)%N -> (k <= n.+1)%N ->
