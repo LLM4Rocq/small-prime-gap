@@ -343,10 +343,26 @@ Proof. unfold mat_dim, mzero. apply mzero_aux_len. Qed.
    derived from `char_poly_int`), so this lemma is only useful for
    cross-validation with D = 1.
    ------------------------------------------------------------------ *)
+(* The well-formedness hypothesis says every row of M has length n.
+   It is needed because the bridge lemmas (mat_int_to_rat_mmul, etc.)
+   in CharPolyHelpers.v require an honest n x n grid. Callers that
+   build M from `build_mat_sq` or from well-formed FLINT data satisfy it. *)
 Lemma char_poly_int_correct
   (M : mat) (n : nat)
-  (sq : mat_dim M = n) :
+  (sq : mat_dim M = n)
+  (wf : forall i, (i < List.length M)%coq_nat ->
+          List.length (List.nth i M nil) = n) :
   pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n).
+Proof.
+  (* Proof route:
+     1. Unfold char_poly_int to fl_loop ... ++ [1]
+     2. Use fl_invariant_L2 (now Qed in CharPolyL2.v modulo Z_rem_of_intr_eq)
+        to show each coefficient of the integer FL loop, lifted to rat,
+        equals the corresponding coefficient of fl_loop_rat.
+     3. Use fl_loop_rat_is_char_poly_L2 (Qed) to equate with char_poly.
+     This assembly requires showing pol_to_polyrat distributes over
+     the list operations (rcons/map/rev) used in char_poly_int and
+     fl_loop_rat_is_char_poly_L2. *)
 Admitted.
 
 (* ==================================================================
