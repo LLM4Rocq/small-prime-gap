@@ -437,10 +437,240 @@ Proof. Admitted.
    This is multi-day work and is left Admitted.
    ================================================================== *)
 
+(* ------------------------------------------------------------------
+   Core identity: the FL coefficient at step k (for k = 1, ..., sz)
+   equals the (sz-k)-th coefficient of char_poly B.
+
+   This is proved by strong induction on k.  The key ingredients are:
+   (a) Cayley-Hamilton:  horner_mx B (char_poly B) = 0
+   (b) Taking traces of B^m * (Cayley-Hamilton equation) gives Newton
+       identities on the char_poly coefficients.
+   (c) The FL recurrence computes the same Newton identity by
+       construction (the trace term in fl_step_rat is exactly the
+       Newton sum).
+   (d) By uniqueness of the recurrence, the FL coefficients must
+       equal the char_poly coefficients.
+   ------------------------------------------------------------------ *)
+
+(* We factor the proof into sub-lemmas. *)
+Section FL_CharPoly_Core.
+
+Variable (n : nat).
+Variable (B : 'M[rat]_n.+1).
+
+(* ----- Abbreviations ------------------------------------------------ *)
+Let cp := char_poly B.
+
+(* The FL "matrix" at step k (a partial sum involving B-powers). *)
+(* M_k = sum_{j=0}^{k-1} fl_c_rat B j *: B^{k-1-j}
+   By the FL recurrence:
+     M_0 = 0
+     M_k = B * M_{k-1} + fl_c_rat B (k-1) *: 1%:M *)
+
+(* ----- Sub-lemma: fl_M_rat satisfies a trace-sum expansion --------- *)
+
+(* FL matrix expansion: M_k = \sum_{j=0}^{k-1} c_{n+1-j} * B^{k-1-j} *)
+Lemma fl_M_expansion (k : nat) :
+  (k <= n.+1)%N ->
+  fl_M_rat B k =
+    (\sum_(j < k) fl_c_rat B j *: B ^+ (k - j.+1))%R.
+Proof.
+  elim: k => [|k IH] Hk.
+  - by rewrite big_ord0.
+  - rewrite /fl_M_rat /= -/fl_loop_rat /fl_step_rat /=.
+    rewrite -/(fl_M_rat B k) -/(fl_c_rat B k).
+    have Hk' : (k <= n.+1)%N by exact (ltnW Hk).
+    rewrite (IH Hk').
+    rewrite mulmx_sumr.
+    rewrite big_ord_recr /=.
+    rewrite subnn expr0.
+    congr (_ + _)%R.
+    apply eq_bigr => j _.
+    rewrite -scalemxAr.
+    congr (_ *: _)%R.
+    have Hj : (j < k)%N by exact (ltn_ord j).
+    change (B *m B ^+ (k - j.+1))%R with (B * B ^+ (k - j.+1))%R.
+    rewrite -exprS.
+    congr (B ^+ _)%R.
+    rewrite subSn //.
+Qed.
+
+(* ----- Sub-lemma: FL trace identity matches Newton identity ---------- *)
+
+(* From the FL recurrence, we get:
+     k * fl_c_rat B k = -tr(B * M_k)
+   Expanding M_k:
+     k * c_k = - sum_{j=0}^{k-1} c_j * tr(B^{k-j})
+
+   where c_j = fl_c_rat B j.
+
+   Separately, from Cayley-Hamilton (horner_mx B cp = 0), multiplying
+   by B^m and taking traces gives:
+     sum_{i=0}^{n+1} cp`_i * tr(B^{i+m}) = 0
+
+   These two sets of identities are the SAME recurrence when we set
+   c_j = cp`_{n+1-j} (i.e., fl_c_rat B j should equal cp`_{n+1-j}).
+*)
+
+(* The Newton identity from Cayley-Hamilton.
+   For k = 1, ..., n+1:
+     sum_{j=0}^{k-1} cp`_{n+1-j} * tr(B^{k-j}) + k * cp`_{n+1-k} = 0 *)
+Lemma char_poly_newton (k : nat) :
+  (1 <= k)%N -> (k <= n.+1)%N ->
+  (\sum_(j < k) (cp)`_(n.+1 - j) * \tr (B ^+ (k - j)))%R
+  = (- (k%:R * (cp)`_(n.+1 - k)))%R.
+Proof.
+  (* This follows from Cayley-Hamilton. The key steps:
+     1. From Cayley_Hamilton: horner_mx B cp = 0
+     2. horner_mx B cp = \sum_{i < n+2} cp`_i *: B^i = 0
+     3. Multiply by B^m on left (or right) and take trace.
+     4. Rearrange to get the Newton identity.
+
+     The derivation requires showing that the trace of the matrix
+     polynomial evaluation \sum_i c_i * tr(B^i) satisfies a
+     recurrence, then extracting individual Newton identities
+     from the full Cayley-Hamilton sum.
+
+     This is non-trivial but standard linear algebra. *)
+  admit.
+Admitted.
+
+(* ----- Sub-lemma: FL trace identity -------------------------------- *)
+
+Lemma fl_trace_identity (k : nat) :
+  (1 <= k)%N -> (k <= n.+1)%N ->
+  (k%:R * fl_c_rat B k)%R =
+    (- \sum_(j < k) fl_c_rat B j * \tr (B ^+ (k - j)))%R.
+Proof.
+  move=> Hk1 Hk.
+  destruct k as [|k']; first by rewrite ltnn in Hk1.
+  rewrite /fl_c_rat /= -/fl_loop_rat /fl_step_rat /=.
+  rewrite -/(fl_M_rat B k') -/(fl_c_rat B k').
+  (* Simplify k'.+1 * (-tr(...) / k'.+1) to -tr(...) *)
+  rewrite mulrC -mulrA.
+  rewrite mulVf; last first.
+  { apply/eqP => Habs.
+    have := @Num.Theory.ltr0Sn _ k'.
+    move=> /(_ rat). rewrite Habs. by move=> []. }
+  rewrite mulr1.
+  congr (- _)%R.
+  rewrite mulmxDr mxtraceD.
+  rewrite -(scalemxAr (fl_c_rat B k') B (1%:M : 'M_n.+1)) mulmx1 mxtraceZ.
+  rewrite big_ord_recr /= subSn // subnn expr1.
+  congr (_ + _)%R.
+  have Hk' : (k' <= n.+1)%N by exact (ltnW Hk).
+  rewrite (fl_M_expansion Hk').
+  rewrite mulmx_sumr mulmx_sumr raddf_sum.
+  apply eq_bigr => j _.
+  rewrite /matrix_mxtrace__canonical__Algebra_Additive /=.
+  rewrite -(scalemxAr (fl_c_rat B j) B).
+  rewrite -(scalemxAr (fl_c_rat B j) B).
+  rewrite mxtraceZ.
+  congr (_ * _)%R.
+  change (B *m (B *m B ^+ (k' - j.+1)))%R with (B * (B * B ^+ (k' - j.+1)))%R.
+  rewrite -exprS.
+  change (B * B ^+ (k' - j))%R with (B *m B ^+ (k' - j))%R.
+  change (B *m B ^+ (k' - j))%R with (B * B ^+ (k' - j))%R.
+  rewrite -exprS.
+  congr (\tr (B ^+ _))%R.
+  have Hj : (j < k')%N by exact (ltn_ord j).
+  rewrite subSn //; last exact (ltnW Hj).
+  by rewrite subnS prednK // subn_gt0.
+Qed.
+
+(* ----- Main sub-lemma: FL coefficient = char_poly coefficient -------- *)
+
+(* fl_c_rat B k = cp`_{n.+1 - k} for k = 0, 1, ..., n.+1 *)
+Lemma fl_c_rat_eq_char_poly (k : nat) :
+  (k <= n.+1)%N ->
+  fl_c_rat B k = ((cp)`_(n.+1 - k))%R.
+Proof.
+  (* By strong induction on k. *)
+  elim/ltn_ind: k => k IH Hk.
+  destruct k as [|k'].
+  - (* k = 0: fl_c_rat B 0 = 1, cp`_{n.+1} = 1 (leading coeff) *)
+    rewrite subn0 /fl_c_rat /=.
+    have /monicP := char_poly_monic B.
+    rewrite /lead_coef (size_char_poly B).
+    by move=> ->.
+  - (* k = k'.+1: use uniqueness of the Newton recurrence *)
+    (* We have:
+       k'.+1 * fl_c_rat B k'.+1 = - sum_{j<k'.+1} fl_c_rat B j * tr(B^{k'.+1-j})
+       k'.+1 * cp`_{n-k'}       = - sum_{j<k'.+1} cp`_{n.+1-j} * tr(B^{k'.+1-j})
+       By IH, fl_c_rat B j = cp`_{n.+1-j} for j < k'.+1.
+       So the RHS are equal, hence the LHS are equal.
+       Since k'.+1 != 0 in rat, we can divide by k'.+1. *)
+    have Hk'1 : (1 <= k'.+1)%N by done.
+    have Hk'le : (k'.+1 <= n.+1)%N by exact Hk.
+    have Hfl := fl_trace_identity Hk'1 Hk'le.
+    have Hnewton := char_poly_newton Hk'1 Hk'le.
+    (* Rewrite newton: sum = - (k'.+1 * cp`_{n.+1 - k'.+1})
+       i.e. sum_{j<k'.+1} cp`_{n.+1-j} * tr(B^{k'.+1-j}) = -(k'.+1 * cp`_{n-k'}) *)
+    (* By IH, fl_c_rat B j = cp`_{n.+1-j} for all j < k'.+1 *)
+    have Hsums_eq :
+      (\sum_(j < k'.+1) fl_c_rat B j * \tr (B ^+ (k'.+1 - j)))%R =
+      (\sum_(j < k'.+1) (cp)`_(n.+1 - j) * \tr (B ^+ (k'.+1 - j)))%R.
+    { apply eq_bigr => j _. congr (_ * _)%R.
+      apply IH.
+      - exact (ltn_ord j).
+      - exact (ltnW (leq_trans (ltn_ord j) Hk'le)). }
+    (* From fl_trace_identity: k'.+1 * fl_c_rat B k'.+1 = - same sum *)
+    (* From char_poly_newton: same sum = -(k'.+1 * cp`_{n-k'}) *)
+    have Hkne0 : (k'.+1%:R : rat) != 0%R.
+    { apply/eqP => Habs.
+      have := @Num.Theory.ltr0Sn _ k'.
+      move=> /(_ rat). rewrite Habs. by move=> []. }
+    apply (mulfI Hkne0).
+    rewrite Hfl Hsums_eq Hnewton subSS opprK. reflexivity.
+Qed.
+
+End FL_CharPoly_Core.
+
 Lemma fl_loop_rat_is_char_poly_L2 (sz : nat) (B : 'M[rat]_sz) :
-  let cs := map (fl_c_rat B) (rev (iota 0 sz)) in
+  let cs := map (fl_c_rat B) (rev (iota 1 sz)) in
   Poly (rcons cs 1%R) = char_poly B.
-Proof. Admitted.
+Proof.
+  destruct sz as [|n].
+  - (* sz = 0 *)
+    rewrite /= /char_poly.
+    have -> : B = (0 : 'M_0)%R by apply/matrixP => i; case: i => [].
+    rewrite det_mx00 cons_poly_def mul0r add0r. reflexivity.
+  - (* sz = n.+1 *)
+    rewrite /=.
+    set cs := map _ _.
+    set q := char_poly B.
+    have Hsize_cs : size cs = n.+1.
+    { by rewrite size_map size_rev /= size_iota. }
+    have Hlast : last 1%R (rcons cs 1%R) != 0%R.
+    { rewrite last_rcons. exact GRing.oner_neq0. }
+    have Hsize_q : size q = n.+2.
+    { exact (size_char_poly B). }
+    apply/polyP => i.
+    rewrite coef_Poly.
+    case: (ltnP i n.+2) => Hi.
+    + (* i < n.+2: in range *)
+      case: (ltnP i n.+1) => Hi2.
+      * (* i < n.+1: FL coefficient *)
+        rewrite nth_rcons Hsize_cs Hi2.
+        rewrite (nth_map 0%N); last by rewrite size_rev /= size_iota.
+        rewrite nth_rev; last by rewrite /= size_iota.
+        rewrite /= size_iota -/(iota 1 n.+1).
+        rewrite nth_iota; last by rewrite ltn_subrL.
+        rewrite add1n subSS.
+        (* fl_c_rat B (n - i).+1 = (char_poly B)`_i *)
+        rewrite /q fl_c_rat_eq_char_poly.
+        { congr (_`_ _)%R. rewrite subSS subKn //. }
+        { rewrite ltnS. exact (leq_subr i n). }
+      * (* i = n.+1: leading coefficient *)
+        have Hieq : i = n.+1 by apply/eqP; rewrite eqn_leq Hi2 -ltnS Hi.
+        subst i.
+        rewrite nth_rcons Hsize_cs ltnn eqxx.
+        have /monicP := char_poly_monic B.
+        by rewrite /lead_coef /q Hsize_q /= => ->.
+    + (* i > n.+1: both sides are 0 (out of range) *)
+      rewrite nth_default; last by rewrite size_rcons Hsize_cs.
+      rewrite nth_default //. rewrite Hsize_q. exact Hi.
+Qed.
 
 (* ==================================================================
    5. Base case helper — closed.
