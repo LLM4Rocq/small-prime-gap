@@ -512,27 +512,138 @@ Qed.
    c_j = cp`_{n+1-j} (i.e., fl_c_rat B j should equal cp`_{n+1-j}).
 *)
 
-(* The Newton identity from Cayley-Hamilton.
+(* The Newton identity from Cayley-Hamilton + Jacobi's formula.
    For k = 1, ..., n+1:
-     sum_{j=0}^{k-1} cp`_{n+1-j} * tr(B^{k-j}) + k * cp`_{n+1-k} = 0 *)
+     sum_{j=0}^{k-1} cp`_{n+1-j} * tr(B^{k-j}) + k * cp`_{n+1-k} = 0
+
+   Proof outline:
+   1. Define adj_coef l = the l-th expansion coefficient of adj(xI-B),
+      satisfying N_0 = I, N_{l+1} = B*N_l + cp_{n-l}*I.
+   2. Show adj_coef l = \sum_{m<=l} cp_{n+1-l+m} *: B^m (explicit formula).
+   3. Show tr(adj_coef l) = (n+1-l)*cp_{n+1-l} for l <= n (from Jacobi's
+      formula: deriv(char_poly B) = tr(adj(char_poly_mx B)), which gives
+      the k-th coefficient of cp' = (k+1)*cp_{k+1} = tr(N_k)).
+   4. For k <= n: combine (2) and (3), split off the m=0 term (trace of
+      identity), and rearrange to get Newton's identity.
+   5. For k = n+1: use the Cayley-Hamilton trace identity directly. *)
+
+(* Adjugate coefficient matrices: N l represents the l-th power expansion
+   coefficient of adj(char_poly_mx B), counting from the top.
+   N 0 = I (coefficient of x^n), N l = B*N(l-1) + cp_{n-l+1}*I *)
+Fixpoint adj_coef (l : nat) : 'M[rat]_(n.+1) :=
+  match l with
+  | O => 1%:M
+  | l'.+1 => (B *m adj_coef l' + (cp)`_(n - l') *: 1%:M)%R
+  end.
+
+Let Hlead_cp : ((cp)`_n.+1 = 1 :> rat)%R.
+Proof.
+  have /monicP := char_poly_monic B.
+  by rewrite /lead_coef (size_char_poly B).
+Qed.
+
+(* Explicit formula: adj_coef l = \sum_{m < l+1} cp_{n+1-l+m} *: B^m.
+   Proof: by induction on l, using the recurrence and Hlead_cp. *)
+Lemma adj_coef_formula (l : nat) :
+  (l <= n.+1)%N ->
+  adj_coef l = (\sum_(m < l.+1) (cp)`_(n.+1 - l + m) *: B ^+ m)%R.
+Proof. admit. Admitted.
+
+(* Trace of adj_coef *)
+Lemma adj_coef_trace (l : nat) :
+  (l <= n.+1)%N ->
+  mxtrace (adj_coef l) =
+    (\sum_(m < l.+1) (cp)`_(n.+1 - l + m) * mxtrace (B ^+ m))%R.
+Proof.
+  move=> Hl. rewrite (adj_coef_formula Hl) raddf_sum /=.
+  apply eq_bigr => m _. by rewrite mxtraceZ.
+Qed.
+
+(* Jacobi for adj_coef: tr(adj_coef l) = (n+1-l) * cp_{n+1-l} for l <= n.
+   This follows from Jacobi's formula (deriv of determinant = trace of adjugate)
+   applied to char_poly_mx B. The proof requires:
+   (a) deriv(det M) = \sum_i cofactor(M,i,i) for M = xI - B^polyC
+   (b) Identifying cofactor(M,i,i) = char_poly(row' i (col' i B))
+   (c) Matching coefficients to relate tr(adj_coef l) to (cp')_{n-l} = (n+1-l)*cp_{n+1-l} *)
+Lemma adj_coef_jacobi (l : nat) :
+  (l <= n)%N ->
+  mxtrace (adj_coef l) = ((n.+1 - l)%:R * (cp)`_(n.+1 - l))%R.
+Proof.
+  move=> Hl.
+  (* From jacobi_char_poly: cp' = \sum_i char_poly(B_{[i]})
+     The k-th coefficient of cp' is (k+1)*cp_{k+1}.
+     The k-th coefficient of \sum_i char_poly(B_{[i]}) is
+     \sum_i (char_poly(B_{[i]}))`_k.
+     Setting k = n - l:
+     (n-l+1)*cp_{n-l+1} = \sum_i (char_poly(B_{[i]}))`_{n-l}
+
+     But tr(adj_coef l) = (n-l+1)-th coefficient of tr(adj(char_poly_mx B))
+     = (n-l+1)-th coefficient of cp' = (n-l+1)*cp_{n-l+1} = (n+1-l)*cp_{n+1-l}.
+
+     More precisely: the coefficients of adj(char_poly_mx B) define the N_k
+     and their traces give the coefficients of cp'.
+     Since adj(char_poly_mx B)_{i,i} = cofactor(char_poly_mx B, i, i) = char_poly(B_{[i]}),
+     tr(adj(char_poly_mx B)) = \sum_i char_poly(B_{[i]}) = cp' (by Jacobi).
+     The l-th coefficient from the top (i.e., coefficient of x^{n-l}) is tr(adj_coef l).
+     And (cp')_{n-l} = (n-l+1)*cp_{n-l+1} = (n+1-l)*cp_{n+1-l}. *)
+  (* This requires connecting adj_coef to the actual adjugate matrix,
+     which is non-trivial. Let me use the recurrence verification instead. *)
+  admit.
+Admitted.
+
 Lemma char_poly_newton (k : nat) :
   (1 <= k)%N -> (k <= n.+1)%N ->
   (\sum_(j < k) (cp)`_(n.+1 - j) * \tr (B ^+ (k - j)))%R
   = (- (k%:R * (cp)`_(n.+1 - k)))%R.
 Proof.
-  (* This follows from Cayley-Hamilton. The key steps:
-     1. From Cayley_Hamilton: horner_mx B cp = 0
-     2. horner_mx B cp = \sum_{i < n+2} cp`_i *: B^i = 0
-     3. Multiply by B^m on left (or right) and take trace.
-     4. Rearrange to get the Newton identity.
-
-     The derivation requires showing that the trace of the matrix
-     polynomial evaluation \sum_i c_i * tr(B^i) satisfies a
-     recurrence, then extracting individual Newton identities
-     from the full Cayley-Hamilton sum.
-
-     This is non-trivial but standard linear algebra. *)
-  admit.
+  move=> Hk1 Hkle.
+  have Hsize : size cp = n.+2 := size_char_poly B.
+  have Hlead : ((cp)`_n.+1 = 1 :> rat)%R.
+  { have /monicP := char_poly_monic B. by rewrite /lead_coef Hsize. }
+  have HCH := Cayley_Hamilton B : horner_mx B cp = 0%R.
+  (* Establish CH matrix sum *)
+  have HCH_mx : (\sum_(i < n.+2) (cp)`_i *: B ^+ i)%R = 0%R :> 'M_(n.+1).
+  { suff -> : (\sum_(i < n.+2) (cp)`_i *: B ^+ i)%R = horner_mx B cp
+      by exact HCH.
+    rewrite /horner_mx /horner_morph /=.
+    rewrite (@horner_coef_wide _ n.+2 (map_poly scalar_mx cp) B).
+    - apply eq_bigr => i _. rewrite coef_map /=. by rewrite -mul_scalar_mx.
+    - rewrite (size_map_poly_id0 _); first by rewrite Hsize.
+      have /monicP := char_poly_monic B. rewrite /lead_coef Hsize /= => ->.
+      exact: oner_neq0. }
+  (* CH trace identity *)
+  have CH_trace : forall m : nat,
+    (\sum_(i < n.+2) (cp)`_i * \tr (B ^+ (i + m)))%R = 0%R.
+  { move=> m.
+    have : (\sum_(i < n.+2) (cp)`_i *: B ^+ i *m B ^+ m)%R = 0%R
+      by rewrite -mulmx_suml HCH_mx mul0mx.
+    move/(congr1 (@mxtrace _ _)). rewrite mxtrace0 raddf_sum /=.
+    suff H : forall i : 'I_n.+2,
+      mxtrace ((cp)`_i *: B ^+ i *m B ^+ m)%R =
+        ((cp)`_i * mxtrace (B ^+ (i + m)))%R.
+    { move=> Hsum. by rewrite -(eq_bigr _ (fun i _ => H i)) Hsum. }
+    move=> i. by rewrite -scalemxAl mxtraceZ exprD. }
+  case: (ltnP k n.+1) => Hk.
+  - (* k < n+1, use adjugate + Jacobi *)
+    have Hkn : (k <= n)%N by rewrite -ltnS.
+    have Hkn1 : (k <= n.+1)%N := Hkle.
+    have HNt := adj_coef_trace Hkn1.
+    have HNj := adj_coef_jacobi Hkn.
+    (* tr(adj_coef k) = \sum_{m < k+1} cp_{n+1-k+m} * tr(B^m) *)
+    (* tr(adj_coef k) = (n+1-k) * cp_{n+1-k} *)
+    (* Combining: \sum_{m<k+1} cp_{n+1-k+m}*tr(B^m) = (n+1-k)*cp_{n+1-k}
+       Split off m=0: cp_{n+1-k}*(n+1) + \sum_{m=1}^k cp_{n+1-k+m}*tr(B^m) = (n+1-k)*cp_{n+1-k}
+       Rearrange: \sum_{m=1}^k cp_{n+1-k+m}*tr(B^m) = -k*cp_{n+1-k}
+       Reindex j = k-m: \sum_{j<k} cp_{n+1-j}*tr(B^{k-j}) = -k*cp_{n+1-k} *)
+    admit.
+  - (* k = n+1, use CH trace at m=0 *)
+    have Hk_eq : k = n.+1 by apply/eqP; rewrite eqn_leq Hkle Hk.
+    subst k.
+    (* Newton for k=n+1 is equivalent to CH_trace(0) after reindexing:
+       \sum_{i<n+2} cp_i*tr(B^i) = 0 becomes
+       cp_0*(n+1) + \sum_{i=1}^{n+1} cp_i*tr(B^i) = 0
+       i.e. \sum_{j<n+1} cp_{n+1-j}*tr(B^{n+1-j}) = -(n+1)*cp_0 *)
+    admit.
 Admitted.
 
 (* ----- Sub-lemma: FL trace identity -------------------------------- *)
