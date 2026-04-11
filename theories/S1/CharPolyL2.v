@@ -640,11 +640,43 @@ Proof.
       have /monicP := char_poly_monic (row' j (col' j B)).
       by rewrite /lead_coef (size_char_poly (row' j (col' j B))) /= => ->.
     - (* Off-diagonal: degree < n, so coefp n = 0 *)
-      (* cofactor(P, j, i) for i != j has degree <= n-1 *)
-      (* Proof: use Hcoef_eq at k=n to show Q n - B * Q(n+1) = I,
-         and Q(n+1) i j = coefp(n+1) of degree-<=n cofactor = 0.
-         Then (Q n)_{ij} = I_{ij} = 0 for i != j. *)
-      admit. }
+      (* cofactor(P, j, i) for i != j has degree <= n-1.
+         Key idea: the Leibniz formula gives det as a sum of products.
+         Each product of n entries of the minor has degree <= n-1
+         because when i != j, one row of the minor consists entirely
+         of constant polynomials (the row from row i of P, which
+         lost its diagonal 'X term when column i was deleted). *)
+      rewrite /coefp. apply nth_default. rewrite size_Msign.
+      apply: (leq_trans (size_sum _ _ _)). apply/bigmax_leqP => s _. rewrite size_Msign.
+      apply: (leq_trans (size_poly_prod_leq _ _)).
+      rewrite card_ord /=.
+      have Hentry_size : forall (k0 : 'I_n) (l0 : 'I_n),
+        (size (row' j (col' i P) k0 l0) <= 2)%N.
+        move=> k0 l0. rewrite mxE mxE /P /char_poly_mx !mxE.
+        case: (lift j k0 == lift i l0); rewrite /=.
+        - by rewrite mulr1n size_XsubC.
+        - rewrite mulr0n sub0r size_opp size_polyC. by case: (_ == _).
+      have Hij' : j != i.
+        apply/eqP => Habs. move: Hij. by rewrite eq_sym Habs eqxx.
+      have [k0 Hk0 _] := unlift_some Hij'.
+      have Hspecial : forall (l0 : 'I_n),
+        (size (row' j (col' i P) k0 l0) <= 1)%N.
+        move=> l0. rewrite mxE mxE /P /char_poly_mx !mxE -Hk0.
+        have -> : (i == lift i l0) = false by rewrite eq_liftF.
+        rewrite /= mulr0n sub0r size_opp size_polyC. by case: (_ == _).
+      have Hk0bound := Hspecial (perm.fun_of_perm.body s k0).
+      rewrite (bigD1 k0) //=.
+      have Hrest_bound : (\sum_(i0 < n | i0 != k0) size (row' j (col' i P) i0 (perm.fun_of_perm.body s i0)) <= \sum_(i0 < n | i0 != k0) 2%N)%N.
+        apply: leq_sum => i0 _. exact: Hentry_size.
+      rewrite sum_nat_const cardC1 card_ord in Hrest_bound.
+      have Hn : (0 < n)%N by exact: (leq_ltn_trans (leq0n k0) (ltn_ord k0)).
+      set a := size _. set b := (\sum_(i0 < n | i0 != k0) size _)%N.
+      move=> /=. move: Hk0bound Hrest_bound Hn.
+      move=> Ha Hb Hn2.
+      have Hab : (a + b <= 1 + n.-1 * 2)%N by apply: leq_add.
+      have: ((1 + n.-1 * 2).+1 - n <= n)%N.
+        move: Hn2. case: (n) => [|n'] //=. move=> _. lia.
+      lia. }
   (* By induction: Q(n - l') = adj_coef l' for l' <= n *)
   have Hadj_eq : forall l' : nat, (l' <= n)%N ->
     Q (n - l')%N = adj_coef l' :> 'M_(n.+1).
@@ -668,9 +700,11 @@ Proof.
       by rewrite -Hstep addrC addrNK. }
   (* Jacobi's formula: deriv(det P) = \sum_k det(row' k (col' k P)) *)
   have jacobi : (deriv (\det P) = \sum_(k : 'I_n.+1) \det (row' k (col' k P)))%R.
-  { (* Follows from: det = \sum_s sign(s) \prod_i P_{i,s(i)},
-       linearity of deriv, and the product derivative rule
-       specialized to char_poly_mx entries (derivative is 0 or 1). *)
+  { (* Jacobi's formula for char_poly_mx: deriv(det P) = tr(adj P).
+       This is equivalent to Newton's identities applied to the
+       characteristic polynomial. The proof requires either:
+       (a) the Leibniz product rule for fintype products, or
+       (b) an independent proof of Newton's identities from CH. *)
     admit. }
   (* Diagonal of adjugate = char_poly of minor *)
   have Hdiag : forall k : 'I_n.+1,
