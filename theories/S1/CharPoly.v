@@ -1760,6 +1760,17 @@ Proof.
   rewrite eqr_int in H3. exact H3.
 Qed.
 
+Lemma Z_to_int_injective (x y : Z) : Z_to_int x = Z_to_int y -> x = y.
+Proof.
+  destruct x as [|px|px], y as [|py|py]; rewrite /Z_to_int //; intro Hxy;
+    try (exfalso; have := Pos2Nat.is_pos px; have := Pos2Nat.is_pos py; lia);
+    try (exfalso; have := Pos2Nat.is_pos px; lia);
+    try (exfalso; have := Pos2Nat.is_pos py; lia).
+  - f_equal. apply Pos2Nat.inj. injection Hxy => Hnat. exact Hnat.
+  - f_equal. apply Pos2Nat.inj. injection Hxy => Hnat.
+    have := Pos2Nat.is_pos px. have := Pos2Nat.is_pos py. lia.
+Qed.
+
 Lemma Z_rem_of_intr_eq (a : Z) (k : nat) (z : int) :
   (0 < k)%N ->
   ((Z_to_int a)%:~R : rat)%R = (- ((k%:R : rat) * (z%:~R : rat)))%R ->
@@ -1771,8 +1782,15 @@ Proof.
     rewrite -pmulrn. exact Heq. }
   apply Z.rem_divide.
   - destruct k; [inversion Hk | lia].
-  - admit.
-Admitted.
+  - set w := (match z with Posz n => Z.of_nat n
+                          | Negz n => Z.neg (Pos.of_succ_nat n) end).
+    exists (Z.opp w).
+    apply Z_to_int_injective. rewrite Z_to_int_mul Z_to_int_opp Z_to_int_of_nat.
+    rewrite Hint.
+    f_equal. rewrite mulrC. subst w. destruct z as [n|n].
+    + by rewrite Z_to_int_of_nat mulNr mulrC.
+    + rewrite Z_to_int_neg_pos SuccNat2Pos.id_succ mulNr mulrC. ring.
+Qed.
 
 Lemma fl_combined (M : mat) (sz : nat) :
   let A := mat_int_to_rat M 1 sz in
@@ -1890,6 +1908,21 @@ Proof.
   exact ((fl_combined Hdim Hrows Hle).2 Hk1).
 Qed.
 
+Lemma fl_loop_eq_fl_state (A : mat) (steps j : nat) (acc : list Z) :
+  fl_loop steps (Z.of_nat (S j)) A (meye (mat_dim A))
+          (fl_M_int_k A j) (fl_c_int_k A j) acc
+  = rev (map (fl_c_int_k A) (iota (S j) steps)) ++ acc.
+Proof.
+  revert j acc. induction steps as [|s IH] => j acc.
+  - simpl. reflexivity.
+  - simpl fl_loop.
+    rewrite -(fl_M_int_k_step A j).
+    rewrite -(fl_c_int_k_step A j).
+    replace (Z.pos (PosDef.Pos.of_succ_nat j + 1)) with (Z.of_nat j.+2) by lia.
+    rewrite /= rev_cons -cats1 -catA /=.
+    exact (IH j.+1 (fl_c_int_k A j.+1 :: acc)).
+Qed.
+
 (* ------------------------------------------------------------------
    L2 (PLAN_S1.md section 3) — the load-bearing correctness lemma.
 
@@ -1907,16 +1940,34 @@ Lemma char_poly_int_correct
           List.length (List.nth i M nil) = n) :
   pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n).
 Proof.
-  (* Proof route:
-     1. Unfold char_poly_int to fl_loop ... ++ [1]
-     2. Use fl_invariant_L2 to show each coefficient of the integer
-        FL loop, lifted to rat, equals the corresponding coefficient
-        of fl_loop_rat.
-     3. Use fl_loop_rat_is_char_poly_L2 to equate with char_poly.
-     This assembly requires showing pol_to_polyrat distributes over
-     the list operations (rcons/map/rev) used in char_poly_int and
-     fl_loop_rat_is_char_poly_L2. *)
-Admitted.
+  rewrite <- (fl_loop_rat_is_char_poly_L2 (mat_int_to_rat M 1 n)).
+  rewrite /char_poly_int sq.
+  have Hwf : all_rows_len n M by exact wf.
+  have Hfl_eq : fl_loop n Z.one M (meye n) (mzero n) Z.one [::]
+            = rev (map (fl_c_int_k M) (iota 1 n)).
+  { have -> : mzero n = fl_M_int_k M 0 by rewrite fl_M_int_k_base sq.
+    have -> : meye n = meye (mat_dim M) by rewrite sq.
+    replace Z.one with (fl_c_int_k M 0) by (rewrite fl_c_int_k_base; reflexivity).
+    replace (fl_c_int_k M 0) with (Z.of_nat 1) at 1 by (rewrite fl_c_int_k_base; reflexivity).
+    by rewrite (fl_loop_eq_fl_state M n 0 []) /= cats0. }
+  rewrite Hfl_eq /pol_to_polyrat.
+  congr (Poly _).
+  rewrite List.map_app /= Z_to_int_1_rat -map_rev -cats1.
+  congr (_ ++ _).
+  have Heq_lists : forall ks : seq nat,
+    (forall k, k \in ks -> (k <= n)%N) ->
+    ListDef.map (fun z : Z => (Z_to_int z)%:~R%R)
+      [seq fl_c_int_k M i | i <- ks]
+    = [seq fl_c_rat (mat_int_to_rat M 1 n) i | i <- ks].
+  { induction ks as [|k ks' IHks'] => Hbnd; first reflexivity.
+    simpl. f_equal.
+    - exact (fl_invariant_L2 sq Hwf (Hbnd k (mem_head k ks'))).2.
+    - apply IHks' => j Hj. apply Hbnd. by rewrite in_cons Hj orbT. }
+  apply Heq_lists.
+  intros k Hk. rewrite mem_rev mem_iota in Hk.
+  move/andP : Hk => [_ Hlt].
+  rewrite addnC addn1 ltnS in Hlt. exact Hlt.
+Qed.
 
 (* ==================================================================
    Sanity tests — must reduce under vm_compute.
