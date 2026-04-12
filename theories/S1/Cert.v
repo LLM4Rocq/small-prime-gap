@@ -77,13 +77,22 @@ Lemma sturm_count_correct :
 Proof. exact maynard_L1_concrete. Qed.
 
 (* ------------------------------------------------------------------
-   L2 — the integer-cleared shipped polynomial equals `char_poly A_rat`
-   after lifting to realalg. The precise equational form (with the
-   D^n scaling) lives in CharPoly.v (char_poly_int_correct). Here we
-   only state the lifted version we actually need to chain L1 → L3. *)
-Lemma charpoly_int_eq_charpoly :
-  charpoly_as_poly_realalg
-  = map_poly (ratr : rat -> realalg) (char_poly A_rat).
+   L2 — root transfer: a root of the shipped polynomial (verified by
+   Sturm) is also a root of `char_poly A_rat`.
+
+   The shipped `charpoly_int` is D_q-scaled: each coefficient is
+   D_q * (char_poly A)_i. So `charpoly_as_poly_realalg` differs from
+   `map_poly ratr (char_poly A_rat)` by a nonzero scalar D_q. Roots
+   are preserved under nonzero scaling, so a root of one is a root
+   of the other.
+
+   Previous versions stated this as polynomial equality, which is
+   false when D_q != 1. The root-transfer form is what the headline
+   proof actually needs.
+   ------------------------------------------------------------------ *)
+Lemma charpoly_root_transfer (lambda : realalg) :
+  root charpoly_as_poly_realalg lambda ->
+  root (map_poly (ratr : rat -> realalg) (char_poly A_rat)) lambda.
 Admitted.
 
 (* ------------------------------------------------------------------
@@ -132,8 +141,7 @@ Proof.
   (* L1: get a realalg root of charpoly_as_poly_realalg above 4/105. *)
   destruct sturm_count_correct as [lambda [Hroot Hgt]].
   exists lambda; split; [| exact Hgt].
-  (* L2: rewrite root ... into root of the lifted `char_poly A_rat`. *)
+  (* L2: transfer root from shipped polynomial to char_poly A_rat. *)
   apply eigenvalue_of_root_realalg.
-  rewrite -charpoly_int_eq_charpoly.
-  exact Hroot.
+  exact (charpoly_root_transfer lambda Hroot).
 Qed.
