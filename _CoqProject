@@ -9,8 +9,6 @@ theories/S1/BrownTraub.v
 theories/S1/SignChain.v
 theories/S1/CharPoly.v
 theories/S1/CharPolyAgree.v
-theories/S1/CharPolyHelpers.v
-theories/S1/CharPolyL2.v
 theories/S1/Bridge.v
 theories/S1/IntMatProof.v
 theories/S1/CRTSigns.v
