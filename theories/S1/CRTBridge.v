@@ -1161,16 +1161,35 @@ Lemma divmod63_spec (p : int) (a k : Z) :
   valid_prime p ->
   (0 < k)%Z -> (k < Uint63.to_Z p)%Z ->
   (k | a)%Z ->
+  (* Fermat condition: k * k^(p-2) ≡ 1 (mod p).
+     This holds when p is prime and 0 < k < p, by Fermat's little theorem.
+     Stated as a Z-level hypothesis to avoid MathComp int ambiguity.
+     Discharged at call site via fermat_mod from Fermat.v. *)
+  ((k * k ^ (Uint63.to_Z p - 2)) mod Uint63.to_Z p = 1 mod Uint63.to_Z p)%Z ->
   Uint63.to_Z (divmod63 p (Z_to_mod63 p a) (Z_to_mod63 p k)) =
   ((a / k) mod Uint63.to_Z p)%Z.
 Proof.
-  (* Proof strategy: unfold divmod63 to mulmod63 + inv_mod63,
-     apply mulmod63_spec + inv_mod63_spec + powmod_fast_spec to get
-     (a mod p * (k mod p)^(p-2)) mod p, use Z.pow_mod + div_mod_fermat
-     + fermat_mod to conclude. Two sub-obligations:
-     1. N.size_nat fuel bound (computation, straightforward)
-     2. Z↔nat bridge for fermat_mod (needs primality of p) *)
-Admitted.
+  intros Hv Hk Hkp Hdiv Hfermat. unfold divmod63.
+  set (pv := Uint63.to_Z p).
+  assert (Hpv : (0 < pv)%Z) by (destruct Hv; lia).
+  assert (Ha_range : in_range p (Z_to_mod63 p a))
+    by (unfold in_range; rewrite Z_to_mod63_spec; [|exact Hv]; split; apply Z.mod_pos_bound; lia).
+  assert (Hk_range : in_range p (Z_to_mod63 p k))
+    by (unfold in_range; rewrite Z_to_mod63_spec; [|exact Hv]; split; apply Z.mod_pos_bound; lia).
+  assert (Hinv_range : in_range p (inv_mod63 p (Z_to_mod63 p k)))
+    by exact (powmod_fast_in_range p (Z_to_mod63 p k) _ 63 Hv).
+  rewrite (mulmod63_spec p _ _ Hv Ha_range Hinv_range).
+  rewrite Z_to_mod63_spec; [|exact Hv].
+  rewrite inv_mod63_spec; [|exact Hv|exact Hk_range].
+  rewrite Z_to_mod63_spec; [|exact Hv].
+  rewrite Zmult_mod_idemp_r. fold pv.
+  transitivity ((a mod pv * (k ^ (pv - 2) mod pv)) mod pv).
+  { rewrite (Z.mul_mod (a mod pv) ((k mod pv) ^ (pv - 2)) pv); [|lia].
+    rewrite (Z.mul_mod (a mod pv) (k ^ (pv - 2) mod pv) pv); [|lia].
+    rewrite Z.mod_pow_l. rewrite !Z.mod_mod; try lia. }
+  symmetry. apply div_mod_fermat; [lia|lia|exact Hdiv|].
+  exact Hfermat.
+Qed.
 
 (* ================================================================== *)
 (* Section 6: FL loop invariant                                        *)
