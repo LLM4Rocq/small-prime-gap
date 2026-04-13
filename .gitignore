@@ -1,33 +1,8 @@
-# Rocq build artifacts
 *.vo
-*.vos
-*.vok
-*.vio
 *.glob
+*.vok
+*.vos
 *.aux
-.*.aux
-.lia.cache
-.nia.cache
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-.python-version
-
-# Editor / OS
-.DS_Store
-*.swp
-*~
-.idea/
-.vscode/
-
-# Project-specific
-flint-task.tar.gz
-flint_probe.json
-spike/
-rocq_mcp_cache_*.v
-.tmp*.aux
-.claude/
-prime_gap.tar.gz
+Makefile
+Makefile.conf
+.Makefile.d

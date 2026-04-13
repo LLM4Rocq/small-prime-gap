@@ -16,5 +16,7 @@ theories/S1/PRSCheck.v
 theories/S1/PrimPoly.v
 theories/S1/CharPolyScale.v
 theories/S1/CRTCheck.v
+theories/S1/Fermat.v
+theories/S1/CRTBridge.v
 theories/S1/Cert.v
 # theories/S1/CertL2.v  -- needs >= 8 GB RAM; see README
