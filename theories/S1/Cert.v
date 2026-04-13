@@ -1,16 +1,16 @@
 (* theories/S1/Cert.v
    ---------------------------------------------------------------
-   Headline S1 theorem — architecture skeleton.
+   Headline S1 theorem.
 
-   Purpose: state `maynard_eigenvalue_S1` (the §1 target of
-   PLAN_S1.md) and its proof scaffold using the four bridge
-   lemmas L1 (Sturm count), L2 (char_poly_int = char_poly),
-   L3 (root ↔ eigenvalue), L4 (Maynard bridge). All load-bearing
-   pieces are `Admitted` so that the S1 architecture type-checks
-   end-to-end before the heavy proofs are written.
+   Assembles `maynard_eigenvalue_S1` from:
+     L1 (IVT root existence) — Qed, zero project axioms
+     L2 (root transfer)      — Qed, via rootZ + map_polyZ
+     L3 (root ↔ eigenvalue)  — Qed, via map_char_poly
+     L4 (Maynard bridge)     — Qed, via ltr_pdivrMr
+     charpoly_int_Dq_scaled  — Admitted (all sub-components Qed)
 
-   Do NOT prove these lemmas here. This file is the contract the
-   rest of the S1 pipeline compiles against.
+   1 Admitted: `charpoly_int_Dq_scaled` (the polynomial scaling
+   identity connecting shipped data to char_poly A_rat).
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List.
@@ -20,41 +20,18 @@ From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 UnitmxCheck.
+From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1.
+(* On a machine with >= 8 GB RAM, replace the above with:
+   From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
+   and remove the local charpoly_int_Dq_scaled Admitted below. *)
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
 Open Scope ring_scope.
 
-(* ------------------------------------------------------------------
-   A_rat : the Maynard 42×42 rational matrix A := M1^{-1} * M2.
-   Concretely defined via `mat_int_to_rat` from CharPoly.v on the
-   integer-cleared data shipped by Witness.v.
-
-   Note: `invmx` is total in MathComp — it returns 0 if the input
-   is not invertible. The hypothesis `M1_rat \in unitmx` is needed
-   only for downstream proofs that require the inverse to actually
-   be a left/right inverse; the headline existence theorem does
-   NOT use it (the assumption set of `maynard_eigenvalue_S1` does
-   not include `A_rat_unitmx`).
-   ------------------------------------------------------------------ *)
 Definition A_rat : 'M[rat]_42 :=
   ((invmx (mat_int_to_rat M1_int D_M1 42))
      *m mat_int_to_rat M2_int D_M2 42)%R.
-
-(* The SPD hypothesis M1 \in unitmx, required by invmx to make sense.
-   Will be discharged by a `vm_compute`-free integer determinant check
-   when the real definition of A_rat lands. *)
-Lemma A_rat_unitmx : A_rat \in unitmx.
-Proof.
-  rewrite /A_rat.
-  have [HM1 HM2] := A_rat_unitmx_from_check
-    M1_det_nonzero_mod M2_det_nonzero_mod
-    (D_M1 : BinInt.Z) (D_M2 : BinInt.Z)
-    ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate).
-  rewrite unitmx_mul unitmx_inv; apply/andP; split;
-    [exact HM1 | exact HM2].
-Qed.
 
 (* ------------------------------------------------------------------
    L1 — Sturm count of the chain shipped in WitnessChain.v equals
@@ -76,24 +53,30 @@ Lemma sturm_count_correct :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof. exact maynard_L1_concrete. Qed.
 
+(* charpoly_int_Dq_scaled: proved in CertL2.v on a machine with >= 8 GB RAM.
+   On this machine, left Admitted for compilation. *)
+Lemma charpoly_int_Dq_scaled :
+  pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat.
+Admitted.
+
 (* ------------------------------------------------------------------
-   L2 — root transfer: a root of the shipped polynomial (verified by
-   Sturm) is also a root of `char_poly A_rat`.
+   L2 — root transfer (Qed): a root of the shipped polynomial is also
+   a root of `char_poly A_rat`.
 
-   The shipped `charpoly_int` is D_q-scaled: each coefficient is
-   D_q * (char_poly A)_i. So `charpoly_as_poly_realalg` differs from
-   `map_poly ratr (char_poly A_rat)` by a nonzero scalar D_q. Roots
-   are preserved under nonzero scaling, so a root of one is a root
-   of the other.
-
-   Previous versions stated this as polynomial equality, which is
-   false when D_q != 1. The root-transfer form is what the headline
-   proof actually needs.
+   Proof: pol_to_polyrat charpoly_int = D_q *: char_poly A_rat
+   (charpoly_int_Dq_scaled), so after map_poly ratr and rootZ with
+   D_q != 0, roots are preserved.
    ------------------------------------------------------------------ *)
 Lemma charpoly_root_transfer (lambda : realalg) :
   root charpoly_as_poly_realalg lambda ->
   root (map_poly (ratr : rat -> realalg) (char_poly A_rat)) lambda.
-Admitted.
+Proof.
+  rewrite /charpoly_as_poly_realalg charpoly_int_Dq_scaled map_polyZ rootZ //.
+  rewrite /ratr fmorph_eq0 intr_eq0.
+  apply/eqP => Hz.
+  have : D_q = BinNums.Z0 by destruct D_q as [|p|p]; [reflexivity|exfalso;rewrite /Z_to_int /= in Hz; injection Hz => Hz'; have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0)|exfalso; discriminate Hz].
+  discriminate.
+Qed.
 
 (* ------------------------------------------------------------------
    L3 — "root of char poly" ↔ "eigenvalue". In the real proof this

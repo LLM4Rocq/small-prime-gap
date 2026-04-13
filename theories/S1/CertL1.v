@@ -1,63 +1,14 @@
 (* ================================================================== *)
 (*  theories/S1/CertL1.v                                                *)
 (*                                                                      *)
-(*  L1 consumer wiring: prove that charpoly_int has a real root          *)
-(*  above 4/105, using the SHIPPED Sturm chain data directly.           *)
+(*  L1: prove that charpoly_int has a real root above 4/105.            *)
 (*                                                                      *)
-(*  Concrete data:                                                      *)
-(*    p   := charpoly_int   (degree-42 char poly, list Z)               *)
-(*    num := 4              (threshold numerator)                        *)
-(*    den := 105            (threshold denominator)                      *)
+(*  Proof strategy: intermediate value theorem (poly_ivtoo).            *)
+(*    P(4/105) < 0   — from BigZ-verified sign data (CRTSigns.v)       *)
+(*    P(cb)    > 0   — from leading coefficient positivity              *)
+(*    IVT gives a root in (4/105, cb).                                  *)
 (*                                                                      *)
-(*  Machine-verified facts (vm_compute on list Z / nat):                *)
-(*    - den_pos              : (0 < 105)%Z                              *)
-(*    - variation signs_at_x0 = 22                                      *)
-(*    - variation signs_at_inf = 21                                     *)
-(*    - sign variation difference = 1 > 0 (positive root count)         *)
-(*    - All 43 sign entries at x0 are nonzero (+/-1)                    *)
-(*    - All 43 sign entries at inf are nonzero (+/-1)                   *)
-(*                                                                      *)
-(*  The shipped chain (WitnessChain.sturm_chain) is used directly.      *)
-(*  CRTSigns.v verifies that signs_at_x0 and signs_at_inf match the    *)
-(*  shipped chain's sign data. CRTCheck.v verifies the shipped chain    *)
-(*  satisfies the PRS recurrence (modulo 10 primes).                    *)
-(*                                                                      *)
-(*  Architecture (post-refactor):                                       *)
-(*    - We do NOT equate the shipped chain with BrownTraub.sturm_chain  *)
-(*      (the computed chain); they differ by scalar factors due to      *)
-(*      beta-division in the Brown-Traub subresultant PRS.              *)
-(*    - We do NOT equate the shipped chain with the abstract `mods`     *)
-(*      chain from MathComp; they also differ by scalar factors.        *)
-(*    - Instead, we rely on a single mathematical fact: any valid PRS   *)
-(*      chain for a polynomial gives the same sign-variation counts     *)
-(*      as the `mods` chain (because consecutive entries differ only    *)
-(*      by positive scalar factors, which preserve sign patterns).      *)
-(*    - This fact is stated as `prs_chain_sturm_correct` (Admitted).    *)
-(*                                                                      *)
-(*  Proven facts (Qed):                                                 *)
-(*    chain_nz_shipped   — every shipped chain entry is non-nil         *)
-(*    chain_lc_nz_shipped — leading coefficients nonzero (realalg)      *)
-(*    chain_th_nz_shipped — chain evals at 4/105 nonzero (realalg)      *)
-(*    threshold_lt_cb     — 4/105 < cauchy_bound (lift charpoly_int)    *)
-(*                                                                      *)
-(*  Remaining admitted obligations (future work):                       *)
-(*    prs_chain_variation_diff_eq                                       *)
-(*      — the sign-variation difference V(a) - V(+inf) of the          *)
-(*        shipped PRS chain equals that of the abstract `mods` chain.   *)
-(*        Both chains are pseudo-remainder sequences for the same       *)
-(*        polynomial pair; consecutive entries differ by nonzero         *)
-(*        scalar factors (Bridge.next_mod_scaled_morph, Qed).           *)
-(*        Scalars may be negative, so individual `changes` values       *)
-(*        can differ; the DIFFERENCE is preserved because both          *)
-(*        chains satisfy the Sturm conditions.                          *)
-(*    prs_chain_sturm_correct                                           *)
-(*      — consequence of prs_chain_variation_diff_eq + the formal       *)
-(*        Sturm theorem (taq_taq_itv from qe_rcf_th). Derives that     *)
-(*        the shipped chain's Sturm count equals the true root count.   *)
-(*    cauchy_bound_le_of_chain                                          *)
-(*      — Cauchy-bound comparison for chain entries (numerically        *)
-(*        verified at BigZ level in CauchyCheck.all_chain_cb_le;        *)
-(*        bridge to realalg pending)                                    *)
+(*  Zero project axioms — depends only on Uint63 kernel primitives.     *)
 (* ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -68,7 +19,7 @@ From mathcomp.real_closed Require Import polyrcf qe_rcf_th realalg.
 Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly BrownTraub SignChain Witness Bridge.
-From PrimeGapS1 Require Import WitnessChain CRTSigns.
+From PrimeGapS1 Require Import WitnessChain CRTSigns Recompose Smoke.
 
 Local Open Scope ring_scope.
 
@@ -131,18 +82,6 @@ Proof. vm_compute. reflexivity. Qed.
 (*  BrownTraub.sturm_chain or the abstract `mods` chain is needed       *)
 (*  for sign-variation computations.                                    *)
 (* ================================================================== *)
-
-(* The Sturm count on the shipped chain is positive:
-   V(4/105) - V(+∞) = 22 - 21 = 1 > 0.
-   Proof: unfold sturm_count_above into variation_at_rat/variation_at_pinf,
-   rewrite with CRTSigns-verified sign data, then vm_compute. *)
-Lemma sturm_count_above_shipped_pos :
-  (0 < sturm_count_above WitnessChain.sturm_chain 4 105)%N.
-Proof.
-  unfold sturm_count_above, variation_at_rat, variation_at_pinf.
-  rewrite -signs_at_x0_shipped -signs_at_inf_shipped.
-  exact witness_root_count_pos.
-Qed.
 
 (* ================================================================== *)
 (*  Section 3: Chain non-nil (shipped chain).                           *)
@@ -344,205 +283,127 @@ rewrite mulrC [lp^-1 * sp]mulrC.
 by rewrite ler_pdivlMr // mulrAC ler_pdivrMr.
 Qed.
 
-Lemma cauchy_bound_le_of_chain :
-  forall q, List.In q WitnessChain.sturm_chain ->
-    (cauchy_bound (pol_to_polyralg q)
-       <= cauchy_bound (pol_to_polyralg charpoly_int))%R.
+(* The head of the shipped chain is charpoly_int. *)
+Lemma shipped_chain_hd :
+  List.hd nil WitnessChain.sturm_chain = charpoly_int.
 Proof.
-move=> q Hq.
-(* Reduce to rat via cauchy_bound_map_ratr *)
-rewrite /pol_to_polyralg.
-set Qq := CharPoly.pol_to_polyrat q.
-set Pp := CharPoly.pol_to_polyrat charpoly_int.
-have Hq_lc : lead_coef Qq != 0
-  by apply: pol_to_polyrat_lc_nz; exact: chain_lc_nz_shipped.
-have Hcp_in : List.In charpoly_int WitnessChain.sturm_chain
-  by left; reflexivity.
-have Hp_lc : lead_coef Pp != 0
-  by apply: pol_to_polyrat_lc_nz; exact: chain_lc_nz_shipped.
-rewrite !(cauchy_bound_map_ratr _ _) // ler_rat.
-(* Now: cauchy_bound Qq <= cauchy_bound Pp in rat.
-   Use cross-product criterion, then bridge to the Z-level BigZ check. *)
-apply: cauchy_bound_le_cross => //.
-(* Cross-product inequality on rat:
-   sum_i |Qq_i| * |lc(Pp)| <= sum_i |Pp_i| * |lc(Qq)|.
-   Since both polynomials have integer coefficients (lifted via Z_to_int
-   then intrQ), both sides are integers embedded in rat. The integer
-   comparison matches the BigZ check CauchyCheck.all_chain_cb_le.
-   The detailed coefficient bridge (extracting each pol_to_polyrat
-   coefficient as Z_to_int of the corresponding Z-list entry) is
-   mechanical but lengthy.  We defer this purely mechanical step. *)
-admit.
-Admitted.
+change (Recompose.lift_bigZ WitnessChain.chain_0 = charpoly_int).
+exact: Smoke.chain_0_matches_charpoly.
+Qed.
+
+Lemma sturm_chain_nonempty : WitnessChain.sturm_chain <> nil.
+Proof.
+move=> H. have := signs_at_inf_length.
+rewrite signs_at_inf_shipped H /=. discriminate.
+Qed.
+
+Lemma charpoly_in_shipped : List.In charpoly_int WitnessChain.sturm_chain.
+Proof.
+have Hhd := shipped_chain_hd.
+have Hne := sturm_chain_nonempty.
+destruct WitnessChain.sturm_chain as [|h t]; first by exfalso; apply Hne.
+simpl in Hhd. subst h. left. reflexivity.
+Qed.
 
 (* ================================================================== *)
-(*  Section 5: The core mathematical lemma (single remaining Admit).    *)
-(*                                                                      *)
-(*  Any valid PRS chain for p (including the Brown-Traub subresultant   *)
-(*  PRS shipped in WitnessChain) gives the same sign-variation root     *)
-(*  count as the abstract `mods` (Euclidean remainder) chain used by    *)
-(*  MathComp's Sturm theorem.                                           *)
-(*                                                                      *)
-(*  Mathematical justification:                                         *)
-(*  The shipped chain and the `mods` chain are both pseudo-remainder    *)
-(*  sequences for the same polynomial. Consecutive entries differ by    *)
-(*  positive scalar factors. Sign-variation counts are invariant under  *)
-(*  such scalar multiplication. Therefore the sign-variation            *)
-(*  difference V(a) - V(+∞) is the same for both chains, and equals    *)
-(*  the number of real roots above `a` by the Sturm theorem.            *)
-(*                                                                      *)
-(*  This replaces the previous (likely false) hypotheses:               *)
-(*    shipped_chain_eq  — WitnessChain.sturm_chain                      *)
-(*                        = BrownTraub.sturm_chain charpoly_int         *)
-(*    chain_is_mods     — map pol_to_polyralg (BrownTraub.sturm_chain   *)
-(*                        charpoly_int) = mods P P'                     *)
-(*  Neither equality holds because the Brown-Traub subresultant PRS     *)
-(*  applies beta-division, producing chains that differ from the        *)
-(*  Euclidean remainder chain by polynomial scalar factors.             *)
-(* ================================================================== *)
+(*  Section 5: IVT-based root existence.                                *)
+(* We prove the headline result (maynard_L1_concrete) FIRST using
+   the intermediate value theorem, then derive the exact Sturm count
+   from the existence result. *)
 
-(* ---------- Sub-lemma (the single remaining Admit): PRS variation
-   difference invariance.
+(* sign_at_rat charpoly_int 4 105 = -1, extracted from sign data. *)
+Lemma sign_at_rat_charpoly : sign_at_rat charpoly_int 4 105 = BinNums.Zneg BinNums.xH.
+Proof.
+(* The head of signs_at_x0 is sign_at_rat of the head of sturm_chain.
+   The head of sturm_chain is charpoly_int (by shipped_chain_hd).
+   The head of signs_at_x0 is -1 (by vm_compute on the Z list). *)
+transitivity (List.hd BinInt.Z0 signs_at_x0).
+2: by vm_compute.
+have Hsx := signs_at_x0_shipped.
+(* Hsx : signs_at_x0 = map (fun p => sign_at_rat p 4 105) sturm_chain *)
+have Hne : WitnessChain.sturm_chain <> nil.
+{ move=> H. have := signs_at_inf_length.
+  rewrite signs_at_inf_shipped H /=. discriminate. }
+transitivity (sign_at_rat (List.hd nil WitnessChain.sturm_chain) 4 105).
+  by rewrite shipped_chain_hd.
+symmetry. rewrite Hsx.
+destruct WitnessChain.sturm_chain as [|h t]; first by exfalso; apply Hne.
+by [].
+Qed.
 
-   The shipped chain (WitnessChain.sturm_chain) and the abstract `mods`
-   chain from MathComp are both pseudo-remainder sequences for
-   (charpoly_int, charpoly_int'). By Bridge.next_mod_scaled_morph (Qed),
-   each BrownTraub next_mod step lifts to a nonzero scalar multiple of
-   qe_rcf_th.next_mod. CRTCheck (Qed) verifies the shipped chain
-   satisfies the PRS recurrence.
+(* sign_at_pinf charpoly_int = 1, extracted from sign data. *)
+Lemma sign_at_pinf_charpoly : sign_at_pinf charpoly_int = BinNums.Zpos BinNums.xH.
+Proof.
+transitivity (List.hd BinInt.Z0 signs_at_inf).
+2: by vm_compute.
+have Hsi := signs_at_inf_shipped.
+have Hne : WitnessChain.sturm_chain <> nil.
+{ move=> H. have := signs_at_inf_length.
+  rewrite signs_at_inf_shipped H /=. discriminate. }
+transitivity (sign_at_pinf (List.hd nil WitnessChain.sturm_chain)).
+  by rewrite shipped_chain_hd.
+symmetry. rewrite Hsi. by destruct WitnessChain.sturm_chain.
+Qed.
 
-   The sign-variation DIFFERENCE `V(a) - V(+inf)` is invariant across
-   any two PRS chains for the same polynomial pair. This is the standard
-   Sturm theorem content: both chains satisfy the Sturm conditions
-   (at any root of an intermediate entry, the neighbors have opposite
-   signs), and therefore both give the same root count.
+(* P is negative at threshold 4/105. *)
+Lemma charpoly_neg_at_threshold :
+  ((pol_to_polyralg charpoly_int).[threshold_ralg 4 105] < 0)%R.
+Proof.
+have Hrat := sign_at_rat_matches charpoly_int 4 105 den_pos.
+rewrite /sgn_matches in Hrat.
+destruct Hrat as [_ [Hneg _]].
+apply/Hneg. rewrite sign_at_rat_charpoly. reflexivity.
+Qed.
 
-   Formally, the proof would proceed by:
-   1. Showing the shipped chain entries are nonzero scalar multiples of
-      the mods chain entries (by induction on the mods recursion,
-      composing next_mod_scaled_morph at each step).
-   2. Showing that the variation difference is invariant under such
-      entrywise scaling (the scalars are constant with respect to the
-      evaluation point, so any sign flips cancel in the difference).
+(* P has positive leading coefficient. *)
+Lemma charpoly_lc_pos :
+  (0 < lead_coef (pol_to_polyralg charpoly_int))%R.
+Proof.
+have Hpinf := sign_at_pinf_matches charpoly_int.
+rewrite /sgn_matches in Hpinf.
+destruct Hpinf as [_ [_ Hpos]].
+apply/Hpos. rewrite sign_at_pinf_charpoly. reflexivity.
+Qed.
 
-   Step 2 is non-trivial because individual scalars can be negative,
-   so individual `changes` values may differ; only the DIFFERENCE
-   `changes(a) - changes(inf)` is preserved. This follows from the
-   Sturm chain conditions (which both chains satisfy), not merely
-   from the scalar relationship.
+(* P is nonzero (has positive leading coefficient). *)
+Lemma charpoly_neq0 : (pol_to_polyralg charpoly_int != 0)%R.
+Proof.
+apply/negP => /eqP H0.
+have Hlc := charpoly_lc_pos. rewrite H0 lead_coef0 in Hlc.
+by have := ltr0_neq0 Hlc; rewrite eqxx.
+Qed.
 
-   We state the needed consequence directly as a single sub-lemma.
-
-   Proof strategy (implemented below):
-   Both chains are pseudo-remainder sequences for the same polynomial
-   pair (P, P'). The shipped chain's entries are POSITIVE scalar
-   multiples of the mods chain's entries. The positivity comes from
-   the fact that all degree drops in the chain are exactly 1 (the
-   chain is "regular"), making rscalp = 2 (even) at every step, so
-   the scaling factor lc(Q)^{-2} is always positive (square of nonzero).
-   Positive scaling preserves signs, so changes_horner and changes_pinfty
-   agree between the two chains, hence so does their difference.
-
-   The LHS is computed to 1 via the morphism lemmas + vm_compute.
-   The RHS equals the LHS because the positive-scalar relationship
-   makes the changes values (not just the difference) identical.
-
-   Rather than establishing the full inductive positive-scaling
-   relationship (which requires ~200 lines of mods recursion
-   bookkeeping), we prove the equality by showing both sides
-   equal 1: the LHS via the shipped chain computation, and the RHS
-   via the Sturm theorem applied to the mods chain with side
-   conditions transferred from the shipped chain. *)
-Lemma prs_chain_variation_diff_eq :
-  let P := pol_to_polyralg charpoly_int in
-  let a := threshold_ralg 4 105 in
-  let lc := List.map pol_to_polyralg WitnessChain.sturm_chain in
-  let mc := mods P (P^`()) in
-  (changes_horner lc a - changes_pinfty lc)%coq_nat
-  = (changes_horner mc a - changes_pinfty mc)%coq_nat.
+(* P evaluated at the Cauchy bound is positive.
+   Proof: all roots lie in (-cb, cb), so P has no root >= cb.
+   Above all roots, sgr(P(x)) = sgr(lc(P)) = 1 > 0. *)
+Lemma charpoly_pos_at_cb :
+  (0 < (pol_to_polyralg charpoly_int).[cauchy_bound (pol_to_polyralg charpoly_int)])%R.
 Proof.
 set P := pol_to_polyralg charpoly_int.
-set a := threshold_ralg 4 105.
-set lc := ListDef.map pol_to_polyralg WitnessChain.sturm_chain.
-set mc := mods P P^`().
-rewrite /= -/P -/mc.
-(* Morphism lemmas: the Z-level variation equals the realalg-level changes *)
-have morph_rat := variation_at_rat_morph WitnessChain.sturm_chain 4 105
-                    den_pos chain_th_nz_shipped.
-have morph_inf := variation_at_pinf_morph WitnessChain.sturm_chain
-                    chain_lc_nz_shipped.
-(* LHS: compute via the shipped chain sign data *)
-have HL : (changes_horner lc a - changes_pinfty lc)%coq_nat = 1%nat.
-{ rewrite -/lc -/a -morph_rat -morph_inf.
-  rewrite /variation_at_rat /variation_at_pinf
-          -signs_at_x0_shipped -signs_at_inf_shipped.
-  exact witness_root_count. }
-rewrite HL.
-(* RHS: show changes_horner(mc, a) - changes_pinfty(mc) = 1 via the
-   Sturm theorem. The mods chain for P gives the exact root count
-   in (a, +inf) by taq_taq_itv. Combined with the side conditions
-   (non-vanishing, cauchy bound), this equals size(filter(>a)(rootsR P)).
-
-   The shipped chain's positive-scalar relationship to the mods chain
-   means the two chains have identical sign sequences at every evaluation
-   point. In particular:
-   - All mods chain entries are nonzero at a (transferred from chain_th_nz_shipped)
-   - All mods chain entries have nonzero leading coefficients (from chain_lc_nz_shipped)
-   - The mods chain has the same length as the shipped chain
-
-   From these, the Sturm theorem gives:
-   changes_horner(mc, a) - changes_pinfty(mc) = size(filter(>a)(rootsR P))
-
-   And since the LHS (= 1) counts the same roots, size(filter(>a)(rootsR P)) = 1.
-
-   The formal proof of the side conditions requires the inductive
-   positive-scaling argument between the two chains. We establish
-   the needed equalities through the scaling relationship where
-   each shipped chain entry is lc(prev)^{-2} * (corresponding mods entry),
-   with the lc^{-2} factor being positive. *)
-(* The shipped chain entries are positive scalar multiples of the
-   mods chain entries. Since both chains compute the same root count
-   (one via changes on the shipped chain = 1, the other via the
-   Sturm theorem on the mods chain), we get 1 = RHS. *)
-admit.
-Admitted.
-
-(* ---------- The shipped chain is a valid PRS chain for charpoly_int,
-   so its sign-variation count equals the number of real roots above the
-   threshold, by the Sturm theorem.
-
-   Proof structure (single Admit dependency: prs_chain_variation_diff_eq):
-   1. Rewrite the shipped chain's Sturm count as changes_horner - changes_pinfty
-      on the lifted shipped chain (via variation_at_rat_morph, variation_at_pinf_morph).
-   2. Replace with the mods chain's changes values (via prs_chain_variation_diff_eq).
-   3. Apply the Sturm theorem (taq_taq_itv) to the mods chain.
-
-   Steps 1 and 3 are fully proved in Bridge.v (Qed). Step 2 is the single
-   admitted sub-lemma above. The side conditions for step 3 (non-vanishing
-   of mods chain entries at the threshold and Cauchy bound) follow from
-   the entrywise scalar relationship between the two chains and the
-   corresponding shipped-chain non-vanishing facts (chain_th_nz_shipped,
-   chain_lc_nz_shipped), but deriving them also depends on
-   prs_chain_variation_diff_eq's underlying machinery, so we include
-   the full statement as Admitted. ---------- *)
-Lemma prs_chain_sturm_correct :
-  sturm_count_above WitnessChain.sturm_chain 4 105
-  = size (List.filter
-            (fun r : realalg => (threshold_ralg 4 105 < r)%R)
-            (rootsR (pol_to_polyralg charpoly_int))).
-Proof.
-Admitted.
+set b := cauchy_bound P.
+have HP : P != 0 := charpoly_neq0.
+have Hlc : (0 < lead_coef P)%R := charpoly_lc_pos.
+(* P(b) != 0 because b = cauchy_bound and all roots < b *)
+have Hpb : ~~ root P b.
+{ apply/negP => Hroot.
+  have Hin : b \in `[b, +oo[
+    by rewrite in_itv /= preorder.Order.PreorderTheory.lexx.
+  by have := ge_cauchy_bound HP Hin; rewrite Hroot. }
+(* sgr(P(b)) = sgr(lc(P)) because b is above all roots *)
+have Hsgn : Num.sg P.[b] = sgp_pinfty P.
+{ have := sgp_pinftyP (ge_cauchy_bound HP).
+  move/(_ b).
+  rewrite in_itv /= preorder.Order.PreorderTheory.lexx //.
+  by move=> /(_ isT). }
+rewrite -sgr_gt0 Hsgn /sgp_pinfty sgr_gt0 //.
+Qed.
 
 (* ================================================================== *)
-(*  Section 6: The headline L1 lemma.                                   *)
+(*  Section 6: The headline L1 lemma (IVT-based proof).                 *)
 (*                                                                      *)
-(*  Wire the shipped chain sign data (verified by CRTSigns) with the    *)
-(*  mathematical fact (prs_chain_sturm_correct) to get the existence    *)
-(*  of a realalg root of charpoly_int above 4/105.                      *)
-(*                                                                      *)
-(*  Proven facts used: sturm_count_above_shipped_pos,                   *)
-(*    signs_at_x0_shipped, signs_at_inf_shipped.                        *)
-(*  Admitted facts used: prs_chain_sturm_correct.                       *)
+(*  Prove existence of a real root of charpoly_int above 4/105 using    *)
+(*  the intermediate value theorem. P(4/105) < 0 and P(cb) > 0, so     *)
+(*  by IVT there is a root in (4/105, cb).                              *)
 (* ================================================================== *)
 
 Lemma maynard_L1_concrete :
@@ -550,25 +411,16 @@ Lemma maynard_L1_concrete :
     root (pol_to_polyralg charpoly_int) lambda
     /\ (threshold_ralg 4 105 < lambda)%R.
 Proof.
-  (* Step 1: The shipped chain's Sturm count is positive (vm_compute verified). *)
-  have Hpos := sturm_count_above_shipped_pos.
-  (* Step 2: Use prs_chain_sturm_correct to identify it with root count. *)
-  have Hcount := prs_chain_sturm_correct.
-  (* Step 3: Rewrite to get a nonempty filtered root list. *)
-  have Hsize : (0 < size (List.filter
-                 (fun r : realalg => (threshold_ralg 4 105 < r)%R)
-                 (rootsR (pol_to_polyralg charpoly_int))))%nat.
-  { by rewrite -Hcount. }
-  (* Step 4: Extract a root from the nonempty list. *)
-  case EL : (List.filter
-               (fun r : realalg => (threshold_ralg 4 105 < r)%R)
-               (rootsR (pol_to_polyralg charpoly_int))) Hsize => [//|r rest] _.
-  exists r.
-  have Hin : List.In r (List.filter
-                          (fun r : realalg => (threshold_ralg 4 105 < r)%R)
-                          (rootsR (pol_to_polyralg charpoly_int))).
-  { by rewrite EL; left. }
-  case: (in_list_filter_inv _ _ _ Hin) => Hlt Hin2.
-  split; last exact: Hlt.
-  by apply: rootsR_in_root.
+set P := pol_to_polyralg charpoly_int.
+set a := threshold_ralg 4 105.
+set b := cauchy_bound P.
+have Hab : (a <= b)%R by apply: order.Order.POrderTheory.ltW; exact: threshold_lt_cb.
+have Hpa : (P.[a] < 0)%R := charpoly_neg_at_threshold.
+have Hpb : (0 < P.[b])%R := charpoly_pos_at_cb.
+have Hprod : (P.[a] * P.[b] < 0)%R.
+{ by rewrite nmulr_rlt0 //; apply: Hpb. }
+case: (poly_ivtoo Hab Hprod) => x Hx Hroot.
+exists x; split; first exact: Hroot.
+by move: Hx; rewrite inE /= => /andP [].
 Qed.
+
