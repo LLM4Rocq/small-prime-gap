@@ -7,10 +7,10 @@
      L2 (root transfer)      — Qed, via rootZ + map_polyZ
      L3 (root ↔ eigenvalue)  — Qed, via map_char_poly
      L4 (Maynard bridge)     — Qed, via ltr_pdivrMr
-     charpoly_int_Dq_scaled  — Admitted (all sub-components Qed)
+     charpoly_int_Dq_scaled  — Admitted locally, closed by CertL2.v
 
-   1 Admitted: `charpoly_int_Dq_scaled` (the polynomial scaling
-   identity connecting shipped data to char_poly A_rat).
+   1 local Admitted: `charpoly_int_Dq_scaled`. Closed by compiling
+   CertL2.v (needs >= 8 GB RAM) and importing it here.
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List.

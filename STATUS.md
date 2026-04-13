@@ -1,6 +1,6 @@
 # Project status
 
-**18 Rocq files. 1 Admitted lemma (headline). 17 files with 0 admits.**
+**19 Rocq files (18 base + CertL2). 0 admits with CertL2; 1 without.**
 
 ## Headline theorem
 
@@ -53,13 +53,12 @@ theorem (`poly_ivtoo`): P(4/105) < 0 (BigZ Horner) and P(cauchy_bound) > 0
 - **char_poly_int_correct**: Qed — `pol_to_polyrat(FL(M)) = char_poly(M/1)`.
 - **char_poly_scale**: Qed — `(char_poly(c *: M))_k = c^{n-k} * (char_poly M)_k`.
 
-## The 1 remaining admit
+## Admits
 
-| File | Lemma | Nature |
+| File | Lemma | Status |
 |---|---|---|
-| Cert.v | `charpoly_int_Dq_scaled` | shipped poly = D_q \* char_poly A_rat |
-
-No other admits exist in the codebase.
+| Cert.v | `charpoly_int_Dq_scaled` | Admitted locally; **closed by CertL2.v** |
+| CertL2.v | (all lemmas) | **0 admits** — uses native_compute, needs >= 8 GB RAM |
 
 ### Critical path for closing the headline
 
@@ -77,12 +76,14 @@ charpoly_int_Dq_scaled               ← ONLY headline admit
   import it in Cert.v to close the admit.
 ```
 
-## Files with 0 admits (17 of 18)
+## Files with 0 admits (18 of 19)
 
-All files except Cert.v (1 admit): Bridge.v, BrownTraub.v, CertL1.v,
+All files except Cert.v: Bridge.v, BrownTraub.v, CertL1.v, CertL2.v,
 CharPoly.v, CharPolyAgree.v, CharPolyScale.v, CRTCheck.v, CRTSigns.v,
 IntMat.v, IntPoly.v, PrimPoly.v, PRSCheck.v, Recompose.v, SignChain.v,
 Smoke.v, Witness.v, WitnessChain.v.
+
+Cert.v's admit is closed by importing CertL2.v (which needs >= 8 GB RAM).
 
 ## Key technical decisions
 
