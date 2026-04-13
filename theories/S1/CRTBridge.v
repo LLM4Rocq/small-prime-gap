@@ -1451,7 +1451,62 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* Section 8: Concrete verification for A_int                          *)
+(* Section 8: fl_all_divisible from fl_divisibility_L2                  *)
+(*                                                                     *)
+(* Bridge between CRTBridge's step-by-step fl_all_divisible and        *)
+(* CharPoly's fl_divisibility_L2 (which proves divisibility at any     *)
+(* step index using Newton's identities).                              *)
+(* ================================================================== *)
+
+(* The FL loop intermediate states match fl_state from CharPoly.v.
+   fl_all_divisible tracks: at step j, (j | trace(A * M_j)).
+   fl_divisibility_L2 proves: for any k <= n, k | trace(M * fl_M_int_k(M,k)).
+   The connection: M_j in fl_all_divisible = fl_M_int_k(A, j).
+
+   This bridge requires showing by induction that fl_all_divisible's
+   M_prev/c_prev match fl_M_int_k/fl_c_int_k at each step.
+   The proof uses fl_state's definition (which mirrors fl_all_divisible). *)
+
+Lemma fl_all_divisible_from_L2 (M : list (list Z)) (n : nat) :
+  mat_dim M = n ->
+  (forall i, (i < List.length M)%nat -> List.length (List.nth i M []) = n) ->
+  fl_all_divisible n Z.one M (meye n) (mzero n) Z.one.
+Proof.
+  intros Hdim Hwf.
+  (* The FL loop starts with M_prev = mzero n, c_prev = 1, k = 1.
+     At each step j (1-indexed): M_j = madd(mmul M M_{j-1})(mscale c_{j-1} I),
+     and we need j | trace(mmul M M_j).
+     This matches fl_state j M = (fl_M_int_k M j, fl_c_int_k M j),
+     and fl_divisibility_L2 gives Z.rem(trace(mmul M (fl_M_int_k M j)))(j) = 0.
+     The bridge is by induction showing the states agree. *)
+  cut (forall steps j, (j + steps <= n)%nat ->
+    fl_all_divisible steps (Z.of_nat (S j)) M (meye (mat_dim M))
+      (fst (fl_state j M)) (snd (fl_state j M))).
+  { intros H. rewrite <- Hdim in *. exact (H (mat_dim M) 0%nat (Nat.le_refl _)). }
+  induction steps as [|s IH]; intros j Hj.
+  - exact I.
+  - simpl. split.
+    + destruct (fl_state j M) as [Mj cj] eqn:HFS.
+      simpl fst. simpl snd.
+      (* Now create Hdiv with the destructed form *)
+      pose proof (@fl_divisibility_L2 M n (S j) Hdim Hwf) as Hdiv.
+      assert (H1 : is_true (ssrnat.leq 1 (S j))) by reflexivity.
+      assert (H2 : is_true (ssrnat.leq (S j) n))
+        by (unfold is_true, ssrnat.leq; apply Nat.eqb_eq; unfold ssrnat.subn; lia).
+      specialize (Hdiv H1 H2).
+      unfold fl_M_int_k in Hdiv. simpl fl_state in Hdiv. rewrite HFS in Hdiv. simpl fst in Hdiv.
+      apply Z.rem_divide in Hdiv; [exact Hdiv|lia].
+    + replace (Z.of_nat (S j) + 1)%Z with (Z.of_nat (S (S j))) by lia.
+      specialize (IH (S j) ltac:(lia)).
+      destruct (fl_state j M) as [Mj cj] eqn:HFS.
+      simpl fst in *. simpl snd in *. rewrite HFS in IH. simpl in IH.
+      replace (Z.pos (PosDef.Pos.of_succ_nat j + 1)) with
+        (Z.pos (PosDef.Pos.succ (PosDef.Pos.of_succ_nat j))) by lia.
+      exact IH.
+Qed.
+
+(* ================================================================== *)
+(* Section 9: Concrete verification for A_int                          *)
 (*                                                                     *)
 (* For the specific matrix A_int, we can verify the FL bridge by      *)
 (* vm_compute on small examples and state the general result.          *)
