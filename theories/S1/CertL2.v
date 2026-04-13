@@ -144,7 +144,17 @@ Proof. move=> HD. rewrite GRing.unitfE intr_eq0. exact: Z_to_int_neq0'. Qed.
    3. A proof that det != 0 mod p implies List.hd Z0 (char_poly_int M1_int) <> Z0
    For now we admit the conclusion directly. *)
 Lemma M1_charpoly_hd_nz : List.hd Z0 (char_poly_int M1_int) <> Z0.
-Proof. Admitted.
+Proof.
+  (* Strategy: char_poly_mod p M1_int has nonzero head (M1_det_nz_mod).
+     By char_poly_mod_sound, map (Z_to_mod63 p) (char_poly_int M1_int) =
+     char_poly_mod p M1_int. Taking heads: Z_to_mod63 p (hd 0 (...)) =
+     hd 0 (char_poly_mod p M1_int) ≠ 0. Contraposition: if hd = 0,
+     then Z_to_mod63 p 0 = 0, contradiction.
+
+     Needs: char_poly_mod_sound for M1_int, which requires
+     fl_all_divisible (from fl_divisibility_L2) and fermat_Z.
+     All mathematical content is Qed; wiring pending. *)
+  Admitted.
 
 Lemma M1_1_unit : mat_int_to_rat M1_int 1 42 \in unitmx.
 Proof.
