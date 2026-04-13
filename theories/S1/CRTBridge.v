@@ -1195,6 +1195,24 @@ Qed.
 (* Section 6: FL loop invariant                                        *)
 (* ================================================================== *)
 
+(* negmod63 of Z_to_mod63 = Z_to_mod63 of negation *)
+Lemma negmod63_Z_to_mod63 (p : int) (z : Z) :
+  valid_prime p ->
+  negmod63 p (Z_to_mod63 p z) = Z_to_mod63 p (-z).
+Proof.
+  intros Hv. apply Uint63.to_Z_inj.
+  assert (Hrange : in_range p (Z_to_mod63 p z))
+    by (unfold in_range; rewrite Z_to_mod63_spec; [|exact Hv];
+        split; apply Z.mod_pos_bound; destruct Hv; lia).
+  rewrite negmod63_spec; [|exact Hv|exact Hrange].
+  rewrite !Z_to_mod63_spec; [|exact Hv|exact Hv].
+  destruct Hv as [Hp1 Hp2]. set (pv := Uint63.to_Z p).
+  rewrite Zminus_mod_idemp_r.
+  replace (pv - z)%Z with (- z + pv)%Z by lia.
+  replace (- z + pv)%Z with (pv + - z)%Z by lia.
+  rewrite <- Zplus_mod_idemp_l. rewrite Z_mod_same_full. simpl. reflexivity.
+Qed.
+
 (* FL divisibility at every step *)
 Fixpoint fl_all_divisible (steps : nat) (k : Z) (A I_n M_prev : list (list Z))
     (c_prev : Z) : Prop :=
@@ -1216,6 +1234,9 @@ Theorem fl_loop_mod_sound :
   (k > 0)%Z ->
   (k + Z.of_nat steps < Uint63.to_Z p)%Z ->
   fl_all_divisible steps k A I_n M_prev c_prev ->
+  (* Fermat condition for all step indices *)
+  (forall j : Z, (0 < j < Uint63.to_Z p)%Z ->
+    (j * j ^ (Uint63.to_Z p - 2)) mod Uint63.to_Z p = 1 mod Uint63.to_Z p)%Z ->
   List.map (Z_to_mod63 p)
     (fl_loop steps k A I_n M_prev c_prev acc) =
   fl_mod_loop p
@@ -1226,7 +1247,7 @@ Theorem fl_loop_mod_sound :
     steps.
 Proof.
   induction steps as [|st IH]; intros k A I_n M_prev c_prev acc p n
-    Hv Hn HsA HsI HsM Hk Hkb Hdiv.
+    Hv Hn HsA HsI HsM Hk Hkb Hdiv Hfermat.
   - reflexivity.
   - simpl. unfold reduce_mat_Z.
     set (M_k := madd (mmul A M_prev) (IntMat.mscale c_prev I_n)).
@@ -1239,7 +1260,7 @@ Proof.
       (Z_to_mod63 p (k + 1))
       (List.map (Z_to_mod63 p) (c_new :: acc))
       st).
-    + apply (IH _ _ _ _ _ _ _ n); [exact Hv|exact Hn|exact HsA|exact HsI| |lia|lia|exact Hdiv_rest].
+    + apply (IH _ _ _ _ _ _ _ n); [exact Hv|exact Hn|exact HsA|exact HsI| |lia|lia|exact Hdiv_rest|exact Hfermat].
       apply square_mat_madd; [|exact (square_mat_mscale n c_prev I_n HsI)].
       exact (square_mat_mmul n A M_prev Hn HsA HsM).
     + unfold reduce_mat_Z. f_equal.
@@ -1252,8 +1273,44 @@ Proof.
               rewrite HwM; [symmetry; exact HdM | unfold mat_dim in HdM; lia].
         -- apply mscale_mod_sound; exact Hv.
       * (* c_new: division soundness *)
-        (* Needs: divmod63_spec + negmod63_spec + trace_mod_sound *)
-        admit.
+        assert (HsMk : square_mat n M_k)
+          by (apply square_mat_madd; [exact (square_mat_mmul n A M_prev Hn HsA HsM)|
+                                       exact (square_mat_mscale n c_prev I_n HsI)]).
+        assert (HsAMk : square_mat n (mmul A M_k))
+          by (exact (square_mat_mmul n A M_k Hn HsA HsMk)).
+        assert (Htrace_eq :
+          mmat_trace p (mmat_mul p (map (map (Z_to_mod63 p)) A)
+            (mmat_add p (mmat_mul p (map (map (Z_to_mod63 p)) A)
+              (map (map (Z_to_mod63 p)) M_prev))
+              (mmat_scale p (Z_to_mod63 p c_prev) (map (map (Z_to_mod63 p)) I_n))))
+          = Z_to_mod63 p tr).
+        { unfold tr. symmetry.
+          rewrite (trace_mod_sound p (mmul A M_k) Hv).
+          2:{ destruct HsAMk as [Hd Hw]. intros j Hj.
+              rewrite Hw; [unfold mat_dim in Hd; lia|unfold mat_dim in Hd; lia]. }
+          f_equal. unfold M_k.
+          rewrite (mmul_mod_sound p A
+            (madd (mmul A M_prev) (IntMat.mscale c_prev I_n)) Hv).
+          2:{ destruct HsA as [HdA HwA]. destruct HsMk as [HdMk _]. intros i Hi.
+              rewrite HwA; [symmetry; exact HdMk|unfold mat_dim in HdA; lia]. }
+          2:{ destruct HsMk as [HdMk HwMk]. intros j Hj.
+              fold M_k. fold M_k in Hj.
+              rewrite HwMk; [symmetry; exact HdMk|unfold mat_dim in HdMk; lia]. }
+          f_equal. rewrite (madd_mod_sound_gen p _ _ Hv). f_equal.
+          - apply mmul_mod_sound; [exact Hv| |].
+            + destruct HsA as [HdA HwA]. destruct HsM as [HdM _]. intros i Hi.
+              rewrite HwA; [symmetry; exact HdM|unfold mat_dim in HdA; lia].
+            + destruct HsM as [HdM HwM]. intros j Hj.
+              rewrite HwM; [symmetry; exact HdM|unfold mat_dim in HdM; lia].
+          - apply mscale_mod_sound; exact Hv. }
+        rewrite Htrace_eq. unfold c_new.
+        rewrite negmod63_Z_to_mod63; [|exact Hv].
+        apply Uint63.to_Z_inj.
+        rewrite Z_to_mod63_spec; [|exact Hv].
+        set (pv := Uint63.to_Z p).
+        rewrite (divmod63_spec p (-tr) k Hv); [reflexivity|lia|lia| |].
+        -- apply Z.divide_opp_r. exact Hkdiv.
+        -- apply Hfermat; lia.
       * (* k+1 *)
         apply Uint63.to_Z_inj.
         rewrite Z_to_mod63_spec; [|exact Hv].
@@ -1267,9 +1324,48 @@ Proof.
         { split; [lia|]. assert (wB = (2^63)%Z) as -> by reflexivity. lia. }
         rewrite (Z.mod_small _ wB Hsum_nf).
         rewrite Z.mod_small; lia.
-      * (* c_new :: acc *)
-        admit.
-Admitted.
+      * (* c_new :: acc — same as c_new above *)
+        simpl. f_equal.
+        -- (* Same as c_new goal *)
+           assert (HsMk : square_mat n M_k)
+             by (apply square_mat_madd; [exact (square_mat_mmul n A M_prev Hn HsA HsM)|
+                                          exact (square_mat_mscale n c_prev I_n HsI)]).
+           assert (HsAMk : square_mat n (mmul A M_k))
+             by (exact (square_mat_mmul n A M_k Hn HsA HsMk)).
+           assert (Htrace_eq :
+             mmat_trace p (mmat_mul p (map (map (Z_to_mod63 p)) A)
+               (mmat_add p (mmat_mul p (map (map (Z_to_mod63 p)) A)
+                 (map (map (Z_to_mod63 p)) M_prev))
+                 (mmat_scale p (Z_to_mod63 p c_prev) (map (map (Z_to_mod63 p)) I_n))))
+             = Z_to_mod63 p tr).
+           { unfold tr. symmetry.
+             rewrite (trace_mod_sound p (mmul A M_k) Hv).
+             2:{ destruct HsAMk as [Hd Hw]. intros j Hj.
+                 rewrite Hw; [unfold mat_dim in Hd; lia|unfold mat_dim in Hd; lia]. }
+             f_equal. unfold M_k.
+             rewrite (mmul_mod_sound p A
+               (madd (mmul A M_prev) (IntMat.mscale c_prev I_n)) Hv).
+             2:{ destruct HsA as [HdA HwA]. destruct HsMk as [HdMk _]. intros i Hi.
+                 rewrite HwA; [symmetry; exact HdMk|unfold mat_dim in HdA; lia]. }
+             2:{ destruct HsMk as [HdMk HwMk]. intros j Hj.
+                 fold M_k. fold M_k in Hj.
+                 rewrite HwMk; [symmetry; exact HdMk|unfold mat_dim in HdMk; lia]. }
+             f_equal. rewrite (madd_mod_sound_gen p _ _ Hv). f_equal.
+             - apply mmul_mod_sound; [exact Hv| |].
+               + destruct HsA as [HdA HwA]. destruct HsM as [HdM _]. intros i Hi.
+                 rewrite HwA; [symmetry; exact HdM|unfold mat_dim in HdA; lia].
+               + destruct HsM as [HdM HwM]. intros j Hj.
+                 rewrite HwM; [symmetry; exact HdM|unfold mat_dim in HdM; lia].
+             - apply mscale_mod_sound; exact Hv. }
+           rewrite Htrace_eq. unfold c_new.
+           rewrite negmod63_Z_to_mod63; [|exact Hv].
+           apply Uint63.to_Z_inj.
+           rewrite Z_to_mod63_spec; [|exact Hv].
+           set (pv := Uint63.to_Z p).
+           rewrite (divmod63_spec p (-tr) k Hv); [reflexivity|lia|lia| |].
+           ++ apply Z.divide_opp_r. exact Hkdiv.
+           ++ apply Hfermat; lia.
+Qed.
 
 (* ================================================================== *)
 (* Section 7: Main theorem                                             *)
@@ -1279,9 +1375,15 @@ Theorem char_poly_mod_sound (p : int) (M : list (list Z)) :
   valid_prime p ->
   square_mat (List.length M) M ->
   (Z.of_nat (List.length M) + 1 < Uint63.to_Z p)%Z ->
+  (* FL divisibility for M (holds by Newton's identity / fl_divisibility_L2) *)
+  fl_all_divisible (List.length M) Z.one M
+    (meye (List.length M)) (mzero (List.length M)) Z.one ->
+  (* Fermat condition (holds when to_Z p is prime) *)
+  (forall j : Z, (0 < j < Uint63.to_Z p)%Z ->
+    (j * j ^ (Uint63.to_Z p - 2)) mod Uint63.to_Z p = 1 mod Uint63.to_Z p)%Z ->
   List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
 Proof.
-  intros Hv Hsq Hbound.
+  intros Hv Hsq Hbound Hfldiv Hfermat.
   unfold char_poly_int, char_poly_mod.
   set (n := List.length M).
   assert (Hmd : mat_dim M = n) by (unfold mat_dim; reflexivity).
@@ -1289,13 +1391,64 @@ Proof.
   rewrite List.map_app. simpl.
   f_equal.
   - (* FL loop part *)
-    admit. (* Assembly from fl_loop_mod_sound + meye/mzero correspondence *)
+    rewrite <- (meye_mod_eq p n Hv). rewrite <- (mzero_mod_eq p n Hv).
+    replace ((1 mod p)%uint63) with (Z_to_mod63 p Z.one).
+    2:{ apply Uint63.to_Z_inj. rewrite Z_to_mod63_spec; [|exact Hv]. rewrite mod_spec. reflexivity. }
+    replace 1%uint63 with (Z_to_mod63 p Z.one).
+    2:{ apply Uint63.to_Z_inj. rewrite Z_to_mod63_spec; [|exact Hv].
+        change (to_Z 1) with 1%Z. unfold Z.one. rewrite Z.mod_small; [reflexivity|destruct Hv as [H1 H2]; lia]. }
+    destruct n as [|n']; [reflexivity|].
+    apply fl_loop_mod_sound with (n := S n').
+    + exact Hv.
+    + lia.
+    + rewrite <- Hmd. exact Hsq.
+    + (* square_mat (S n') (meye (S n')) *)
+      split.
+      * unfold mat_dim, meye.
+        enough (forall i, List.length (meye_aux (S n') i) = i) as H by exact (H (S n')).
+        induction i; [reflexivity|]. simpl. rewrite List.length_app. simpl. rewrite IHi. lia.
+      * intros i Hi. unfold meye.
+        enough (forall j k, (k < j)%nat -> (j <= S n')%nat ->
+          List.length (List.nth k (meye_aux (S n') j) []) = S n') as H
+          by exact (H (S n') i Hi (Nat.le_refl _)).
+        induction j; intros k Hk Hj; [lia|].
+        simpl. destruct (Nat.lt_ge_cases k j).
+        -- rewrite List.app_nth1; [apply IHj; lia|].
+           enough (List.length (meye_aux (S n') j) = j) by lia.
+           clear. induction j; [reflexivity|]. simpl. rewrite List.length_app. simpl. rewrite IHj. lia.
+        -- assert (k = j) by lia. subst k.
+           rewrite List.app_nth2.
+           ++ enough (Hlen : List.length (meye_aux (S n') j) = j).
+              { rewrite Hlen. rewrite Nat.sub_diag. simpl.
+                clear -n'. revert j. induction n'; intros j; destruct j; simpl; try lia.
+                ** enough (forall m, List.length (zrow m) = m) by (rewrite H; lia).
+                   induction m; [reflexivity|]. simpl. f_equal. exact IHm.
+                ** specialize (IHn' j). lia. }
+              clear. induction j; [reflexivity|]. simpl. rewrite List.length_app. simpl. rewrite IHj. lia.
+           ++ enough (List.length (meye_aux (S n') j) = j) by lia.
+              clear. induction j; [reflexivity|]. simpl. rewrite List.length_app. simpl. rewrite IHj. lia.
+    + (* square_mat (S n') (mzero (S n')) *)
+      split.
+      * unfold mat_dim, mzero.
+        enough (forall r c, List.length (mzero_aux r c) = r) as H by exact (H (S n') (S n')).
+        induction r; intros c; [reflexivity|]. simpl. f_equal. apply IHr.
+      * intros i Hi. unfold mzero.
+        enough (forall r c k, (k < r)%nat -> List.length (List.nth k (mzero_aux r c) []) = c) as H
+          by exact (H (S n') (S n') i Hi).
+        induction r; intros c k Hk; [lia|].
+        destruct k; simpl.
+        -- clear. induction c; [reflexivity|]. simpl. f_equal. exact IHc.
+        -- apply IHr. lia.
+    + unfold Z.one; lia.
+    + unfold Z.one, mat_dim in *; lia.
+    + rewrite <- Hmd. exact Hfldiv.
+    + exact Hfermat.
   - (* Leading coefficient: Z_to_mod63 p 1 = 1 mod p *)
     f_equal.
     apply Uint63.to_Z_inj.
     rewrite Z_to_mod63_spec; [|exact Hv].
     rewrite mod_spec. reflexivity.
-Admitted.
+Qed.
 
 (* ================================================================== *)
 (* Section 8: Concrete verification for A_int                          *)
