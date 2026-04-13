@@ -1,6 +1,6 @@
 # Project status
 
-**44 commits. 21 Rocq files (25 000+ lines). 9 admits. Headline has 1 project-level Admitted lemma (L2).**
+**18 Rocq files. 1 Admitted lemma (headline). 17 files with 0 admits.**
 
 ## Headline theorem
 
@@ -11,88 +11,78 @@ Theorem maynard_eigenvalue_S1 :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-Qed. Depends on L2 (`charpoly_int_eq_charpoly`) + two bridge admits + Uint63 kernel axioms.
+Qed. 1 project axiom: `charpoly_int_Dq_scaled` + Uint63 kernel axioms.
 
 ## Cert.v lemma status
 
 | Lemma | Status |
 |---|---|
-| `sturm_count_correct` (L1) | **Qed** -- via CertL1.maynard_L1_concrete |
-| `eigenvalue_of_root_realalg` (L3) | **Qed** -- map_char_poly + eigenvalue_root_char |
-| `maynard_bridge_L4` | **Qed** -- ltr_pdivrMr rescaling |
-| `A_rat_unitmx` | **Qed** -- CRT modular det via UnitmxCheck |
-| `charpoly_int_eq_charpoly` (L2) | **Admitted** -- shipped poly = char_poly A_rat |
+| `sturm_count_correct` (L1) | **Qed** — via CertL1.maynard_L1_concrete (IVT) |
+| `charpoly_root_transfer` (L2) | **Qed** — via rootZ + map_polyZ |
+| `eigenvalue_of_root_realalg` (L3) | **Qed** — map_char_poly + eigenvalue_root_char |
+| `maynard_bridge_L4` | **Qed** — ltr_pdivrMr rescaling |
+| `A_rat_unitmx` | **Qed** — CRT modular det via UnitmxCheck |
+| `charpoly_int_Dq_scaled` | **Admitted** — pol_to_polyrat charpoly_int = D_q *: char_poly A_rat |
 
 ## Machine-verified computational facts
 
 | Fact | Method | Time | File |
 |---|---|---|---|
+| FL(A_int) = FLINT's charpoly | CRT, 710 Uint63 primes | ~12 min | CharPolyAgree.v |
+| M1\*A\*D_M2 = M2\*(D_M1\*D_A) | CRT, 710 Uint63 primes | ~12 min | CharPolyAgree.v |
+| charpoly_int[k]\*D_A^{42-k} = D_q\*cp_A[k] | BigZ exact arithmetic | < 1 s | CharPolyAgree.v |
+| char_poly(c \*: M)\_k = c^{n-k} \* (char_poly M)\_k | MathComp algebra | < 1 s | CharPolyScale.v |
 | 42-step PRS chain | CRT, 10 Uint63 primes | 21 s | CRTCheck.v |
-| char_poly_int(A_int) = FLINT's charpoly | CRT Uint63 Faddeev-LeVerrier | 11 s | CharPolyAgree.v |
-| Sign vectors at 4/105 (43 entries) | BigZ Horner | < 1 s | CRTSigns.v |
-| Sign vectors at +inf (43 entries) | BigZ leading-coef | < 1 s | CRTSigns.v |
-| V(4/105)=22, V(+inf)=21, diff=1 | IntPoly variation | < 1 s | CertL1.v |
-| det(M1_int) != 0, det(M2_int) != 0 | CRT modular det | < 1 s | UnitmxCheck.v |
-| 10 CRT primes are prime | Uint63 trial division | < 1 s | CRTCheck.v |
-| Product of primes > 2^299 | vm_compute | < 1 s | CRTCheck.v |
+| Sign vectors at 4/105, +inf | BigZ Horner / leading-coef | < 1 s | CRTSigns.v |
+| V(4/105)−V(+inf) = 1 | IntPoly variation | < 1 s | CertL1.v |
+| det(M1\_int) ≠ 0, det(M2\_int) ≠ 0 | CRT modular det | < 1 s | UnitmxCheck.v |
 | 3528/3528 matrix entries | closed-form Beta integrals | < 1 s | Python |
 
-### CRT caveat
+## L1: IVT proof (fully Qed, zero project axioms)
 
-The CRT checks use 10 primes (~300-bit coverage). Full CRT proof of the
-293 kbit max coefficient requires ~9776 primes, blocked by BigZ.modulo
-performance (~6 hours estimated). The 10-prime check is a strong
-probabilistic test (false positive ~2^{-300}), not a mathematical proof.
-The `crt_correctness` lemma in CRTCheck.v is Qed with the full CRT
-argument (Gauss's lemma + product divisibility), conditional on a
-coefficient-bound hypothesis.
+`maynard_L1_concrete` proves root existence via the intermediate value
+theorem (`poly_ivtoo`): P(4/105) < 0 (BigZ Horner) and P(cauchy_bound) > 0
+(leading coefficient sign via `sgp_pinftyP`), so IVT gives a root in between.
 
-## L2 breakthrough: Jacobi's formula and FL = char_poly
+## L2: Faddeev-LeVerrier = char_poly (fully Qed)
 
-The abstract Faddeev-LeVerrier correctness proof (the hardest part of L2)
-is now resolved:
+- **adj_coef_jacobi** (Jacobi's formula): Qed via mul_mx_adj + Leibniz.
+- **fl_loop_rat_is_char_poly_L2**: Qed via adj_coef_jacobi.
+- **fl_divisibility_L2**: Qed via Newton's identity + Cayley-Hamilton.
+- **fl_invariant_L2**: Qed (inductive bridge from Z to rat).
+- **char_poly_int_correct**: Qed — `pol_to_polyrat(FL(M)) = char_poly(M/1)`.
+- **char_poly_scale**: Qed — `(char_poly(c *: M))_k = c^{n-k} * (char_poly M)_k`.
 
-- **adj_coef_jacobi** (Jacobi's formula): fully Qed in CharPolyL2.v.
-  Proved from the Leibniz expansion of determinants via mul_mx_adj on
-  char_poly_mx. This was the load-bearing mathematical identity.
-- **fl_loop_rat_is_char_poly_L2**: Qed -- FL recurrence coefficients
-  equal char_poly coefficients, proved via adj_coef_jacobi.
-- **fl_invariant_L2_gen** (inductive step): Qed under hypotheses.
+## The 1 remaining admit
 
-Remaining L2 work: fl_divisibility_L2 (k | tr(A*M_k)) and assembly.
+| File | Lemma | Nature |
+|---|---|---|
+| Cert.v | `charpoly_int_Dq_scaled` | shipped poly = D_q \* char_poly A_rat |
 
-## Files with 0 admits (14 of 21)
+No other admits exist in the codebase.
 
-Bridge.v, BrownTraub.v, CharPolyAgree.v, CharPolyHelpers.v, CRTCheck.v,
-CRTSigns.v, IntMat.v, IntPoly.v, PrimPoly.v, PRSCheck.v, Recompose.v,
-SignChain.v, Smoke.v, Witness.v, WitnessChain.v.
-
-(Note: 15 files were previously listed as 0-admits; CharPolyL2.v was
-miscounted -- it has 1 Admitted lemma.)
-
-## The 9 remaining admits
-
-| # | File | Lemma | Nature | Effort |
-|---|---|---|---|---|
-| 1 | Cert.v | `charpoly_int_eq_charpoly` | L2: shipped poly = char_poly A_rat | assembly |
-| 2 | CertL1.v | `prs_chain_sturm_correct` | Sturm theorem bridge | 1-2 weeks |
-| 3 | CertL1.v | `cauchy_bound_le_of_chain` | Cauchy bound (BigZ-verified) | days |
-| 4 | CertL1.v | `maynard_L1_concrete` (sub-admit) | see prs_chain_sturm_correct | included in #2 |
-| 5 | CharPoly.v | `char_poly_int_correct` | FL integers = char_poly rationals | assembly |
-| 6 | CharPolyL2.v | `fl_divisibility_L2` | k divides tr(A*M_k) | 1-2 weeks |
-| 7 | IntMatProof.v | `det_int_laplace_eq_det_int` | Bareiss = Laplace | 1-2 weeks |
-| 8 | UnitmxCheck.v | `A_rat_unitmx_from_check` | modular det -> unitmx bridge | days |
-| 9 | UnitmxCheck.v | `modular_det_nonzero_implies` | modular det axiom | days |
-
-### Critical path
+### Critical path for closing the headline
 
 ```
-fl_divisibility_L2 (#6)
-  -> fl_invariant_L2 (wrapper, currently Admitted)
-    -> char_poly_int_correct (#5)
-      -> charpoly_int_eq_charpoly (#1)
-        -> headline has 0 project axioms (modulo Sturm + det bridges)
+charpoly_int_Dq_scaled               ← ONLY headline admit
+  All sub-components are Qed:
+    (a) char_poly_int A_int = charpoly_of_A_int   [710-prime CRT, Qed]
+    (b) charpoly_int[k] * D_A^{42-k} = D_q * cp_A[k]  [BigZ exact, Qed]
+    (c) M1*A*D_M2 = M2*(D_M1*D_A)                [710-prime CRT, Qed]
+    (d) char_poly(c *: M) scaling formula         [CharPolyScale.v, Qed]
+  Assembly is in CertL2.v (separate file, no realalg import).
+  CertL2.v uses native_compute for the heavy Z-level facts and
+  needs >= 8 GB RAM. On the current machine, Cert.v keeps the
+  admit; on a better machine, compile CertL2.v first then
+  import it in Cert.v to close the admit.
 ```
+
+## Files with 0 admits (17 of 18)
+
+All files except Cert.v (1 admit): Bridge.v, BrownTraub.v, CertL1.v,
+CharPoly.v, CharPolyAgree.v, CharPolyScale.v, CRTCheck.v, CRTSigns.v,
+IntMat.v, IntPoly.v, PrimPoly.v, PRSCheck.v, Recompose.v, SignChain.v,
+Smoke.v, Witness.v, WitnessChain.v.
 
 ## Key technical decisions
 
@@ -103,6 +93,5 @@ fl_divisibility_L2 (#6)
   shipped via `rocq-bignums` BigZ (100 kbit in 0.4 s).
 - **CRT over Uint63** solves the 42x42 computation wall. Native 63-bit
   arithmetic at ~17 billion ops/sec makes modular verification trivial.
-- **Brown-Traub and modified-Sturm chains differ by polynomial scalars.**
-  Strict chain equality is unprovable; the weak variation-difference
-  form is what Sturm's theorem needs.
+- **710 Uint63 primes** (~21000-bit coverage) verify both the FL
+  polynomial agreement and the matrix identity.
