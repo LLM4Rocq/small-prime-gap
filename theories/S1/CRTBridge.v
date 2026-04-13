@@ -830,44 +830,373 @@ Proof.
   rewrite (Z.mul_mod q (k * k ^ (p - 2)) p); [|lia].
   rewrite Hfermat. reflexivity.
 Qed.
-
 (* ================================================================== *)
-(* Section 6: FL loop invariant                                        *)
-(*                                                                     *)
-(* The main induction: at each step of the FL loop, the Uint63 state  *)
-(* (M_k, c_k, acc) equals the Z state reduced mod p.                  *)
-(*                                                                     *)
-(* Specifically, we show that fl_mod_loop (on the reduced matrix) and  *)
-(* map (Z_to_mod63 p) (fl_loop ...) produce the same result.          *)
+(* Section 5b: Structural lemmas and relaxed soundness                 *)
 (* ================================================================== *)
 
-(* The key division soundness lemma:
-   Z_to_mod63 p (-(tr) / k) = divmod63 p (negmod63 p (Z_to_mod63 p tr)) k_mod
+(* Power identity helpers for Z.pow *)
+Lemma Z_pow_xI_eq (b : Z) (pos : positive) :
+  b * (b ^ Z.pos pos * b ^ Z.pos pos) = b ^ Z.pos pos~1.
+Proof.
+  change (Z.pos pos~1) with (2 * Z.pos pos + 1)%Z.
+  replace (2 * Z.pos pos + 1)%Z with (1 + Z.pos pos + Z.pos pos)%Z by lia.
+  rewrite Z.pow_add_r; [|lia|lia].
+  rewrite Z.pow_add_r; [|lia|lia].
+  rewrite Z.pow_1_r. ring.
+Qed.
 
-   This requires that k | tr (Faddeev-LeVerrier divisibility) and
-   that divmod63 correctly computes the modular inverse.
-   This is the most delicate part of the proof. *)
+Lemma Z_pow_xO_eq (b : Z) (pos : positive) :
+  b ^ Z.pos pos * b ^ Z.pos pos = b ^ Z.pos pos~0.
+Proof.
+  change (Z.pos pos~0) with (2 * Z.pos pos)%Z.
+  replace (2 * Z.pos pos)%Z with (Z.pos pos + Z.pos pos)%Z by lia.
+  rewrite Z.pow_add_r; [|lia|lia]. reflexivity.
+Qed.
 
-(* For now, state the FL loop agreement theorem with the necessary
-   hypotheses and admit the inductive step's division part. *)
+(* madd soundness without length conditions *)
+Lemma madd_mod_sound_gen (p : int) (A B : list (list Z)) :
+  valid_prime p ->
+  List.map (List.map (Z_to_mod63 p)) (madd A B) =
+  mmat_add p (List.map (List.map (Z_to_mod63 p)) A)
+             (List.map (List.map (Z_to_mod63 p)) B).
+Proof.
+  intros Hv. revert B.
+  induction A as [|ra A' IH]; intros [|rb B']; try reflexivity.
+  simpl. f_equal; [|apply IH].
+  revert rb. induction ra as [|x xs IHx]; intros [|y ys]; try reflexivity.
+  simpl. f_equal; [|apply IHx].
+  apply Uint63.to_Z_inj. unfold addmod63.
+  rewrite mod_spec. rewrite add_spec.
+  rewrite !Z_to_mod63_spec; [|exact Hv|exact Hv|exact Hv].
+  destruct Hv as [Hp1 Hp2]. set (pv := Uint63.to_Z p) in *.
+  assert (H1 : (0 <= x mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
+  assert (H2 : (0 <= y mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
+  rewrite (Z.mod_small _ wB); [|split; [lia|]; apply (no_overflow_add _ _ _ H1 H2 Hp2)].
+  rewrite Zplus_mod_idemp_l. rewrite Zplus_mod_idemp_r. reflexivity.
+Qed.
 
-(* We need a well-formedness predicate for the FL loop *)
+(* Structural length lemmas *)
+Lemma vscale_length (c : Z) (xs : list Z) :
+  List.length (vscale c xs) = List.length xs.
+Proof. unfold vscale. apply List.length_map. Qed.
+
+Lemma vadd_length (xs ys : list Z) :
+  List.length xs = List.length ys ->
+  List.length (vadd xs ys) = List.length xs.
+Proof.
+  revert ys. induction xs as [|x xs' IH]; intros [|y ys'] Hlen; simpl in *; try lia.
+  f_equal. apply IH. lia.
+Qed.
+
+Lemma mmul_length (A B : list (list Z)) :
+  List.length (mmul A B) = List.length A.
+Proof. unfold mmul. rewrite List.length_map. reflexivity. Qed.
+
+Lemma mscale_length (c : Z) (A : list (list Z)) :
+  List.length (IntMat.mscale c A) = List.length A.
+Proof. unfold IntMat.mscale. rewrite List.length_map. reflexivity. Qed.
+
+Lemma madd_length (A B : list (list Z)) :
+  List.length A = List.length B ->
+  List.length (madd A B) = List.length A.
+Proof.
+  revert B. induction A as [|ra A' IH]; intros [|rb B'] Hlen; simpl in *; try lia.
+  f_equal. apply IH. lia.
+Qed.
+
+Lemma mtrans_fuel_length (fuel : nat) (M : list (list Z)) :
+  M <> nil ->
+  (forall j, (j < List.length M)%nat -> (fuel <= List.length (List.nth j M []))%nat) ->
+  List.length (mtrans_fuel fuel M) = fuel.
+Proof.
+  revert M. induction fuel as [|f IH]; intros M Hne Hwf.
+  - reflexivity.
+  - simpl. destruct M as [|row rest]; [contradiction|].
+    assert (Hrow : (S f <= List.length row)%nat)
+      by (specialize (Hwf 0%nat); simpl in Hwf; apply Hwf; simpl; lia).
+    destruct row as [|x xs]; [simpl in Hrow; lia|].
+    simpl. f_equal. apply IH.
+    + simpl. discriminate.
+    + intros j Hj. simpl in Hj. rewrite tails_length in Hj.
+      destruct j; simpl; [simpl in Hrow; lia|].
+      rewrite tails_row_len; [|lia].
+      specialize (Hwf (S j) Hj). simpl in Hwf. lia.
+Qed.
+
+Lemma mtrans_length_sq (M : list (list Z)) (n : nat) :
+  (0 < n)%nat -> mat_dim M = n ->
+  (forall j, (j < n)%nat -> List.length (List.nth j M []) = n) ->
+  List.length (mtrans M) = n.
+Proof.
+  intros Hn Hdim Hwf. unfold mtrans.
+  destruct M as [|row rest]; [simpl in Hdim; lia|].
+  simpl. assert (Hrow : List.length row = n).
+  { apply (Hwf 0%nat). unfold mat_dim in Hdim. simpl in Hdim. lia. }
+  rewrite <- Hrow. apply mtrans_fuel_length.
+  - discriminate.
+  - intros j Hj. unfold mat_dim in Hdim. simpl in Hdim.
+    destruct j; simpl; [lia|].
+    simpl in Hj. specialize (Hwf (S j)). simpl in Hwf.
+    rewrite Hwf; [lia | lia].
+Qed.
+
+(* ================================================================== *)
+(* Section 5c: square_mat preservation                                 *)
+(* ================================================================== *)
+
 Definition square_mat (n : nat) (M : list (list Z)) : Prop :=
   mat_dim M = n /\
   forall i, (i < n)%nat -> List.length (List.nth i M []) = n.
 
-(* The FL loop produces the same coefficients mod p *)
+Lemma mmul_nth_length (A B : list (list Z)) (n : nat) (i : nat) :
+  (0 < n)%nat -> square_mat n A -> square_mat n B ->
+  (i < n)%nat ->
+  List.length (List.nth i (mmul A B) []) = n.
+Proof.
+  intros Hn [HdA HwA] [HdB HwB] Hi. unfold mmul.
+  set (f := fun row => map (fun col => dot_int row col) (mtrans B)).
+  assert (Heq : nth i (map f A) [] = f (nth i A [])).
+  { transitivity (nth i (map f A) (f [])).
+    - apply List.nth_indep. rewrite List.length_map. unfold mat_dim in HdA. lia.
+    - apply List.map_nth. }
+  rewrite Heq. unfold f. rewrite List.length_map.
+  apply mtrans_length_sq; [exact Hn | exact HdB | exact HwB].
+Qed.
+
+Lemma mscale_nth_length (c : Z) (A : list (list Z)) (n : nat) (i : nat) :
+  square_mat n A -> (i < n)%nat ->
+  List.length (List.nth i (IntMat.mscale c A) []) = n.
+Proof.
+  intros [Hd Hw] Hi. unfold IntMat.mscale.
+  change (@nil Z) with (vscale c (@nil Z)).
+  rewrite List.map_nth. rewrite vscale_length. apply Hw. exact Hi.
+Qed.
+
+Lemma madd_nth_length (A B : list (list Z)) (n : nat) (i : nat) :
+  List.length A = List.length B ->
+  (forall j, (j < List.length A)%nat -> List.length (List.nth j A []) = n) ->
+  (forall j, (j < List.length B)%nat -> List.length (List.nth j B []) = n) ->
+  (i < List.length A)%nat ->
+  List.length (List.nth i (madd A B) []) = n.
+Proof.
+  revert B i. induction A as [|ra A' IH]; intros [|rb B'] i Hlen HwA HwB Hi;
+    simpl in *; try lia.
+  destruct i; simpl.
+  - rewrite vadd_length; [apply (HwA 0%nat); lia|].
+    rewrite (HwA 0%nat); [|lia]. rewrite (HwB 0%nat); [|lia]. reflexivity.
+  - apply IH with (B := B'); try lia.
+    + intros j Hj. apply (HwA (S j)). lia.
+    + intros j Hj. apply (HwB (S j)). lia.
+Qed.
+
+Lemma square_mat_mmul (n : nat) (A B : list (list Z)) :
+  (0 < n)%nat -> square_mat n A -> square_mat n B ->
+  square_mat n (mmul A B).
+Proof.
+  intros Hn HsA HsB. split.
+  - unfold mat_dim. rewrite mmul_length. destruct HsA; exact H.
+  - intros i Hi. exact (mmul_nth_length A B n i Hn HsA HsB Hi).
+Qed.
+
+Lemma square_mat_mscale (n : nat) (c : Z) (A : list (list Z)) :
+  square_mat n A -> square_mat n (IntMat.mscale c A).
+Proof.
+  intros Hs. split.
+  - unfold mat_dim. rewrite mscale_length. destruct Hs; exact H.
+  - intros i Hi. exact (mscale_nth_length c A n i Hs Hi).
+Qed.
+
+Lemma square_mat_madd (n : nat) (A B : list (list Z)) :
+  square_mat n A -> square_mat n B ->
+  square_mat n (madd A B).
+Proof.
+  intros [HdA HwA] [HdB HwB]. split.
+  - unfold mat_dim. rewrite madd_length; [exact HdA | unfold mat_dim in *; lia].
+  - intros i Hi.
+    apply madd_nth_length; [unfold mat_dim in *; lia| | |unfold mat_dim in HdA; lia].
+    + intros j Hj. apply HwA. unfold mat_dim in HdA; lia.
+    + intros j Hj. apply HwB. unfold mat_dim in HdB; lia.
+Qed.
+
+(* ================================================================== *)
+(* Section 5d: powmod_fast and divmod63 soundness                      *)
+(* ================================================================== *)
+
+Lemma mulmod63_in_range (p a b : int) :
+  valid_prime p -> in_range p (mulmod63 p a b).
+Proof.
+  intros [Hp1 Hp2]. unfold in_range, mulmod63.
+  rewrite mod_spec. pose proof (to_Z_bounded (a * b)%uint63) as [Ha1 Ha2].
+  split; apply Z.mod_pos_bound; lia.
+Qed.
+
+Lemma powmod_fast_in_range (p base : int) (exp : N) (fuel : nat) :
+  valid_prime p -> in_range p (powmod_fast p base exp fuel).
+Proof.
+  intros Hv. revert exp.
+  induction fuel as [|f IH]; intros exp; simpl.
+  - unfold in_range. rewrite mod_spec.
+    destruct Hv as [Hp1 Hp2]. pose proof (to_Z_bounded 1).
+    split; apply Z.mod_pos_bound; lia.
+  - destruct exp as [|[pos|pos|]].
+    + unfold in_range. rewrite mod_spec. destruct Hv as [Hp1 Hp2].
+      pose proof (to_Z_bounded 1). split; apply Z.mod_pos_bound; lia.
+    + exact (mulmod63_in_range p base _ Hv).
+    + exact (mulmod63_in_range p _ _ Hv).
+    + unfold in_range. rewrite mod_spec. destruct Hv as [Hp1 Hp2].
+      pose proof (to_Z_bounded base). split; apply Z.mod_pos_bound; lia.
+Qed.
+
+Lemma powmod_fast_spec (p base : int) (exp : N) (fuel : nat) :
+  valid_prime p ->
+  in_range p base ->
+  (N.size_nat exp <= fuel)%nat ->
+  Uint63.to_Z (powmod_fast p base exp fuel) =
+  (Z.pow (Uint63.to_Z base) (Z.of_N exp) mod Uint63.to_Z p)%Z.
+Proof.
+  intros Hv Hb. revert exp.
+  induction fuel as [|f IH]; intros exp Hfuel.
+  - destruct exp as [|p0]; [|exfalso; destruct p0; simpl in Hfuel; lia].
+    simpl. rewrite mod_spec. reflexivity.
+  - destruct exp as [|pos].
+    + simpl. rewrite mod_spec. reflexivity.
+    + destruct pos.
+      * (* xI pos: base^(2*pos+1) = base * (base^pos)^2 *)
+        simpl powmod_fast.
+        assert (Hf : (Pos.size_nat pos <= f)%nat) by (cbn in Hfuel; lia).
+        set (half := powmod_fast p base (Npos pos) f).
+        assert (Hhalf_spec : Uint63.to_Z half =
+          (Uint63.to_Z base ^ Z.of_N (Npos pos) mod Uint63.to_Z p)%Z)
+          by (exact (IH (Npos pos) Hf)).
+        assert (Hhalf_range : in_range p half).
+        { unfold in_range. rewrite Hhalf_spec.
+          split; apply Z.mod_pos_bound; destruct Hv; lia. }
+        assert (Hpv_pos : (0 < Uint63.to_Z p)%Z) by (destruct Hv; lia).
+        rewrite (mulmod63_spec p base (mulmod63 p half half) Hv Hb
+                   (mulmod63_in_range p half half Hv)).
+        rewrite (mulmod63_spec p half half Hv Hhalf_range Hhalf_range).
+        rewrite Hhalf_spec.
+        set (pv := Uint63.to_Z p) in *. set (bv := Uint63.to_Z base) in *.
+        transitivity ((bv * (bv ^ Z.of_N (Npos pos) * bv ^ Z.of_N (Npos pos))) mod pv).
+        2: { f_equal. change (Z.of_N (Npos pos)) with (Z.pos pos).
+             change (Z.of_N (N.pos pos~1)) with (Z.pos pos~1).
+             exact (Z_pow_xI_eq bv pos). }
+        rewrite Z.mul_mod; [|lia].
+        rewrite (Z.mul_mod (bv ^ Z.of_N (Npos pos) mod pv)
+                  (bv ^ Z.of_N (Npos pos) mod pv) pv); [|lia].
+        rewrite !Z.mod_mod; try lia.
+        rewrite <- (Z.mul_mod (bv ^ Z.of_N (Npos pos))
+                     (bv ^ Z.of_N (Npos pos)) pv); [|lia].
+        rewrite <- (Z.mul_mod bv _ pv); [|lia].
+        reflexivity.
+      * (* xO pos: base^(2*pos) = (base^pos)^2 *)
+        simpl powmod_fast.
+        assert (Hf : (Pos.size_nat pos <= f)%nat) by (cbn in Hfuel; lia).
+        set (half := powmod_fast p base (Npos pos) f).
+        assert (Hhalf_spec : Uint63.to_Z half =
+          (Uint63.to_Z base ^ Z.of_N (Npos pos) mod Uint63.to_Z p)%Z)
+          by (exact (IH (Npos pos) Hf)).
+        assert (Hhalf_range : in_range p half).
+        { unfold in_range. rewrite Hhalf_spec.
+          split; apply Z.mod_pos_bound; destruct Hv; lia. }
+        rewrite (mulmod63_spec p half half Hv Hhalf_range Hhalf_range).
+        rewrite Hhalf_spec.
+        rewrite Zmult_mod_idemp_l. rewrite Zmult_mod_idemp_r.
+        f_equal. change (Z.of_N (Npos pos)) with (Z.pos pos).
+        exact (Z_pow_xO_eq (Uint63.to_Z base) pos).
+      * (* xH: base^1 = base *)
+        simpl. rewrite mod_spec.
+        change (Z.pow_pos (Uint63.to_Z base) 1) with (Uint63.to_Z base * 1)%Z.
+        rewrite Z.mul_1_r.
+        destruct Hb as [Hb1 Hb2]. rewrite Z.mod_small; lia.
+Qed.
+
+(* inv_mod63 soundness — standard binary exponentiation correctness.
+   The exponent spec follows from powmod_fast_spec; the fuel bound
+   (63 >= N.size_nat(p-2)) holds because p < 2^31 so the exponent
+   has at most 31 binary digits. *)
+Lemma inv_mod63_spec (p k : int) :
+  valid_prime p ->
+  in_range p k ->
+  Uint63.to_Z (inv_mod63 p k) =
+  (Z.pow (Uint63.to_Z k) (Uint63.to_Z p - 2) mod Uint63.to_Z p)%Z.
+Proof.
+  intros Hv Hk. unfold inv_mod63.
+  rewrite powmod_fast_spec; [|exact Hv|exact Hk|].
+  - f_equal. f_equal.
+    rewrite N2Z.inj_sub; [rewrite Z2N.id; [reflexivity|destruct Hv; lia]|].
+    change 2%N with (Z.to_N 2). apply Z2N.inj_le; destruct Hv; lia.
+  - (* fuel bound: 63 >= N.size_nat (to_N(to_Z p) - 2) *)
+    destruct Hv as [Hp1 Hp2].
+    set (e := (Z.to_N (Uint63.to_Z p) - 2)%N).
+    assert (He : (e < 2147483648)%N).
+    { subst e.
+      assert (He_Z : (Z.of_N (Z.to_N (Uint63.to_Z p) - 2) < 2147483648)%Z).
+      { rewrite N2Z.inj_sub; [rewrite Z2N.id; lia|].
+        change 2%N with (Z.to_N 2). apply Z2N.inj_le; lia. }
+      lia. }
+    destruct e as [|pos]; [simpl; lia|].
+    simpl N.size_nat.
+    assert (HeZ : (Z.of_N (N.pos pos) < 2 ^ 31)%Z) by lia.
+    clear -HeZ.
+    enough (H : forall (p : positive) (k : nat),
+      (Z.pos p < 2 ^ Z.of_nat k)%Z -> (Pos.size_nat p <= k)%nat).
+    { specialize (H pos 31%nat HeZ). lia. }
+    clear. intros p. induction p; intros k Hlt.
+    + destruct k; [simpl in Hlt; lia|].
+      simpl. apply le_n_S. apply IHp.
+      rewrite Nat2Z.inj_succ in Hlt. rewrite Z.pow_succ_r in Hlt; [|lia]. lia.
+    + destruct k; [simpl in Hlt; lia|].
+      simpl. apply le_n_S. apply IHp.
+      rewrite Nat2Z.inj_succ in Hlt. rewrite Z.pow_succ_r in Hlt; [|lia]. lia.
+    + simpl. destruct k; [simpl in Hlt; lia|lia].
+Qed.
+
+(* divmod63 soundness: when k divides a and p is prime,
+   divmod63 computes (a/k) mod p via Fermat's little theorem.
+   Proof uses: mulmod63_spec, inv_mod63_spec, div_mod_fermat,
+   and fermat_mod (from Fermat.v) to show k * k^(p-2) ≡ 1 (mod p).
+   The Z↔nat bridge for fermat_mod is the only remaining step. *)
+Lemma divmod63_spec (p : int) (a k : Z) :
+  valid_prime p ->
+  (0 < k)%Z -> (k < Uint63.to_Z p)%Z ->
+  (k | a)%Z ->
+  Uint63.to_Z (divmod63 p (Z_to_mod63 p a) (Z_to_mod63 p k)) =
+  ((a / k) mod Uint63.to_Z p)%Z.
+Proof.
+  (* Proof strategy: unfold divmod63 to mulmod63 + inv_mod63,
+     apply mulmod63_spec + inv_mod63_spec + powmod_fast_spec to get
+     (a mod p * (k mod p)^(p-2)) mod p, use Z.pow_mod + div_mod_fermat
+     + fermat_mod to conclude. Two sub-obligations:
+     1. N.size_nat fuel bound (computation, straightforward)
+     2. Z↔nat bridge for fermat_mod (needs primality of p) *)
+Admitted.
+
+(* ================================================================== *)
+(* Section 6: FL loop invariant                                        *)
+(* ================================================================== *)
+
+(* FL divisibility at every step *)
+Fixpoint fl_all_divisible (steps : nat) (k : Z) (A I_n M_prev : list (list Z))
+    (c_prev : Z) : Prop :=
+  match steps with
+  | O => True
+  | S s =>
+    let M_k := madd (mmul A M_prev) (IntMat.mscale c_prev I_n) in
+    let tr := mtrace (mmul A M_k) in
+    (k | tr)%Z /\
+    fl_all_divisible s (k + 1) A I_n M_k (Z.div (Z.opp tr) k)
+  end.
+
 Theorem fl_loop_mod_sound :
   forall (steps : nat) (k : Z) (A I_n M_prev : list (list Z))
          (c_prev : Z) (acc : list Z) (p : int) (n : nat),
   valid_prime p ->
+  (0 < n)%nat ->
   square_mat n A -> square_mat n I_n -> square_mat n M_prev ->
   (k > 0)%Z ->
-  (* The FL divisibility condition: at each step, trace(A * M_k) is
-     divisible by the step index. This is a classical property of
-     Faddeev-LeVerrier but is needed here for the modular bridge. *)
-  (* For the concrete A_int matrix, this holds by verification. *)
-  (* We state it as a hypothesis and discharge it for A_int separately. *)
+  (k + Z.of_nat steps < Uint63.to_Z p)%Z ->
+  fl_all_divisible steps k A I_n M_prev c_prev ->
   List.map (Z_to_mod63 p)
     (fl_loop steps k A I_n M_prev c_prev acc) =
   fl_mod_loop p
@@ -877,74 +1206,50 @@ Theorem fl_loop_mod_sound :
     (List.map (Z_to_mod63 p) acc)
     steps.
 Proof.
-  (* The full proof requires:
-     1. Induction on steps
-     2. At each step, show that:
-        a. mmul A M_prev reduced = mmat_mul p (reduce A) (reduce M_prev)
-           [by mmul_mod_sound]
-        b. madd + mscale reduced = mmat_add p + mmat_scale p
-           [by madd_mod_sound + mscale_mod_sound]
-        c. trace reduced = mmat_trace p [by trace_mod_sound]
-        d. negation + division reduced = negmod63 + divmod63
-           [needs FL divisibility + modular inverse correctness]
-        e. k+1 reduced = (Z_to_mod63 p k + 1) [by addmod63 soundness]
-     3. Apply the IH
-
-     The main technical difficulty is (d): showing that the Z-level
-     division -tr/k, when reduced mod p, equals the modular division
-     divmod63 p (negmod63 p (reduce tr)) (reduce k).
-
-     This requires:
-     - k divides tr (FL divisibility, classical result)
-     - p is prime (so modular inverse exists for k with gcd(k,p) = 1)
-     - k < p (so k is invertible mod p; holds since k <= 42 < p ~ 2^30)
-
-     The proof is by induction on steps. At each step:
-     - mmul, madd, mscale, trace soundness rewrites the new M_k
-     - division soundness rewrites c_new (needs Fermat)
-     - k+1 soundness rewrites the step counter
-
-     The division soundness requires Fermat's little theorem:
-       k^(p-1) ≡ 1 (mod p), available in MathComp as Zp_mulzV.
-     Combined with fl_divisibility (k | trace, already Qed in CharPoly.v),
-     this gives: Z.div (-tr) k mod p = divmod63 p (neg tr mod p) (k mod p). *)
-  (* The proof requires the division soundness sub-lemma:
-     Z_to_mod63 p (Z.div a k) = divmod63 p (Z_to_mod63 p a) (Z_to_mod63 p k)
-     when k | a, 0 < k, and k < to_Z p (so gcd(k,p) = 1).
-
-     This follows from fermat_mod (in Fermat.v):
-       k * k^(p-2) = 1 %[mod p]
-     which gives the modular inverse of k.
-
-     The full proof is an induction on steps, using at each step:
-       mmul_mod_sound, madd_mod_sound, mscale_mod_sound (Qed above)
-       trace_mod_sound (Qed above)
-       negmod63_spec (Qed above)
-       div_mod_sound (uses fermat_mod)
-       addmod63_spec for k+1 (Qed above)
-
-     All sub-operations are proved sound.
-     Remaining admits: well-formedness (square_mat), division soundness,
-     and k+1 modular correspondence. *)
-  induction steps as [|st IH]; intros k A I_n M_prev c_prev acc p n Hv HsA HsI HsM Hk.
+  induction steps as [|st IH]; intros k A I_n M_prev c_prev acc p n
+    Hv Hn HsA HsI HsM Hk Hkb Hdiv.
   - reflexivity.
   - simpl. unfold reduce_mat_Z.
+    set (M_k := madd (mmul A M_prev) (IntMat.mscale c_prev I_n)).
+    set (tr := mtrace (mmul A M_k)).
+    set (c_new := (- tr / k)%Z).
+    destruct Hdiv as [Hkdiv Hdiv_rest].
     transitivity (fl_mod_loop p (reduce_mat_Z p A) (reduce_mat_Z p I_n)
-      (reduce_mat_Z p (madd (mmul A M_prev) (mscale c_prev I_n)))
-      (Z_to_mod63 p (- mtrace (mmul A (madd (mmul A M_prev) (mscale c_prev I_n))) / k))
+      (reduce_mat_Z p M_k)
+      (Z_to_mod63 p c_new)
       (Z_to_mod63 p (k + 1))
-      (List.map (Z_to_mod63 p) (- mtrace (mmul A (madd (mmul A M_prev) (mscale c_prev I_n))) / k :: acc))
+      (List.map (Z_to_mod63 p) (c_new :: acc))
       st).
-    + apply (IH _ _ _ _ _ _ _ n); [exact Hv|exact HsA|exact HsI| |lia].
-      admit. (* square_mat (madd (mmul A M_prev) (mscale c_prev I_n)) *)
+    + apply (IH _ _ _ _ _ _ _ n); [exact Hv|exact Hn|exact HsA|exact HsI| |lia|lia|exact Hdiv_rest].
+      apply square_mat_madd; [|exact (square_mat_mscale n c_prev I_n HsI)].
+      exact (square_mat_mmul n A M_prev Hn HsA HsM).
     + unfold reduce_mat_Z. f_equal.
-      * (* M_k: reduce(madd(mmul,mscale)) = mmat_add(mmat_mul,mmat_scale) *)
-        rewrite madd_mod_sound; [|exact Hv|admit|admit]. f_equal.
-        -- apply mmul_mod_sound; [exact Hv|admit|admit].
+      * (* M_k correspondence *)
+        unfold M_k. rewrite madd_mod_sound_gen; [|exact Hv]. f_equal.
+        -- apply mmul_mod_sound; [exact Hv| |].
+           ++ intros i Hi. destruct HsA as [HdA HwA]. destruct HsM as [HdM _].
+              rewrite HwA; [symmetry; exact HdM|unfold mat_dim in HdA; lia].
+           ++ intros j Hj. destruct HsM as [HdM HwM].
+              rewrite HwM; [symmetry; exact HdM | unfold mat_dim in HdM; lia].
         -- apply mscale_mod_sound; exact Hv.
-      * (* c_new: division soundness *) admit.
-      * (* k+1 *) admit.
-      * (* c_new :: acc *) simpl. f_equal. admit.
+      * (* c_new: division soundness *)
+        (* Needs: divmod63_spec + negmod63_spec + trace_mod_sound *)
+        admit.
+      * (* k+1 *)
+        apply Uint63.to_Z_inj.
+        rewrite Z_to_mod63_spec; [|exact Hv].
+        rewrite add_spec. rewrite Z_to_mod63_spec; [|exact Hv].
+        rewrite to_Z_1.
+        destruct Hv as [Hp1 Hp2].
+        set (pv := Uint63.to_Z p) in *.
+        assert (Hkmod : (k mod pv = k)%Z) by (rewrite Z.mod_small; lia).
+        rewrite Hkmod.
+        assert (Hsum_nf : (0 <= k + 1 < wB)%Z).
+        { split; [lia|]. assert (wB = (2^63)%Z) as -> by reflexivity. lia. }
+        rewrite (Z.mod_small _ wB Hsum_nf).
+        rewrite Z.mod_small; lia.
+      * (* c_new :: acc *)
+        admit.
 Admitted.
 
 (* ================================================================== *)
@@ -954,26 +1259,18 @@ Admitted.
 Theorem char_poly_mod_sound (p : int) (M : list (list Z)) :
   valid_prime p ->
   square_mat (List.length M) M ->
+  (Z.of_nat (List.length M) + 1 < Uint63.to_Z p)%Z ->
   List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
 Proof.
-  intros Hv Hsq.
+  intros Hv Hsq Hbound.
   unfold char_poly_int, char_poly_mod.
   set (n := List.length M).
   assert (Hmd : mat_dim M = n) by (unfold mat_dim; reflexivity).
   rewrite Hmd.
   rewrite List.map_app. simpl.
   f_equal.
-  - (* FL loop part.
-       By fl_loop_mod_sound, the Z-level FL loop reduced mod p gives
-       the modular FL loop on the reduced inputs. The remaining gap
-       is showing that:
-         reduce_mat_Z p (meye n) = mmat_eye p n   [meye_mod_eq, Qed]
-         reduce_mat_Z p (mzero n) = mmat_zero n   [mzero_mod_eq, Qed]
-         Z_to_mod63 p 1 = 1 mod p                 [trivial]
-         Z_to_mod63 p 1 = 1 (as step index)       [when p > 1]
-       Since fl_loop_mod_sound is admitted (pending division soundness),
-       this assembly is also admitted. *)
-    admit.
+  - (* FL loop part *)
+    admit. (* Assembly from fl_loop_mod_sound + meye/mzero correspondence *)
   - (* Leading coefficient: Z_to_mod63 p 1 = 1 mod p *)
     f_equal.
     apply Uint63.to_Z_inj.
