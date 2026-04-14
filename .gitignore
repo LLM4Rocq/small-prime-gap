@@ -7,3 +7,8 @@ Makefile
 Makefile.conf
 .Makefile.d
 .claude/
+*.vo
+*.vok
+*.vos
+*.glob
+*.aux
