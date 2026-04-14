@@ -16,7 +16,7 @@ From mathcomp Require Import all_boot all_algebra.
 Import GRing.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CharPolyScale CharPolyAgree.
-From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck.
+From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck CRTCheck.
 
 Open Scope ring_scope.
 
@@ -57,6 +57,40 @@ Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall i
 
    Both lemmas are validated by 710-prime modular checks + scaling
    relation scaling_Z_from_check. *)
+(* Charpoly coefficient bound: for an n×n integer matrix M with max
+   absolute entry B, each coefficient of char_poly_int M has absolute
+   value at most (2*n*B)^n. This follows from the cofactor expansion
+   of the determinant of (xI - M): each coefficient c_k is a sum of
+   C(n,k) k×k minors, each bounded by k!*B^k ≤ (n*B)^n.
+   Total: |c_k| ≤ C(n,k)*(n*B)^n ≤ (2*n*B)^n.
+
+   Formalizing this requires MathComp's det_expand + triangle inequality,
+   which is feasible but lengthy. We state it as an axiom and verify
+   the concrete bound computationally. *)
+Definition max_abs_entry (M : list (list Z)) : Z :=
+  List.fold_left (fun acc row =>
+    List.fold_left (fun acc2 x => Z.max acc2 (Z.abs x)) row acc) M BinNums.Z0.
+
+Axiom charpoly_coeff_bound : forall (M : list (list Z)) (n : nat) (k : nat),
+  mat_dim M = n -> all_rows_len n M ->
+  (k < S n)%coq_nat ->
+  Z.le (Z.abs (List.nth k (char_poly_int M) BinNums.Z0))
+       (Z.pow (Z.mul 2 (Z.mul (Z.of_nat n) (max_abs_entry M))) (Z.of_nat n)).
+
+(* Verify: 2 * (2*42*max_entry(A_int))^42 < product_of_710_primes *)
+Definition crt_product_710 : Z :=
+  List.fold_left Z.mul (List.map Uint63.to_Z crt_primes_all) (BinNums.Zpos BinNums.xH).
+
+Lemma crt_bound_sufficient :
+  Z.lt (Z.add (Z.mul 2 (Z.pow (Z.mul 2 (Z.mul 42 (max_abs_entry A_int))) 42))
+              (Z.mul 2 (max_abs_coeff charpoly_of_A_int)))
+       crt_product_710.
+Proof. vm_compute. reflexivity. Qed.
+
+(* TODO: close fl_eq_flint using char_poly_mod_sound +
+   all_primes_divide_product + small_multiple_zero +
+   charpoly_coeff_bound + crt_bound_sufficient.
+   All infrastructure exists; needs per-coefficient wiring. *)
 Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int. Proof. Admitted.
 Lemma matrix_identity_Z : mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
 Proof. Admitted.
