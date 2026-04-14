@@ -163,7 +163,7 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  move/negP: (Z_to_int_neq0' M1_charpoly_hd_nz); apply.
+  move/negP: (@Z_to_int_neq0' (List.hd Z0 (char_poly_int M1_int)) M1_charpoly_hd_nz); apply.
   rewrite -(pol_to_polyrat_coef0 _ Hne).
   rewrite -horner_coef0.
   rewrite Hcpi /char_poly.
