@@ -12,3 +12,4 @@ Makefile.conf
 *.vos
 *.glob
 *.aux
+*.tar.gz
