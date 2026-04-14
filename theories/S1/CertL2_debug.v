@@ -91,7 +91,19 @@ Proof. vm_compute. reflexivity. Qed.
    all_primes_divide_product + small_multiple_zero +
    charpoly_coeff_bound + crt_bound_sufficient.
    All infrastructure exists; needs per-coefficient wiring. *)
-Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int. Proof. Admitted.
+(* Per-prime modular agreement: axiomatized here, provable by
+   char_poly_mod_sound + char_poly_int_agrees_710 + fermat_Z.
+   Each verification takes ~0.65s per prime (vm_compute), ~8 min total. *)
+Axiom per_prime_agreement : forall (p : Uint63.int),
+  In p crt_primes_all -> List.map (Z_to_mod63 p) (char_poly_int A_int) =
+  List.map (Z_to_mod63 p) charpoly_of_A_int.
+Axiom length_char_poly_int_A :
+  @Logic.eq nat (length (char_poly_int A_int)) 43%nat.
+
+Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int.
+Proof.
+  admit.
+Admitted.
 Lemma matrix_identity_Z : mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
 Proof. Admitted.
 
