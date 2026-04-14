@@ -143,7 +143,7 @@ Proof. move=> HD. rewrite GRing.unitfE intr_eq0. exact: Z_to_int_neq0'. Qed.
    2. A lemma M1_det_nz_mod : check_M1_det_nz = true
    3. A proof that det != 0 mod p implies List.hd Z0 (char_poly_int M1_int) <> Z0
    For now we admit the conclusion directly. *)
-Lemma M1_charpoly_hd_nz : List.hd Z0 (char_poly_int M1_int) <> Z0.
+Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
 Proof.
   (* Strategy: char_poly_mod p M1_int has nonzero head (M1_det_nz_mod).
      By char_poly_mod_sound, map (Z_to_mod63 p) (char_poly_int M1_int) =
@@ -163,8 +163,12 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  move/negP: (@Z_to_int_neq0' (List.hd Z0 (char_poly_int M1_int)) M1_charpoly_hd_nz); apply.
-  rewrite -(pol_to_polyrat_coef0 _ Hne).
+  have Hnz := Z_to_int_neq0' _ M1_charpoly_hd_nz.
+  move/negP: Hnz; apply.
+  (* Goal should be: (Z_to_int (head Z0 (char_poly_int M1_int)))%:~R = 0 *)
+  (* pol_to_polyrat_coef0 gives: ... = (Z_to_int (List.hd Z0 l))%:~R *)
+  (* Try rewriting with List.hd = head *)
+  rewrite /List.hd -(pol_to_polyrat_coef0 _ Hne).
   rewrite -horner_coef0.
   rewrite Hcpi /char_poly.
   have Hdm := det_map_mx (horner_eval 0) (char_poly_mx (mat_int_to_rat M1_int 1 42)).
