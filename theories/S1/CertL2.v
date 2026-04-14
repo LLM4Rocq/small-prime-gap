@@ -195,13 +195,27 @@ Lemma mat_identity_rat :
   (Z_to_int D_M2)%:~R *: (mat_int_to_rat M1_int 1 42 *m mat_int_to_rat A_int 1 42) =
   ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R) *: mat_int_to_rat M2_int 1 42.
 Proof.
-  have := matrix_identity_Z.
-  move/(congr1 (fun M => mat_int_to_rat M 1 42)).
-  rewrite mat_int_to_rat_mscale.
-  rewrite -/(mat_int_to_rat (mmul M1_int A_int) 1 42).
-  rewrite (mat_int_to_rat_mmul M1_int A_int 42 M1_int_dim' A_int_dim' M1_int_wf' A_int_wf').
-  rewrite mat_int_to_rat_mscale -Z_to_int_mul -intrM.
-  by move=> ->.
+  have HZ := matrix_identity_Z.
+  (* Avoid forcing computation on large matrices *)
+  set LHS := mscale D_M2 (mmul M1_int A_int) in HZ.
+  set RHS := mscale (Z.mul D_M1 D_A) M2_int in HZ.
+  have HLHS : mat_int_to_rat LHS 1 42 =
+    (Z_to_int D_M2)%:~R *: mat_int_to_rat (mmul M1_int A_int) 1 42.
+  { subst LHS. exact (mat_int_to_rat_mscale D_M2 (mmul M1_int A_int) 42). }
+  have HRHS : mat_int_to_rat RHS 1 42 =
+    ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R) *: mat_int_to_rat M2_int 1 42.
+  { subst RHS.
+    transitivity ((Z_to_int (Z.mul D_M1 D_A))%:~R *: mat_int_to_rat M2_int 1 42).
+    - exact (mat_int_to_rat_mscale _ _ _).
+    - set M2r := mat_int_to_rat M2_int 1 42.
+      apply (f_equal (fun x => x *: M2r)).
+      rewrite Z_to_int_mul. exact: intrM. }
+  have Hmmul : mat_int_to_rat (mmul M1_int A_int) 1 42 =
+    mat_int_to_rat M1_int 1 42 *m mat_int_to_rat A_int 1 42.
+  { exact (mat_int_to_rat_mmul M1_int A_int 42 M1_int_dim' A_int_dim' M1_int_wf' A_int_wf'). }
+  exact (eq_ind _ (fun x => x = _) (eq_ind _ (fun x => _ = x)
+    (f_equal (fun M => mat_int_to_rat M 1 42) HZ) _ HRHS) _
+    (eq_trans HLHS (f_equal (fun x => _ *: x) Hmmul))).
 Qed.
 
 Lemma mat_A_eq_Arat : mat_int_to_rat A_int D_A 42 = A_rat.
