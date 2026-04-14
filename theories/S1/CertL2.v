@@ -88,6 +88,10 @@ Proof. Admitted.
 (*  Helpers.                                                          *)
 (* ================================================================ *)
 
+(* Prevent kernel from reducing Z_to_int on ~150-digit Z values,
+   which causes stack overflow (Posz with 10^170 successors). *)
+Opaque Z_to_int.
+
 Lemma pol_to_polyrat_coef0 (l : list Z) :
   l <> @nil Z ->
   (pol_to_polyrat l)`_0 = (Z_to_int (head Z0 l))%:~R :> rat.
@@ -97,10 +101,10 @@ Proof.
 Qed.
 
 Lemma intr_rat_eq0 (D : BinInt.Z) : (Z_to_int D)%:~R = 0 :> rat -> D = Z0.
-Proof. move/eqP. rewrite intr_eq0 => /eqP H.
+Proof. Transparent Z_to_int. move/eqP. rewrite intr_eq0 => /eqP H.
   destruct D as [|p|p]; [reflexivity|exfalso|exfalso].
   - simpl Z_to_int in H. injection H => H'. have := Pos2Nat.is_pos p; rewrite H'; exact (Nat.lt_irrefl 0).
-  - discriminate H. Qed.
+  - discriminate H. Opaque Z_to_int. Qed.
 
 Lemma ListDef_nth_eq (T : Type) (d : T) (l : list T) (n : nat) :
   ListDef.nth n l d = nth d l n.
@@ -108,11 +112,11 @@ Proof. by elim: l n => [|a l' IH] [|n'] //=. Qed.
 
 Lemma Z_to_int_Zpow_rat (z : Z) (n : nat) :
   (Z_to_int (Z.pow z (Z.of_nat n)))%:~R = (Z_to_int z)%:~R ^+ n :> rat.
-Proof.
+Proof. Transparent Z_to_int.
   elim: n => [|m IH].
   - by rewrite Z.pow_0_r /Z_to_int /= expr0.
   - by rewrite Nat2Z.inj_succ Z.pow_succ_r ?Z_to_int_mul ?intrM ?IH ?exprS //; lia.
-Qed.
+Opaque Z_to_int. Qed.
 
 Lemma mat_int_to_rat_scale_inv' (M : list (list BinInt.Z)) (D : BinInt.Z) (n : nat) :
   mat_int_to_rat M D n = (Z_to_int D)%:~R^-1 *: mat_int_to_rat M 1 n.
@@ -124,11 +128,11 @@ Qed.
 Lemma Z_to_int_neq0' (D : BinInt.Z) :
   D <> BinInt.Z0 -> Z_to_int D != 0 :> int.
 Proof.
-  move=> HD; apply/eqP => Hz.
-  apply HD; destruct D as [|p|p]; [reflexivity|exfalso|exfalso].
-  - rewrite /Z_to_int /= in Hz.
-    injection Hz => Hz'.
-    have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
+  move=> HD; apply/eqP => Hz. apply HD.
+  destruct D as [|p|p]; [reflexivity|exfalso|exfalso];
+  (revert Hz; change (Z_to_int _) with (Posz (Pos.to_nat p)) ||
+              change (Z_to_int _) with (Negz (Pos.to_nat p - 1)); intro Hz).
+  - injection Hz => Hz'. have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
   - discriminate Hz.
 Qed.
 
@@ -186,6 +190,7 @@ Qed.
 (* ================================================================ *)
 (*  A_rat and the matrix identity bridge.                             *)
 (* ================================================================ *)
+
 
 Definition A_rat : 'M[rat]_42 :=
   ((invmx (mat_int_to_rat M1_int D_M1 42))
