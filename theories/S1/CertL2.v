@@ -159,7 +159,8 @@ Proof.
 Lemma M1_1_unit : mat_int_to_rat M1_int 1 42 \in unitmx.
 Proof.
   have Hcpi := @char_poly_int_correct M1_int 42 M1_int_dim' M1_int_wf'.
-  have Hne : char_poly_int M1_int <> nil by rewrite /char_poly_int; discriminate.
+  have Hne : char_poly_int M1_int <> nil.
+  { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
   move/negP: (Z_to_int_neq0' M1_charpoly_hd_nz); apply.
