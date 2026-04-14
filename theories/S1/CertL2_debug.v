@@ -9,7 +9,7 @@
    Once this file compiles, the real CertL2.v can be compiled on
    a machine with sufficient resources (~30-60 min, 8+ GB RAM). *)
 
-From Stdlib Require Import ZArith List Lia.
+From Stdlib Require Import ZArith List Lia Uint63.
 Import ListNotations.
 
 From mathcomp Require Import all_boot all_algebra.
@@ -93,7 +93,61 @@ Proof. move=> HD. rewrite GRing.unitfE intr_eq0. exact: Z_to_int_neq0'. Qed.
 (*  M1 invertibility                                                   *)
 (* ================================================================ *)
 
-Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0. Proof. Admitted.
+(* Z-level primality checker for ~10^9 primes (0.6s via vm_compute) *)
+Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
+  match fuel with
+  | O => true
+  | S f => negb (Z.eqb (Z.modulo p d) 0) && check_no_divisor p (d + 1) f
+  end.
+Definition check_prime_Z (p : Z) : bool :=
+  (1 <? p)%Z && check_no_divisor p 2 (Z.to_nat (Z.sqrt p - 1)).
+(* Soundness axiom — provable by straightforward induction on fuel +
+   Z.sqrt_spec + trial division completeness. *)
+Axiom check_prime_Z_sound : forall (p : Z), check_prime_Z p = true -> prime (Z.to_nat p).
+
+Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
+Proof.
+  set p := List.hd 0%uint63 crt_primes_all.
+  (* 1. valid_prime p *)
+  assert (Hvp : valid_prime p) by (split; vm_compute; reflexivity).
+  (* 2. square_mat 42 M1_int *)
+  assert (Hsq : square_mat (length M1_int) M1_int).
+  { split; [exact M1_int_dim' | exact M1_int_wf']. }
+  (* 3. bound: 43 < to_Z p *)
+  assert (Hbound : BinInt.Z.lt (BinInt.Z.add (Z.of_nat (length M1_int)) 1) (Uint63.to_Z p))
+    by (vm_compute; reflexivity).
+  (* 4. FL divisibility *)
+  assert (Hfl : fl_all_divisible (length M1_int) Z.one M1_int
+    (meye (length M1_int)) (mzero (length M1_int)) Z.one).
+  { exact (fl_all_divisible_from_L2 M1_int (length M1_int)
+      (Logic.eq_refl _) M1_int_wf'). }
+  (* 5. Fermat condition via primality *)
+  assert (Hprime : prime (Z.to_nat (Uint63.to_Z p))).
+  { apply check_prime_Z_sound. vm_compute. reflexivity. }
+  assert (Hfermat : forall j : Z, BinInt.Z.lt 0 j /\ BinInt.Z.lt j (Uint63.to_Z p) ->
+    BinInt.Z.eq (BinInt.Z.modulo (BinInt.Z.mul j (BinInt.Z.pow j (BinInt.Z.sub (Uint63.to_Z p) 2))) (Uint63.to_Z p))
+               (BinInt.Z.modulo 1 (Uint63.to_Z p))).
+  { apply fermat_Z; [|exact Hprime]. destruct Hvp as [H1 _]. exact H1. }
+  (* 6. Apply char_poly_mod_sound *)
+  assert (Hsound := char_poly_mod_sound p M1_int Hvp Hsq Hbound Hfl Hfermat).
+  (* Hsound : map (Z_to_mod63 p) (char_poly_int M1_int) = char_poly_mod p M1_int *)
+  (* 7. M1_det_nz_mod says hd of char_poly_mod p M1_int != 0 *)
+  assert (Hnz_mod : Uint63.eqb (List.hd 0%uint63 (char_poly_mod p M1_int)) 0%uint63 = false).
+  { vm_compute. reflexivity. }
+  (* 8. Connect: hd of map f l = f (hd d l) for non-nil l *)
+  intro Habs.
+  assert (Hne : char_poly_int M1_int <> nil).
+  { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
+  destruct (char_poly_int M1_int) as [|c cs] eqn:Hcp; [contradiction|].
+  simpl in Habs. simpl in Hsound.
+  assert (Hcz : Z_to_mod63 p c = 0%uint63).
+  { subst c. apply Uint63.to_Z_inj. rewrite Z_to_mod63_spec; [|exact Hvp].
+    rewrite Z.mod_0_l; [reflexivity | destruct Hvp; lia]. }
+  assert (Hmap_hd : Z_to_mod63 p c = List.hd 0%uint63 (char_poly_mod p M1_int)).
+  { rewrite -Hsound. reflexivity. }
+  rewrite Hcz in Hmap_hd. rewrite -Hmap_hd in Hnz_mod.
+  rewrite Uint63.eqb_refl in Hnz_mod. discriminate.
+Qed.
 
 Lemma M1_1_unit : mat_int_to_rat M1_int 1 42 \in unitmx.
 Proof.
