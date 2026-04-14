@@ -6,3 +6,4 @@
 Makefile
 Makefile.conf
 .Makefile.d
+.claude/
