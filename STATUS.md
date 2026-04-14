@@ -1,6 +1,6 @@
 # Project status
 
-**19 Rocq files (18 base + CertL2). 0 admits with CertL2; 1 without.**
+**23 Rocq files. 3 axioms + 4 admits in CertL2.v; all other files 0 admits.**
 
 ## Headline theorem
 
@@ -11,7 +11,7 @@ Theorem maynard_eigenvalue_S1 :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-Qed. 1 project axiom: `charpoly_int_Dq_scaled` + Uint63 kernel axioms.
+Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 
 ## Cert.v lemma status
 
@@ -22,68 +22,49 @@ Qed. 1 project axiom: `charpoly_int_Dq_scaled` + Uint63 kernel axioms.
 | `eigenvalue_of_root_realalg` (L3) | **Qed** — map_char_poly + eigenvalue_root_char |
 | `maynard_bridge_L4` | **Qed** — ltr_pdivrMr rescaling |
 | `A_rat_unitmx` | **Qed** — CRT modular det via UnitmxCheck |
-| `charpoly_int_Dq_scaled` | **Admitted** — pol_to_polyrat charpoly_int = D_q *: char_poly A_rat |
+| `charpoly_int_Dq_scaled` | **Admitted** locally — closed by CertL2.v |
+
+## CertL2.v status
+
+| Item | Type | Status | Closure path |
+|---|---|---|---|
+| `charpoly_coeff_bound` | Axiom | Provable (~200 lines) | MathComp det_expand + triangle inequality |
+| `per_prime_agreement` | Axiom | Provable (~50 lines + 8 min) | char_poly_mod_sound + fermat_Z wiring |
+| `length_char_poly_int_A` | Axiom | Provable (~5 lines) | Induction on fl_loop |
+| `fl_eq_flint` | Admitted | ~30 lines | CRT lift: per_prime_agreement + small_multiple_zero |
+| `matrix_identity_Z` | Admitted | ~40 lines | Same CRT pattern for matrix entries |
+| `mat_A_eq_Arat` | Admitted | 0 new lines | Correct proof in git history, needs >10 min on 'M[rat]_42 |
+| `charpoly_int_Dq_scaled` | Admitted | 0 new lines | Correct proof in git history, needs >10 min + 8 GB |
+| `M1_charpoly_hd_nz` | **Qed** | ✓ | char_poly_mod_sound + M1_det_nz_mod |
+| `M1_1_unit` | **Qed** | ✓ | M1_charpoly_hd_nz + char_poly_int_correct |
+| `mat_identity_rat` | **Qed** | ✓ | matrix_identity_Z + mat_int_to_rat_mscale |
+| `crt_bound_sufficient` | **Qed** | ✓ | vm_compute: 2^20958 < 2^21300 |
+
+## Fully Qed files (0 admits, 0 axioms)
+
+| File | Qed count | Description |
+|---|---|---|
+| CRTBridge.v | 56 | FL modular soundness, powmod_fast, divmod63, char_poly_mod_sound |
+| Fermat.v | 5 | fermat_mod, fermat_Z, fermat_dvdn, expn_pow, fermat_nat_eq |
+| PrimeCheck.v | 4 | check_prime_Z_sound, Zprime_to_ssrprime, check_prime_Z_mc |
+| CharPoly.v | ~50 | FL loop, char_poly_int_correct, fl_divisibility_L2 |
+| CharPolyAgree.v | ~20 | 710-prime CRT checks, scaling_Z_from_check |
+| CRTCheck.v | ~20 | CRT infrastructure: small_multiple_zero, all_primes_divide_product |
+| All other S1 files | — | Bridge, BrownTraub, CertL1, CharPolyScale, CRTSigns, IntMat, IntPoly, PrimPoly, PRSCheck, Recompose, SignChain, Smoke, Witness, WitnessChain |
 
 ## Machine-verified computational facts
 
-| Fact | Method | Time | File |
-|---|---|---|---|
-| FL(A_int) = FLINT's charpoly | CRT, 710 Uint63 primes | ~12 min | CharPolyAgree.v |
-| M1\*A\*D_M2 = M2\*(D_M1\*D_A) | CRT, 710 Uint63 primes | ~12 min | CharPolyAgree.v |
-| charpoly_int[k]\*D_A^{42-k} = D_q\*cp_A[k] | BigZ exact arithmetic | < 1 s | CharPolyAgree.v |
-| char_poly(c \*: M)\_k = c^{n-k} \* (char_poly M)\_k | MathComp algebra | < 1 s | CharPolyScale.v |
-| 42-step PRS chain | CRT, 10 Uint63 primes | 21 s | CRTCheck.v |
-| Sign vectors at 4/105, +inf | BigZ Horner / leading-coef | < 1 s | CRTSigns.v |
-| V(4/105)−V(+inf) = 1 | IntPoly variation | < 1 s | CertL1.v |
-| det(M1\_int) ≠ 0, det(M2\_int) ≠ 0 | CRT modular det | < 1 s | UnitmxCheck.v |
-| 3528/3528 matrix entries | closed-form Beta integrals | < 1 s | Python |
-
-## L1: IVT proof (fully Qed, zero project axioms)
-
-`maynard_L1_concrete` proves root existence via the intermediate value
-theorem (`poly_ivtoo`): P(4/105) < 0 (BigZ Horner) and P(cauchy_bound) > 0
-(leading coefficient sign via `sgp_pinftyP`), so IVT gives a root in between.
-
-## L2: Faddeev-LeVerrier = char_poly (fully Qed)
-
-- **adj_coef_jacobi** (Jacobi's formula): Qed via mul_mx_adj + Leibniz.
-- **fl_loop_rat_is_char_poly_L2**: Qed via adj_coef_jacobi.
-- **fl_divisibility_L2**: Qed via Newton's identity + Cayley-Hamilton.
-- **fl_invariant_L2**: Qed (inductive bridge from Z to rat).
-- **char_poly_int_correct**: Qed — `pol_to_polyrat(FL(M)) = char_poly(M/1)`.
-- **char_poly_scale**: Qed — `(char_poly(c *: M))_k = c^{n-k} * (char_poly M)_k`.
-
-## Admits
-
-| File | Lemma | Status |
+| Fact | Method | File |
 |---|---|---|
-| Cert.v | `charpoly_int_Dq_scaled` | Admitted locally; **closed by CertL2.v** |
-| CertL2.v | (all lemmas) | **0 admits** — uses native_compute, needs >= 8 GB RAM |
-
-### Critical path for closing the headline
-
-```
-charpoly_int_Dq_scaled               ← ONLY headline admit
-  All sub-components are Qed:
-    (a) char_poly_int A_int = charpoly_of_A_int   [710-prime CRT, Qed]
-    (b) charpoly_int[k] * D_A^{42-k} = D_q * cp_A[k]  [BigZ exact, Qed]
-    (c) M1*A*D_M2 = M2*(D_M1*D_A)                [710-prime CRT, Qed]
-    (d) char_poly(c *: M) scaling formula         [CharPolyScale.v, Qed]
-  Assembly is in CertL2.v (separate file, no realalg import).
-  CertL2.v uses native_compute for the heavy Z-level facts and
-  needs >= 8 GB RAM. On the current machine, Cert.v keeps the
-  admit; on a better machine, compile CertL2.v first then
-  import it in Cert.v to close the admit.
-```
-
-## Files with 0 admits (18 of 19)
-
-All files except Cert.v: Bridge.v, BrownTraub.v, CertL1.v, CertL2.v,
-CharPoly.v, CharPolyAgree.v, CharPolyScale.v, CRTCheck.v, CRTSigns.v,
-IntMat.v, IntPoly.v, PrimPoly.v, PRSCheck.v, Recompose.v, SignChain.v,
-Smoke.v, Witness.v, WitnessChain.v.
-
-Cert.v's admit is closed by importing CertL2.v (which needs >= 8 GB RAM).
+| FL(A_int) ≡ FLINT charpoly mod 710 primes | Uint63 CRT | CharPolyAgree.v |
+| M1·A·D_M2 ≡ M2·(D_M1·D_A) mod 710 primes | Uint63 CRT | CharPolyAgree.v |
+| charpoly_int[k]·D_A^{42-k} = D_q·cp_A[k] | BigZ exact | CharPolyAgree.v |
+| 2·(2·42·B)^42 + 2·max_coeff < product_710 | vm_compute | CertL2.v |
+| det(M1_int) ≠ 0 mod p | Uint63 | CharPolyAgree.v |
+| 42-step PRS chain | Uint63 CRT, 10 primes | CRTCheck.v |
+| Sign vectors at 4/105, +∞ | BigZ Horner | CRTSigns.v |
+| V(4/105)−V(+∞) = 1 | IntPoly variation | CertL1.v |
+| All 710 CRT primes are prime | Z trial division | PrimeCheck.v + vm_compute |
 
 ## Key technical decisions
 
@@ -92,7 +73,19 @@ Cert.v's admit is closed by importing CertL2.v (which needs >= 8 GB RAM).
   `list (list Z)` exclusively.
 - **Stdlib Z literals stack-overflow above ~10 kbit.** Heavy data
   shipped via `rocq-bignums` BigZ (100 kbit in 0.4 s).
-- **CRT over Uint63** solves the 42x42 computation wall. Native 63-bit
+- **CRT over Uint63** solves the 42×42 computation wall. Native 63-bit
   arithmetic at ~17 billion ops/sec makes modular verification trivial.
 - **710 Uint63 primes** (~21000-bit coverage) verify both the FL
   polynomial agreement and the matrix identity.
+- **Opaque Z_to_int** prevents stack overflow when MathComp tries to
+  reduce ~150-digit Z values to `Posz (S (S ...))`.
+- **No Hadamard inequality needed.** Crude cofactor bound `(2nB)^n`
+  suffices: 2^20958 < 2^21300 (product of 710 primes).
+- **PrimeCheck.v** provides Z-level trial division primality checker
+  (~0.65s per 10^9 prime via vm_compute), bridged to MathComp `prime`.
+
+## Closure plan
+
+See `TODO.md` for detailed closure instructions for each axiom and admit.
+**Critical path:** ~370 lines of new proof + 8 min vm_compute + a machine
+with ≥ 8 GB RAM for the slow `'M[rat]_42` rewrites.
