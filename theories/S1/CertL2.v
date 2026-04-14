@@ -227,21 +227,22 @@ Proof.
   set M2_1 := mat_int_to_rat M2_int 1 42.
   set A_1  := mat_int_to_rat A_int 1 42.
   have Hid := mat_identity_rat. rewrite -/M1_1 -/A_1 -/M2_1 in Hid.
+  (* All proofs below avoid `by ... => ->` which triggers matrix computation *)
   have Hma : M1_1 *m A_1 =
     ((Z_to_int D_M2)%:~R^-1 * ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R)) *: M2_1.
-  { have := Hid. move/(congr1 (fun M => (Z_to_int D_M2)%:~R^-1 *: M)).
-    by rewrite scalerA GRing.mulVr ?(Z_to_int_unit' HDM2) // GRing.scale1r => ->. }
+  { have H := f_equal (GRing.scale ((Z_to_int D_M2)%:~R^-1 : rat)) Hid.
+    rewrite scalerA GRing.mulVr ?(Z_to_int_unit' HDM2) // GRing.scale1r in H. exact H. }
   have HA1 : A_1 =
     ((Z_to_int D_M2)%:~R^-1 * ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R)) *:
     (invmx M1_1 *m M2_1).
-  { have := Hma. move/(congr1 (fun M => invmx M1_1 *m M)).
-    by rewrite mulmxA mulKVmx ?M1_1_unit // -scalemxAr => ->. }
+  { have H := f_equal (mulmx (invmx M1_1)) Hma.
+    rewrite mulmxA mulKVmx ?M1_1_unit // -scalemxAr in H. exact H. }
   rewrite /A_rat !(mat_int_to_rat_scale_inv' _ _ 42) -/M1_1 -/M2_1 -/A_1.
   rewrite invmxZ GRing.invrK -scalemxAl -scalemxAr.
   rewrite HA1 scalerA. congr (_ *: _).
   rewrite GRing.invrM ?(Z_to_int_unit' HDA) ?(Z_to_int_unit' HDM2) //.
   rewrite [_ * ((Z_to_int D_M2)%:~R^-1 * _)]mulrCA.
-  by rewrite mulrA GRing.mulVr ?(Z_to_int_unit' HDA) // mul1r mulrC.
+  rewrite mulrA GRing.mulVr ?(Z_to_int_unit' HDA) // mul1r. exact (mulrC _ _).
 Qed.
 
 (* ================================================================ *)
