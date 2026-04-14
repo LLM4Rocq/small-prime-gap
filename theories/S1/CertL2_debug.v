@@ -41,6 +41,12 @@ Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall i
 (*  CRT lift admits                                                    *)
 (* ================================================================ *)
 
+(* CRT LIFT: Both follow from modular agreement (char_poly_int_agrees_710,
+   matrix_identity_710) + char_poly_mod_sound + coefficient bounds.
+   The product of 710 primes > 2^21000 exceeds max coefficient difference
+   (~19923 bits for charpoly, ~2400 bits for matrix entries).
+   Needs: Gauss_dvd iterated over 710 coprime primes + Z coefficient
+   bound (Hadamard's bound or direct from scaling_Z_from_check). *)
 Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int. Proof. Admitted.
 Lemma matrix_identity_Z : mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
 Proof. Admitted.
