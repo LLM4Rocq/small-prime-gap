@@ -90,11 +90,17 @@ Proof. Admitted.
 
 Lemma pol_to_polyrat_coef0 (l : list Z) :
   l <> @nil Z ->
-  (pol_to_polyrat l)`_0 = (Z_to_int (List.hd Z0 l))%:~R :> rat.
+  (pol_to_polyrat l)`_0 = (Z_to_int (head Z0 l))%:~R :> rat.
 Proof.
   destruct l as [|z l']; [tauto | ].
   move=> _. rewrite /pol_to_polyrat coef_Poly /=. reflexivity.
 Qed.
+
+Lemma intr_rat_eq0 (D : BinInt.Z) : (Z_to_int D)%:~R = 0 :> rat -> D = Z0.
+Proof. move/eqP. rewrite intr_eq0 => /eqP H.
+  destruct D as [|p|p]; [reflexivity|exfalso|exfalso].
+  - simpl Z_to_int in H. injection H => H'. have := Pos2Nat.is_pos p; rewrite H'; exact (Nat.lt_irrefl 0).
+  - discriminate H. Qed.
 
 Lemma ListDef_nth_eq (T : Type) (d : T) (l : list T) (n : nat) :
   ListDef.nth n l d = nth d l n.
@@ -163,22 +169,16 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  have Hnz := Z_to_int_neq0' _ M1_charpoly_hd_nz.
-  move/negP: Hnz; apply.
-  (* Goal should be: (Z_to_int (head Z0 (char_poly_int M1_int)))%:~R = 0 *)
-  (* pol_to_polyrat_coef0 gives: ... = (Z_to_int (List.hd Z0 l))%:~R *)
-  (* Try rewriting with List.hd = head *)
-  rewrite /List.hd -(pol_to_polyrat_coef0 _ Hne).
-  rewrite -horner_coef0.
-  rewrite Hcpi /char_poly.
+  apply M1_charpoly_hd_nz.
+  apply intr_rat_eq0.
+  rewrite -(pol_to_polyrat_coef0 _ Hne) -horner_coef0 Hcpi /char_poly.
   have Hdm := det_map_mx (horner_eval 0) (char_poly_mx (mat_int_to_rat M1_int 1 42)).
   change (horner_eval 0 (\det (char_poly_mx (mat_int_to_rat M1_int 1 42))) = 0).
   rewrite -Hdm.
   have -> : (char_poly_mx (mat_int_to_rat M1_int 1 42) ^ horner_eval 0)%sesqui =
     - mat_int_to_rat M1_int 1 42.
   { apply/matrixP => i j. rewrite mxE /char_poly_mx mxE.
-    rewrite GRing.rmorphD /=.
-    rewrite !mxE /horner_eval /=.
+    rewrite GRing.rmorphD /=. rewrite !mxE /horner_eval /=.
     by rewrite hornerMn hornerX GRing.mul0rn GRing.add0r hornerN hornerC. }
   by rewrite -scaleN1r detZ Hdet0 GRing.mulr0.
 Qed.
