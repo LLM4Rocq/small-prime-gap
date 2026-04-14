@@ -9,14 +9,14 @@
    Once this file compiles, the real CertL2.v can be compiled on
    a machine with sufficient resources (~30-60 min, 8+ GB RAM). *)
 
-From Stdlib Require Import ZArith List Lia Uint63.
+From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 Import ListNotations.
 
 From mathcomp Require Import all_boot all_algebra.
 Import GRing.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CharPolyScale CharPolyAgree.
-From PrimeGapS1 Require Import Fermat CRTBridge.
+From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck.
 
 Open Scope ring_scope.
 
@@ -117,9 +117,7 @@ Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
   end.
 Definition check_prime_Z (p : Z) : bool :=
   (1 <? p)%Z && check_no_divisor p 2 (Z.to_nat (Z.sqrt p - 1)).
-(* Soundness axiom — provable by straightforward induction on fuel +
-   Z.sqrt_spec + trial division completeness. *)
-Axiom check_prime_Z_sound : forall (p : Z), check_prime_Z p = true -> prime (Z.to_nat p).
+(* check_prime_Z_mc from PrimeCheck.v: fully proved, 0 axioms *)
 
 Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
 Proof.
@@ -139,7 +137,7 @@ Proof.
       (Logic.eq_refl _) M1_int_wf'). }
   (* 5. Fermat condition via primality *)
   assert (Hprime : prime (Z.to_nat (Uint63.to_Z p))).
-  { apply check_prime_Z_sound. vm_compute. reflexivity. }
+  { apply check_prime_Z_mc. vm_compute. reflexivity. }
   assert (Hfermat : forall j : Z, BinInt.Z.lt 0 j /\ BinInt.Z.lt j (Uint63.to_Z p) ->
     BinInt.Z.eq (BinInt.Z.modulo (BinInt.Z.mul j (BinInt.Z.pow j (BinInt.Z.sub (Uint63.to_Z p) 2))) (Uint63.to_Z p))
                (BinInt.Z.modulo 1 (Uint63.to_Z p))).
