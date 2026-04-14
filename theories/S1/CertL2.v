@@ -231,7 +231,8 @@ Proof.
   have Hma : M1_1 *m A_1 =
     ((Z_to_int D_M2)%:~R^-1 * ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R)) *: M2_1.
   { have H := f_equal (GRing.scale ((Z_to_int D_M2)%:~R^-1 : rat)) Hid.
-    rewrite scalerA GRing.mulVr ?(Z_to_int_unit' HDM2) // GRing.scale1r in H. exact H. }
+    have Hu := Z_to_int_unit' _ HDM2.
+    rewrite scalerA GRing.mulVr ?Hu // GRing.scale1r in H. exact H. }
   have HA1 : A_1 =
     ((Z_to_int D_M2)%:~R^-1 * ((Z_to_int D_M1)%:~R * (Z_to_int D_A)%:~R)) *:
     (invmx M1_1 *m M2_1).
