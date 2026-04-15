@@ -19,5 +19,6 @@ theories/S1/CRTCheck.v
 theories/S1/Fermat.v
 theories/S1/CRTBridge.v
 theories/S1/PrimeCheck.v
+theories/S1/CRTLift.v
 theories/S1/Cert.v
 theories/S1/CertL2.v
