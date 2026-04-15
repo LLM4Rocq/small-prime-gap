@@ -1,6 +1,6 @@
 # Project status
 
-**24 Rocq files. 9 axioms + 5 admits in CRTLift.v + CertL2.v; all other files 0 admits.**
+**24 Rocq files. 5 axioms + 2 admits in CRTLift.v; 2 admits in CertL2.v; all other files 0 admits.**
 
 ## Headline theorem
 
@@ -13,37 +13,26 @@ Theorem maynard_eigenvalue_S1 :
 
 Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 
-## Cert.v lemma status
-
-| Lemma | Status |
-|---|---|
-| `sturm_count_correct` (L1) | **Qed** — via CertL1.maynard_L1_concrete (IVT) |
-| `charpoly_root_transfer` (L2) | **Qed** — via rootZ + map_polyZ |
-| `eigenvalue_of_root_realalg` (L3) | **Qed** — map_char_poly + eigenvalue_root_char |
-| `maynard_bridge_L4` | **Qed** — ltr_pdivrMr rescaling |
-| `A_rat_unitmx` | **Qed** — CRT modular det via UnitmxCheck |
-| `charpoly_int_Dq_scaled` | **Admitted** locally — closed by CertL2.v |
-
-## CRTLift.v status
+## CRTLift.v status (5 axioms, 2 admits)
 
 | Item | Type | Status | Closure path |
 |---|---|---|---|
-| `fl_eq_flint` | Lemma | **Qed** | CRT lift: per_prime_agreement + small_multiple_zero |
-| `matrix_identity_Z` | Lemma | **Qed** | CRT lift: per_prime_matrix_agreement + small_multiple_zero |
+| `fl_eq_flint` | Lemma | **Qed** | CRT lift: nested nth_ext + small_multiple_zero |
+| `matrix_identity_Z` | Lemma | **Qed** | CRT lift: nested nth_ext + small_multiple_zero |
+| `crt_primes_valid` | Lemma | **Qed** | vm_compute check_valid_prime |
+| `crt_product_710_pos` | Lemma | **Qed** | fold_left_mul_pos induction |
+| `matrix_lhs_entry_bound` | Lemma | **Qed** | mat_get_mscale + dot_int_bound |
+| `matrix_rhs_entry_bound` | Lemma | **Qed** | mat_get_mscale + max_abs_entry_get |
+| `length_charpoly_of_A` | Lemma | **Qed** | length_charpoly_of_A_int from CharPolyAgree |
 | `per_prime_agreement` | Axiom | Provable (~50 lines + 8 min) | char_poly_mod_sound + fermat_Z wiring |
 | `charpoly_coeff_bound` | Axiom | Provable (~200 lines) | MathComp det_expand + triangle inequality |
 | `crt_primes_710_NoDup` | Axiom | Provable (vm_compute) | NoDup decision procedure |
 | `crt_primes_710_all_prime` | Axiom | Provable (vm_compute) | 710 x check_prime_Z_sound |
-| `crt_primes_valid` | Axiom | Provable (vm_compute) | unfold valid_prime, bounds check |
-| `crt_product_710_pos` | Axiom | Provable (trivial) | from positivity of each prime |
 | `per_prime_matrix_agreement` | Axiom | Provable (~100 lines) | mmat_eqb/mmat_scale/mmat_mul soundness |
-| `matrix_lhs_entry_bound` | Axiom | Provable (~50 lines) | mat_get_mscale + dot product bound |
-| `matrix_rhs_entry_bound` | Axiom | Provable (~30 lines) | mat_get_mscale + max_abs_entry bound |
 | `crt_bound_sufficient` | Admitted | vm_compute ~2 min | `2*(2*42*B)^42 + 2*max_coeff < product_710` |
-| `length_charpoly_of_A` | Admitted | vm_compute (fast) | charpoly_of_A_int_bigZ_length + lift_bigZ |
 | `matrix_crt_bound_sufficient` | Admitted | vm_compute (fast) | `2*LHS_bound + 2*RHS_bound < product_710` |
 
-## CertL2.v status
+## CertL2.v status (0 axioms, 2 admits)
 
 | Item | Type | Status | Closure path |
 |---|---|---|---|
@@ -63,21 +52,20 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 | CharPoly.v | ~50 | FL loop, char_poly_int_correct, fl_divisibility_L2 |
 | CharPolyAgree.v | ~20 | 710-prime CRT checks, scaling_Z_from_check |
 | CRTCheck.v | ~20 | CRT infrastructure: small_multiple_zero, all_primes_divide_product |
-| All other S1 files | — | Bridge, BrownTraub, CertL1, CharPolyScale, CRTSigns, IntMat, IntPoly, PrimPoly, PRSCheck, Recompose, SignChain, Smoke, Witness, WitnessChain |
+| All other S1 files | -- | Bridge, BrownTraub, CertL1, CharPolyScale, CRTSigns, IntMat, IntPoly, PrimPoly, PRSCheck, Recompose, SignChain, Smoke, Witness, WitnessChain |
 
 ## Machine-verified computational facts
 
 | Fact | Method | File |
 |---|---|---|
-| FL(A_int) ≡ FLINT charpoly mod 710 primes | Uint63 CRT | CharPolyAgree.v |
-| M1·A·D_M2 ≡ M2·(D_M1·D_A) mod 710 primes | Uint63 CRT | CharPolyAgree.v |
-| charpoly_int[k]·D_A^{42-k} = D_q·cp_A[k] | BigZ exact | CharPolyAgree.v |
-| 2·(2·42·B)^42 + 2·max_coeff < product_710 | vm_compute | CRTLift.v |
-| det(M1_int) ≠ 0 mod p | Uint63 | CharPolyAgree.v |
+| FL(A_int) = FLINT charpoly mod 710 primes | Uint63 CRT | CharPolyAgree.v |
+| M1*A*D_M2 = M2*(D_M1*D_A) mod 710 primes | Uint63 CRT | CharPolyAgree.v |
+| charpoly_int[k]*D_A^{42-k} = D_q*cp_A[k] | BigZ exact | CharPolyAgree.v |
+| det(M1_int) != 0 mod p | Uint63 | CharPolyAgree.v |
 | 42-step PRS chain | Uint63 CRT, 10 primes | CRTCheck.v |
-| Sign vectors at 4/105, +∞ | BigZ Horner | CRTSigns.v |
-| V(4/105)−V(+∞) = 1 | IntPoly variation | CertL1.v |
-| All 710 CRT primes are prime | Z trial division | PrimeCheck.v + vm_compute |
+| Sign vectors at 4/105, +inf | BigZ Horner | CRTSigns.v |
+| V(4/105)-V(+inf) = 1 | IntPoly variation | CertL1.v |
+| All 710 CRT primes pass valid_prime check | Uint63 vm_compute | CRTLift.v |
 
 ## Key technical decisions
 
@@ -86,7 +74,7 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
   `list (list Z)` exclusively.
 - **Stdlib Z literals stack-overflow above ~10 kbit.** Heavy data
   shipped via `rocq-bignums` BigZ (100 kbit in 0.4 s).
-- **CRT over Uint63** solves the 42×42 computation wall. Native 63-bit
+- **CRT over Uint63** solves the 42x42 computation wall. Native 63-bit
   arithmetic at ~17 billion ops/sec makes modular verification trivial.
 - **710 Uint63 primes** (~21000-bit coverage) verify both the FL
   polynomial agreement and the matrix identity.
@@ -100,5 +88,5 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 ## Closure plan
 
 See `TODO.md` for detailed closure instructions for each axiom and admit.
-**Critical path:** ~500 lines of new axiom proofs + vm_compute checks +
+**Critical path:** ~450 lines of new axiom proofs + vm_compute checks +
 a machine with >= 8 GB RAM for the slow `'M[rat]_42` rewrites.
