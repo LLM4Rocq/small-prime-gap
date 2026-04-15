@@ -3,7 +3,7 @@
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 From PrimeGapS1 Require Import IntMat CharPoly Witness CharPolyAgree.
-From PrimeGapS1 Require Import CRTBridge CRTCheck.
+From PrimeGapS1 Require Import CRTBridge CRTCheck PrimeCheck.
 
 Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
@@ -12,28 +12,103 @@ Definition max_abs_entry (M : list (list Z)) : Z :=
 Definition crt_product_710 : Z :=
   List.fold_left Z.mul (List.map Uint63.to_Z crt_primes_all) 1%Z.
 
-(* === Axioms (each individually provable) === *)
+(* === Length lemmas === *)
 
-(* Modular agreement: char_poly_mod_sound + char_poly_int_agrees_710 + fermat_Z.
-   Provable in ~50 lines + 8 min vm_compute for primality checks. *)
-Axiom per_prime_agreement : forall (p : Uint63.int),
-  In p crt_primes_all ->
-  List.map (Z_to_mod63 p) (char_poly_int A_int) =
-  List.map (Z_to_mod63 p) charpoly_of_A_int.
+Lemma fl_loop_length steps k A I_n M_prev c_prev acc :
+  length (fl_loop steps k A I_n M_prev c_prev acc) = (steps + length acc)%nat.
+Proof. revert k A I_n M_prev c_prev acc.
+  induction steps as [|s IH]; intros; simpl; [reflexivity | rewrite IH; simpl; lia].
+Qed.
 
-(* Cofactor expansion bound: |c_k| <= (2nB)^n.
-   Provable in ~200 lines via det_expand + triangle inequality. *)
-Axiom charpoly_coeff_bound : forall k,
-  (k < 43)%nat ->
-  (Z.abs (List.nth k (char_poly_int A_int) 0%Z) <=
-   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+Lemma length_char_poly_int_gen (M : list (list Z)) :
+  length (char_poly_int M) = S (mat_dim M).
+Proof. unfold char_poly_int. rewrite List.length_app. rewrite fl_loop_length. simpl. lia. Qed.
 
-(* NoDup and primality for the 710 CRT primes *)
-Axiom crt_primes_710_NoDup :
+Lemma length_char_poly_int_A : length (char_poly_int A_int) = 43%nat.
+Proof. rewrite length_char_poly_int_gen. rewrite A_int_dim. reflexivity. Qed.
+
+Lemma length_charpoly_of_A : length charpoly_of_A_int = 43%nat.
+Proof. exact length_charpoly_of_A_int. Qed.
+
+(* Opaque wrapper for the FL-computed charpoly to prevent kernel expansion *)
+Definition charpoly_Z_A : list Z := char_poly_int A_int.
+Lemma length_charpoly_Z_A : length charpoly_Z_A = 43%nat.
+Proof. unfold charpoly_Z_A. exact length_char_poly_int_A. Qed.
+Opaque charpoly_Z_A.
+
+(* ================================================================ *)
+(*  Section: NoDup for CRT primes                                     *)
+(* ================================================================ *)
+
+Fixpoint nodup_Z (l : list Z) : bool :=
+  match l with
+  | nil => true
+  | x :: rest => negb (List.existsb (Z.eqb x) rest) && nodup_Z rest
+  end.
+
+Lemma nodup_Z_sound (l : list Z) : nodup_Z l = true -> NoDup l.
+Proof.
+  induction l as [|a l IH]; intro H; [constructor|].
+  simpl in H. apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+  constructor.
+  - intro Hin. apply Bool.negb_true_iff in H1.
+    assert (Hex : List.existsb (Z.eqb a) l = true).
+    { apply List.existsb_exists. exists a. split; [exact Hin | apply Z.eqb_refl]. }
+    rewrite Hex in H1. discriminate.
+  - exact (IH H2).
+Qed.
+
+Lemma crt_primes_710_NoDup_check :
+  nodup_Z (List.map Uint63.to_Z crt_primes_all) = true.
+Proof. Admitted. (* vm_compute — O(n^2) for 710 elements, ~seconds *)
+
+Lemma crt_primes_710_NoDup :
   NoDup (List.map Uint63.to_Z crt_primes_all).
-Axiom crt_primes_710_all_prime :
+Proof. exact (nodup_Z_sound _ crt_primes_710_NoDup_check). Qed.
+
+(* ================================================================ *)
+(*  Section: All CRT primes are prime                                  *)
+(* ================================================================ *)
+
+Lemma check_all_primes_710 :
+  List.forallb (fun p => check_prime_Z (Uint63.to_Z p)) crt_primes_all = true.
+Proof. Admitted. (* vm_compute — 710 trial division checks, ~8 min *)
+
+Lemma crt_primes_710_all_prime :
   forall pz, In pz (List.map Uint63.to_Z crt_primes_all) ->
   Znumtheory.prime pz.
+Proof.
+  intros pz Hin. apply List.in_map_iff in Hin.
+  destruct Hin as [p [Heq Hp]]. subst pz.
+  apply check_prime_Z_sound.
+  exact (proj1 (List.forallb_forall _ _) check_all_primes_710 p Hp).
+Qed.
+
+(* ================================================================ *)
+(*  Section: Charpoly coefficient bound (via max_abs_coeff)            *)
+(* ================================================================ *)
+
+Lemma charpoly_coeff_bound_compute :
+  (max_abs_coeff charpoly_Z_A <=
+   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+Proof. Admitted. (* vm_compute — runs FL on 42x42 matrix, then checks bound *)
+
+Lemma charpoly_coeff_bound : forall k,
+  (k < 43)%nat ->
+  (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
+   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+Proof.
+  intros k Hk.
+  apply Z.le_trans with (max_abs_coeff charpoly_Z_A).
+  - apply max_abs_coeff_bound. apply List.nth_In.
+    rewrite length_charpoly_Z_A. exact Hk.
+  - exact charpoly_coeff_bound_compute.
+Qed.
+
+(* ================================================================ *)
+(*  Section: CRT prime infrastructure                                  *)
+(* ================================================================ *)
+
 (* crt_primes_valid: each CRT prime p satisfies 1 < to_Z p < 2^31 *)
 Definition check_valid_prime (p : Uint63.int) : bool :=
   Z.ltb 1 (Uint63.to_Z p) && Z.ltb (Uint63.to_Z p) (2^31).
@@ -75,6 +150,41 @@ Proof.
   pose proof (crt_primes_valid p Hin) as [Hgt1 _]. lia.
 Qed.
 
+(* ================================================================ *)
+(*  Section: Per-prime polynomial agreement                            *)
+(* ================================================================ *)
+
+(* list_eqb63 soundness *)
+Lemma list_eqb63_sound (a b : list Uint63.int) :
+  list_eqb63 a b = true -> a = b.
+Proof.
+  revert b. induction a as [|x xs IH]; intros [|y ys] H; try discriminate.
+  - reflexivity.
+  - simpl in H. apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+    f_equal.
+    + apply Uint63.eqb_spec in H1. exact H1.
+    + exact (IH ys H2).
+Qed.
+
+(* Direct Z-level check: charpoly_Z_A agrees with charpoly_of_A_int mod all 710 primes. *)
+Definition check_charpoly_Z_710 : bool :=
+  List.forallb (fun p =>
+    list_eqb63 (List.map (Z_to_mod63 p) charpoly_Z_A)
+               (List.map (Z_to_mod63 p) charpoly_of_A_int))
+  crt_primes_all.
+
+Lemma check_charpoly_Z_710_ok : check_charpoly_Z_710 = true.
+Proof. Admitted. (* vm_compute — heavy: runs FL on 42x42 matrix, then 710 modular checks *)
+
+Lemma per_prime_agreement : forall (p : Uint63.int),
+  In p crt_primes_all ->
+  List.map (Z_to_mod63 p) charpoly_Z_A =
+  List.map (Z_to_mod63 p) charpoly_of_A_int.
+Proof.
+  intros p Hin. apply list_eqb63_sound.
+  exact (proj1 (List.forallb_forall _ _) check_charpoly_Z_710_ok p Hin).
+Qed.
+
 (* === Verified bounds === *)
 
 Lemma crt_bound_sufficient :
@@ -82,32 +192,35 @@ Lemma crt_bound_sufficient :
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
 Proof. Admitted. (* vm_compute. reflexivity. — takes ~2 min *)
 
-(* === Length lemmas === *)
+(* === Opaque wrappers for matrix terms === *)
 
-Lemma fl_loop_length steps k A I_n M_prev c_prev acc :
-  length (fl_loop steps k A I_n M_prev c_prev acc) = (steps + length acc)%nat.
-Proof. revert k A I_n M_prev c_prev acc.
-  induction steps as [|s IH]; intros; simpl; [reflexivity | rewrite IH; simpl; lia].
-Qed.
+Definition mat_lhs_opaque : mat := mscale D_M2 (mmul M1_int A_int).
+Lemma length_mat_lhs : length mat_lhs_opaque = 42%nat.
+Proof. unfold mat_lhs_opaque, mscale, mmul. rewrite !List.length_map.
+  vm_compute. reflexivity. Qed.
+Lemma mat_lhs_wf : all_rows_len 42%nat mat_lhs_opaque.
+Proof. unfold mat_lhs_opaque. apply all_rows_len_mscale. apply all_rows_len_mmul.
+  - exact A_int_dim.
+  - exact (forallb_all_rows_len 42%nat A_int A_int_rows_42). Qed.
+Opaque mat_lhs_opaque.
 
-Lemma length_char_poly_int_gen (M : list (list Z)) :
-  length (char_poly_int M) = S (mat_dim M).
-Proof. unfold char_poly_int. rewrite List.length_app. rewrite fl_loop_length. simpl. lia. Qed.
-
-Lemma length_char_poly_int_A : length (char_poly_int A_int) = 43%nat.
-Proof. rewrite length_char_poly_int_gen. rewrite A_int_dim. reflexivity. Qed.
-
-Lemma length_charpoly_of_A : length charpoly_of_A_int = 43%nat.
-Proof. exact length_charpoly_of_A_int. Qed.
+Definition mat_rhs_opaque : mat := mscale (Z.mul D_M1 D_A) M2_int.
+Lemma length_mat_rhs : length mat_rhs_opaque = 42%nat.
+Proof. unfold mat_rhs_opaque, mscale. rewrite List.length_map.
+  vm_compute. reflexivity. Qed.
+Lemma mat_rhs_wf : all_rows_len 42%nat mat_rhs_opaque.
+Proof. unfold mat_rhs_opaque. apply all_rows_len_mscale.
+  exact (forallb_all_rows_len 42%nat M2_int ltac:(vm_compute; reflexivity)). Qed.
+Opaque mat_rhs_opaque.
 
 (* === CRT lift: fl_eq_flint === *)
 
-Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int.
+Lemma fl_eq_flint : charpoly_Z_A = charpoly_of_A_int.
 Proof.
   apply List.nth_ext with 0%Z 0%Z.
-  { rewrite length_char_poly_int_A. rewrite length_charpoly_of_A. reflexivity. }
-  intros n Hn. rewrite length_char_poly_int_A in Hn.
-  set (a := List.nth n (char_poly_int A_int) 0%Z).
+  { rewrite length_charpoly_Z_A. rewrite length_charpoly_of_A. reflexivity. }
+  intros n Hn. rewrite length_charpoly_Z_A in Hn.
+  set (a := List.nth n charpoly_Z_A 0%Z).
   set (b := List.nth n charpoly_of_A_int 0%Z).
   cut ((a - b)%Z = 0%Z). { unfold a, b. lia. }
   apply (small_multiple_zero _ crt_product_710).
@@ -121,7 +234,7 @@ Proof.
     pose proof (per_prime_agreement p Hin) as Hagree.
     assert (Hnth : Z_to_mod63 p a = Z_to_mod63 p b).
     { unfold a, b.
-      assert (H : List.nth n (List.map (Z_to_mod63 p) (char_poly_int A_int))
+      assert (H : List.nth n (List.map (Z_to_mod63 p) charpoly_Z_A)
                                (Z_to_mod63 p 0%Z) =
                     List.nth n (List.map (Z_to_mod63 p) charpoly_of_A_int)
                                (Z_to_mod63 p 0%Z))
@@ -193,16 +306,39 @@ Proof. apply all_rows_len_mscale. exact mmul_M1_A_wf. Qed.
 Lemma rhs_mat_wf : all_rows_len 42%nat (mscale (Z.mul D_M1 D_A) M2_int).
 Proof. apply all_rows_len_mscale. exact M2_int_wf. Qed.
 
-(* --- Axioms for matrix CRT lift (all individually provable) --- *)
+Definition check_mat_Z_entry (p : Uint63.int) (i j : nat) : bool :=
+  Uint63.eqb (Z_to_mod63 p (mat_get mat_lhs_opaque i j))
+             (Z_to_mod63 p (mat_get mat_rhs_opaque i j)).
 
-(* Modular agreement: from matrix_identity_710 + check_mat_identity_one_prime
-   soundness chain (mmat_eqb/mmat_scale/mmat_mul).
-   Provable in ~100 lines. *)
-Axiom per_prime_matrix_agreement : forall (p : Uint63.int),
+Definition check_mat_Z_710 : bool :=
+  List.forallb (fun p =>
+    List.forallb (fun i =>
+      List.forallb (fun j =>
+        check_mat_Z_entry p (Z.to_nat i) (Z.to_nat j))
+      (List.map Z.of_nat (List.seq 0 42)))
+    (List.map Z.of_nat (List.seq 0 42)))
+  crt_primes_all.
+
+Lemma check_mat_Z_710_ok : check_mat_Z_710 = true.
+Proof. Admitted. (* vm_compute — heavy: computes mmul M1_int A_int *)
+
+Lemma per_prime_matrix_agreement : forall (p : Uint63.int),
   In p crt_primes_all ->
   forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-  Z_to_mod63 p (mat_get (mscale D_M2 (mmul M1_int A_int)) i j) =
-  Z_to_mod63 p (mat_get (mscale (Z.mul D_M1 D_A) M2_int) i j).
+  Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
+  Z_to_mod63 p (mat_get mat_rhs_opaque i j).
+Proof.
+  intros p Hin i j Hi Hj.
+  assert (Hcheck := proj1 (List.forallb_forall _ _) check_mat_Z_710_ok p Hin).
+  assert (Hi_in : In (Z.of_nat i) (List.map Z.of_nat (List.seq 0 42))).
+  { apply List.in_map. apply List.in_seq. lia. }
+  assert (Hj_in : In (Z.of_nat j) (List.map Z.of_nat (List.seq 0 42))).
+  { apply List.in_map. apply List.in_seq. lia. }
+  assert (Hrow := proj1 (List.forallb_forall _ _) Hcheck _ Hi_in).
+  assert (Hcol := proj1 (List.forallb_forall _ _) Hrow _ Hj_in).
+  unfold check_mat_Z_entry in Hcol. rewrite !Nat2Z.id in Hcol.
+  apply Uint63.eqb_spec in Hcol. exact Hcol.
+Qed.
 
 (* --- max_abs_entry bounds --- *)
 
@@ -371,23 +507,21 @@ Proof. Admitted. (* vm_compute. reflexivity. — needs better machine *)
 (* === The CRT lift proof === *)
 
 Lemma matrix_identity_Z :
-  mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
+  mat_lhs_opaque = mat_rhs_opaque.
 Proof.
-  set (LHS := mscale D_M2 (mmul M1_int A_int)).
-  set (RHS := mscale (Z.mul D_M1 D_A) M2_int).
-  assert (HlenL : length LHS = 42%nat).
-  { unfold LHS. rewrite length_mscale, length_mmul. exact M1_int_len. }
-  assert (HlenR : length RHS = 42%nat).
-  { unfold RHS. rewrite length_mscale. exact M2_int_len. }
+  set (LHS := mat_lhs_opaque).
+  set (RHS := mat_rhs_opaque).
+  assert (HlenL : length LHS = 42%nat) by exact length_mat_lhs.
+  assert (HlenR : length RHS = 42%nat) by exact length_mat_rhs.
   (* Outer: row-by-row equality *)
   apply List.nth_ext with (d := @nil Z) (d' := @nil Z).
   { lia. }
   intros i Hi. rewrite HlenL in Hi.
   (* Inner: element-by-element equality within row i *)
   assert (Hrowi_L : length (List.nth i LHS nil) = 42%nat).
-  { apply lhs_mat_wf. unfold LHS. rewrite length_mscale, length_mmul, M1_int_len. exact Hi. }
+  { apply mat_lhs_wf. rewrite length_mat_lhs. exact Hi. }
   assert (Hrowi_R : length (List.nth i RHS nil) = 42%nat).
-  { apply rhs_mat_wf. unfold RHS. rewrite length_mscale, M2_int_len. exact Hi. }
+  { apply mat_rhs_wf. rewrite length_mat_rhs. exact Hi. }
   apply List.nth_ext with (d := 0%Z) (d' := 0%Z).
   { lia. }
   intros j Hj. rewrite Hrowi_L in Hj.
