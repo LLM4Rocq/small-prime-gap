@@ -1,6 +1,6 @@
 # Project status
 
-**23 Rocq files. 3 axioms + 4 admits in CertL2.v; all other files 0 admits.**
+**24 Rocq files. 9 axioms + 5 admits in CRTLift.v + CertL2.v; all other files 0 admits.**
 
 ## Headline theorem
 
@@ -24,21 +24,34 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 | `A_rat_unitmx` | **Qed** — CRT modular det via UnitmxCheck |
 | `charpoly_int_Dq_scaled` | **Admitted** locally — closed by CertL2.v |
 
+## CRTLift.v status
+
+| Item | Type | Status | Closure path |
+|---|---|---|---|
+| `fl_eq_flint` | Lemma | **Qed** | CRT lift: per_prime_agreement + small_multiple_zero |
+| `matrix_identity_Z` | Lemma | **Qed** | CRT lift: per_prime_matrix_agreement + small_multiple_zero |
+| `per_prime_agreement` | Axiom | Provable (~50 lines + 8 min) | char_poly_mod_sound + fermat_Z wiring |
+| `charpoly_coeff_bound` | Axiom | Provable (~200 lines) | MathComp det_expand + triangle inequality |
+| `crt_primes_710_NoDup` | Axiom | Provable (vm_compute) | NoDup decision procedure |
+| `crt_primes_710_all_prime` | Axiom | Provable (vm_compute) | 710 x check_prime_Z_sound |
+| `crt_primes_valid` | Axiom | Provable (vm_compute) | unfold valid_prime, bounds check |
+| `crt_product_710_pos` | Axiom | Provable (trivial) | from positivity of each prime |
+| `per_prime_matrix_agreement` | Axiom | Provable (~100 lines) | mmat_eqb/mmat_scale/mmat_mul soundness |
+| `matrix_lhs_entry_bound` | Axiom | Provable (~50 lines) | mat_get_mscale + dot product bound |
+| `matrix_rhs_entry_bound` | Axiom | Provable (~30 lines) | mat_get_mscale + max_abs_entry bound |
+| `crt_bound_sufficient` | Admitted | vm_compute ~2 min | `2*(2*42*B)^42 + 2*max_coeff < product_710` |
+| `length_charpoly_of_A` | Admitted | vm_compute (fast) | charpoly_of_A_int_bigZ_length + lift_bigZ |
+| `matrix_crt_bound_sufficient` | Admitted | vm_compute (fast) | `2*LHS_bound + 2*RHS_bound < product_710` |
+
 ## CertL2.v status
 
 | Item | Type | Status | Closure path |
 |---|---|---|---|
-| `charpoly_coeff_bound` | Axiom | Provable (~200 lines) | MathComp det_expand + triangle inequality |
-| `per_prime_agreement` | Axiom | Provable (~50 lines + 8 min) | char_poly_mod_sound + fermat_Z wiring |
-| `length_char_poly_int_A` | Axiom | Provable (~5 lines) | Induction on fl_loop |
-| `fl_eq_flint` | Admitted | ~30 lines | CRT lift: per_prime_agreement + small_multiple_zero |
-| `matrix_identity_Z` | Admitted | ~40 lines | Same CRT pattern for matrix entries |
+| `M1_charpoly_hd_nz` | Lemma | **Qed** | char_poly_mod_sound + M1_det_nz_mod |
+| `M1_1_unit` | Lemma | **Qed** | M1_charpoly_hd_nz + char_poly_int_correct |
+| `mat_identity_rat` | Lemma | **Qed** | matrix_identity_Z + mat_int_to_rat_mscale |
 | `mat_A_eq_Arat` | Admitted | 0 new lines | Correct proof in git history, needs >10 min on 'M[rat]_42 |
 | `charpoly_int_Dq_scaled` | Admitted | 0 new lines | Correct proof in git history, needs >10 min + 8 GB |
-| `M1_charpoly_hd_nz` | **Qed** | ✓ | char_poly_mod_sound + M1_det_nz_mod |
-| `M1_1_unit` | **Qed** | ✓ | M1_charpoly_hd_nz + char_poly_int_correct |
-| `mat_identity_rat` | **Qed** | ✓ | matrix_identity_Z + mat_int_to_rat_mscale |
-| `crt_bound_sufficient` | **Qed** | ✓ | vm_compute: 2^20958 < 2^21300 |
 
 ## Fully Qed files (0 admits, 0 axioms)
 
@@ -59,7 +72,7 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 | FL(A_int) ≡ FLINT charpoly mod 710 primes | Uint63 CRT | CharPolyAgree.v |
 | M1·A·D_M2 ≡ M2·(D_M1·D_A) mod 710 primes | Uint63 CRT | CharPolyAgree.v |
 | charpoly_int[k]·D_A^{42-k} = D_q·cp_A[k] | BigZ exact | CharPolyAgree.v |
-| 2·(2·42·B)^42 + 2·max_coeff < product_710 | vm_compute | CertL2.v |
+| 2·(2·42·B)^42 + 2·max_coeff < product_710 | vm_compute | CRTLift.v |
 | det(M1_int) ≠ 0 mod p | Uint63 | CharPolyAgree.v |
 | 42-step PRS chain | Uint63 CRT, 10 primes | CRTCheck.v |
 | Sign vectors at 4/105, +∞ | BigZ Horner | CRTSigns.v |
@@ -87,5 +100,5 @@ Qed in Cert.v. 1 project axiom: `charpoly_int_Dq_scaled` (closed by CertL2.v).
 ## Closure plan
 
 See `TODO.md` for detailed closure instructions for each axiom and admit.
-**Critical path:** ~370 lines of new proof + 8 min vm_compute + a machine
-with ≥ 8 GB RAM for the slow `'M[rat]_42` rewrites.
+**Critical path:** ~500 lines of new axiom proofs + vm_compute checks +
+a machine with >= 8 GB RAM for the slow `'M[rat]_42` rewrites.

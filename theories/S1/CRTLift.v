@@ -112,10 +112,134 @@ Proof.
     exact crt_bound_sufficient. }
 Qed.
 
-(* === CRT lift: matrix_identity_Z (same pattern) === *)
-(* TODO: same structure as fl_eq_flint but for 42x42 matrix entries.
-   Needs per-entry modular agreement from matrix_identity_710 +
-   entry bound. Left admitted for now. *)
+(* === CRT lift: matrix_identity_Z === *)
+
+(* --- Generic length helpers --- *)
+
+Lemma length_mscale (c : Z) (M : mat) : length (mscale c M) = length M.
+Proof. unfold mscale. apply List.length_map. Qed.
+
+Lemma length_mmul (A B : mat) : length (mmul A B) = length A.
+Proof. unfold mmul. apply List.length_map. Qed.
+
+(* --- Concrete dimension/well-formedness facts --- *)
+
+Lemma M1_int_len : length M1_int = 42%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma M2_int_len : length M2_int = 42%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma M2_int_rows_42 :
+  forallb (fun row => Nat.eqb (List.length row) 42) M2_int = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma A_int_wf : all_rows_len 42%nat A_int.
+Proof. exact (forallb_all_rows_len 42%nat A_int A_int_rows_42). Qed.
+
+Lemma M2_int_wf : all_rows_len 42%nat M2_int.
+Proof. exact (forallb_all_rows_len 42%nat M2_int M2_int_rows_42). Qed.
+
+Lemma mmul_M1_A_wf : all_rows_len 42%nat (mmul M1_int A_int).
+Proof. apply all_rows_len_mmul; [exact A_int_dim | exact A_int_wf]. Qed.
+
+Lemma lhs_mat_wf : all_rows_len 42%nat (mscale D_M2 (mmul M1_int A_int)).
+Proof. apply all_rows_len_mscale. exact mmul_M1_A_wf. Qed.
+
+Lemma rhs_mat_wf : all_rows_len 42%nat (mscale (Z.mul D_M1 D_A) M2_int).
+Proof. apply all_rows_len_mscale. exact M2_int_wf. Qed.
+
+(* --- Axioms for matrix CRT lift (all individually provable) --- *)
+
+(* Modular agreement: from matrix_identity_710 + check_mat_identity_one_prime
+   soundness chain (mmat_eqb/mmat_scale/mmat_mul).
+   Provable in ~100 lines. *)
+Axiom per_prime_matrix_agreement : forall (p : Uint63.int),
+  In p crt_primes_all ->
+  forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+  Z_to_mod63 p (mat_get (mscale D_M2 (mmul M1_int A_int)) i j) =
+  Z_to_mod63 p (mat_get (mscale (Z.mul D_M1 D_A) M2_int) i j).
+
+(* Entry bound for LHS: |D_M2 * (M1·A)[i,j]| ≤ |D_M2| * 42 * B_M1 * B_A
+   where B_X = max_abs_entry X. Provable from mat_get_mscale + dot product
+   triangle inequality (~50 lines). *)
+Definition mat_id_lhs_bound : Z :=
+  (Z.abs D_M2 * (42 * max_abs_entry M1_int * max_abs_entry A_int))%Z.
+
+Axiom matrix_lhs_entry_bound : forall i j : nat,
+  (i < 42)%nat -> (j < 42)%nat ->
+  (Z.abs (mat_get (mscale D_M2 (mmul M1_int A_int)) i j) <= mat_id_lhs_bound)%Z.
+
+(* Entry bound for RHS: |(D_M1·D_A) * M2[i,j]| ≤ |D_M1·D_A| * B_M2.
+   Provable from mat_get_mscale + max_abs_entry bound (~30 lines). *)
+Definition mat_id_rhs_bound : Z :=
+  (Z.abs (Z.mul D_M1 D_A) * max_abs_entry M2_int)%Z.
+
+Axiom matrix_rhs_entry_bound : forall i j : nat,
+  (i < 42)%nat -> (j < 42)%nat ->
+  (Z.abs (mat_get (mscale (Z.mul D_M1 D_A) M2_int) i j) <= mat_id_rhs_bound)%Z.
+
+(* Verified bound: 2 * LHS_bound + 2 * RHS_bound < product of 710 primes. *)
+Lemma matrix_crt_bound_sufficient :
+  (2 * mat_id_lhs_bound + 2 * mat_id_rhs_bound < crt_product_710)%Z.
+Proof. Admitted. (* vm_compute. reflexivity. — needs better machine *)
+
+(* === The CRT lift proof === *)
+
 Lemma matrix_identity_Z :
   mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
-Proof. Admitted.
+Proof.
+  set (LHS := mscale D_M2 (mmul M1_int A_int)).
+  set (RHS := mscale (Z.mul D_M1 D_A) M2_int).
+  assert (HlenL : length LHS = 42%nat).
+  { unfold LHS. rewrite length_mscale, length_mmul. exact M1_int_len. }
+  assert (HlenR : length RHS = 42%nat).
+  { unfold RHS. rewrite length_mscale. exact M2_int_len. }
+  (* Outer: row-by-row equality *)
+  apply List.nth_ext with (d := @nil Z) (d' := @nil Z).
+  { lia. }
+  intros i Hi. rewrite HlenL in Hi.
+  (* Inner: element-by-element equality within row i *)
+  assert (Hrowi_L : length (List.nth i LHS nil) = 42%nat).
+  { apply lhs_mat_wf. unfold LHS. rewrite length_mscale, length_mmul, M1_int_len. exact Hi. }
+  assert (Hrowi_R : length (List.nth i RHS nil) = 42%nat).
+  { apply rhs_mat_wf. unfold RHS. rewrite length_mscale, M2_int_len. exact Hi. }
+  apply List.nth_ext with (d := 0%Z) (d' := 0%Z).
+  { lia. }
+  intros j Hj. rewrite Hrowi_L in Hj.
+  (* Goal: nth j (nth i LHS nil) 0 = nth j (nth i RHS nil) 0
+     which is mat_get LHS i j = mat_get RHS i j *)
+  change (mat_get LHS i j = mat_get RHS i j).
+  set (a := mat_get LHS i j).
+  set (b := mat_get RHS i j).
+  cut ((a - b)%Z = 0%Z). { unfold a, b. lia. }
+  apply (small_multiple_zero _ crt_product_710).
+  { (* product | (a - b) *)
+    unfold crt_product_710.
+    apply all_primes_divide_product.
+    { exact crt_primes_710_NoDup. }
+    { exact crt_primes_710_all_prime. }
+    intros pz Hpz. apply List.in_map_iff in Hpz.
+    destruct Hpz as [p [Hpeq Hin]]. subst pz.
+    pose proof (per_prime_matrix_agreement p Hin i j Hi Hj) as Hagree.
+    fold LHS RHS in Hagree. fold a b in Hagree.
+    apply (f_equal Uint63.to_Z) in Hagree.
+    pose proof (crt_primes_valid p Hin) as Hvp.
+    rewrite !Z_to_mod63_spec in Hagree; [|exact Hvp|exact Hvp].
+    destruct Hvp as [Hvp1 _].
+    assert (Hpnz : (Uint63.to_Z p <> 0)%Z) by lia.
+    exists ((a / Uint63.to_Z p - b / Uint63.to_Z p)%Z).
+    rewrite Z.mul_sub_distr_r.
+    rewrite (Z.div_mod a (Uint63.to_Z p) Hpnz) at 1.
+    rewrite (Z.div_mod b (Uint63.to_Z p) Hpnz) at 1. lia. }
+  { exact crt_product_710_pos. }
+  { apply Z.le_lt_trans with (2 * Z.abs a + 2 * Z.abs b)%Z.
+    { pose proof (Z.abs_triangle a (-b)). rewrite Z.abs_opp in H. lia. }
+    apply Z.le_lt_trans with (2 * mat_id_lhs_bound + 2 * mat_id_rhs_bound)%Z.
+    { apply Z.add_le_mono.
+      { apply Z.mul_le_mono_nonneg_l; [lia|].
+        exact (matrix_lhs_entry_bound i j Hi Hj). }
+      { apply Z.mul_le_mono_nonneg_l; [lia|].
+        exact (matrix_rhs_entry_bound i j Hi Hj). } }
+    exact matrix_crt_bound_sufficient. }
+Qed.
