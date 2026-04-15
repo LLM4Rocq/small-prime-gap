@@ -26,7 +26,7 @@ From mathcomp Require Import all_boot all_algebra.
 Import GRing.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CharPolyScale CharPolyAgree.
-From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck CRTCheck.
+From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck CRTCheck CRTLift.
 
 Open Scope ring_scope.
 
@@ -81,41 +81,9 @@ Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
     List.fold_left (fun acc2 x => Z.max acc2 (Z.abs x)) row acc) M BinNums.Z0.
 
-Axiom charpoly_coeff_bound : forall (M : list (list Z)) (n : nat) (k : nat),
-  mat_dim M = n -> all_rows_len n M ->
-  (k < S n)%coq_nat ->
-  Z.le (Z.abs (List.nth k (char_poly_int M) BinNums.Z0))
-       (Z.pow (Z.mul 2 (Z.mul (Z.of_nat n) (max_abs_entry M))) (Z.of_nat n)).
-
-(* Verify: 2 * (2*42*max_entry(A_int))^42 < product_of_710_primes *)
-Definition crt_product_710 : Z :=
-  List.fold_left Z.mul (List.map Uint63.to_Z crt_primes_all) (BinNums.Zpos BinNums.xH).
-
-Lemma crt_bound_sufficient :
-  Z.lt (Z.add (Z.mul 2 (Z.pow (Z.mul 2 (Z.mul 42 (max_abs_entry A_int))) 42))
-              (Z.mul 2 (max_abs_coeff charpoly_of_A_int)))
-       crt_product_710.
-Proof. vm_compute. reflexivity. Qed.
-
-(* TODO: close fl_eq_flint using char_poly_mod_sound +
-   all_primes_divide_product + small_multiple_zero +
-   charpoly_coeff_bound + crt_bound_sufficient.
-   All infrastructure exists; needs per-coefficient wiring. *)
-(* Per-prime modular agreement: axiomatized here, provable by
-   char_poly_mod_sound + char_poly_int_agrees_710 + fermat_Z.
-   Each verification takes ~0.65s per prime (vm_compute), ~8 min total. *)
-Axiom per_prime_agreement : forall (p : Uint63.int),
-  In p crt_primes_all -> List.map (Z_to_mod63 p) (char_poly_int A_int) =
-  List.map (Z_to_mod63 p) charpoly_of_A_int.
-Axiom length_char_poly_int_A :
-  @Logic.eq nat (length (char_poly_int A_int)) 43%nat.
-
-Lemma fl_eq_flint : char_poly_int A_int = charpoly_of_A_int.
-Proof.
-  admit.
-Admitted.
-Lemma matrix_identity_Z : mscale D_M2 (mmul M1_int A_int) = mscale (Z.mul D_M1 D_A) M2_int.
-Proof. Admitted.
+(* fl_eq_flint, matrix_identity_Z, length_char_poly_int_A
+   are now proved in CRTLift.v (imported above).
+   CRTLift.v has no MathComp imports, avoiding scope issues. *)
 
 (* ================================================================ *)
 (*  Helpers                                                            *)
