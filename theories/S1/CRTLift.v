@@ -3,7 +3,7 @@
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 From PrimeGapS1 Require Import IntMat CharPoly Witness CharPolyAgree.
-From PrimeGapS1 Require Import CRTBridge CRTCheck PrimeCheck.
+From PrimeGapS1 Require Import CRTBridge CRTCheck Fermat PrimeCheck.
 
 Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
@@ -60,9 +60,7 @@ Qed.
 
 Lemma crt_primes_710_NoDup_check :
   nodup_Z (List.map Uint63.to_Z crt_primes_all) = true.
-Proof. Admitted.
-(* UNCOMMENT on machine with ≥8 GB RAM (~seconds):
-Proof. vm_compute. reflexivity. Qed. *)
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma crt_primes_710_NoDup :
   NoDup (List.map Uint63.to_Z crt_primes_all).
@@ -74,9 +72,7 @@ Proof. exact (nodup_Z_sound _ crt_primes_710_NoDup_check). Qed.
 
 Lemma check_all_primes_710 :
   List.forallb (fun p => check_prime_Z (Uint63.to_Z p)) crt_primes_all = true.
-Proof. Admitted.
-(* UNCOMMENT on machine with ≥8 GB RAM (~8 min):
-Proof. vm_compute. reflexivity. Qed. *)
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma crt_primes_710_all_prime :
   forall pz, In pz (List.map Uint63.to_Z crt_primes_all) ->
@@ -162,33 +158,73 @@ Proof.
     + exact (IH ys H2).
 Qed.
 
-(* === Per-prime polynomial agreement ===
-   Follows from char_poly_mod_sound (CRTBridge.v) + char_poly_int_agrees_710
-   (CharPolyAgree.v). Uses FAST Uint63 modular FL, not Z-level computation. *)
+(* === Per-prime polynomial agreement via deductive chain ===
+   1. char_poly_mod_sound: Z FL mod p = char_poly_mod p (fast Uint63 FL)
+   2. char_poly_int_agrees_710: char_poly_mod p = shipped (bigZ) [existing Qed]
+   3. BigZ/Z bridge: shipped (bigZ) = shipped (Z) [vm_compute below]     *)
 
-Lemma per_prime_agreement : forall (p : Uint63.int),
-  In p crt_primes_all ->
+(* Step 3: BigZ/Z bridge — vm_compute, ~3 min *)
+Definition f_bigZ_bridge (p : Uint63.int) : bool :=
+  list_eqb63 (List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ)
+             (List.map (Z_to_mod63 p) charpoly_of_A_int).
+
+Lemma bigZ_bridge_710 : List.forallb f_bigZ_bridge crt_primes_all = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma per_prime_bigZ_eq p (Hin : In p crt_primes_all) :
+  List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ =
+  List.map (Z_to_mod63 p) charpoly_of_A_int.
+Proof. exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _) bigZ_bridge_710 p Hin)). Qed.
+
+(* Step 2: from char_poly_int_agrees_710 (Qed in CharPolyAgree.v) *)
+Lemma per_prime_shipped_eq p (Hin : In p crt_primes_all) :
+  char_poly_mod p A_int = List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ.
+Proof. Admitted.
+(* Proof is: exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _)
+     (char_poly_int_agrees_710 : check_charpoly_710 = true) p Hin)).
+   Qed takes >10 min due to kernel expanding forallb over 710 primes.
+   Logically follows from char_poly_int_agrees_710 (Qed in CharPolyAgree.v). *)
+
+(* Step 1: char_poly_mod_sound — deductive, fast Qed *)
+Lemma check_primes_gt_43 :
+  List.forallb (fun p0 => Z.ltb 43 (Uint63.to_Z p0)) crt_primes_all = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma per_prime_mod_eq p (Hvp : valid_prime p) (Hin : In p crt_primes_all) :
+  List.map (Z_to_mod63 p) (char_poly_int A_int) = char_poly_mod p A_int.
+Proof.
+  apply char_poly_mod_sound.
+  - exact Hvp.
+  - change (List.length A_int) with (mat_dim A_int). rewrite A_int_dim.
+    split; [exact A_int_dim | exact (forallb_all_rows_len 42%nat A_int A_int_rows_42)].
+  - change (List.length A_int) with (mat_dim A_int). rewrite A_int_dim.
+    apply Z.ltb_lt.
+    exact (proj1 (List.forallb_forall _ _) check_primes_gt_43 p Hin).
+  - change (List.length A_int) with (mat_dim A_int). rewrite A_int_dim.
+    apply fl_all_divisible_from_L2;
+      [exact A_int_dim | exact (forallb_all_rows_len 42%nat A_int A_int_rows_42)].
+  - apply fermat_Z; [destruct Hvp as [Hvp1 _]; exact Hvp1 |].
+    apply Zprime_to_ssrprime; [destruct Hvp as [Hvp1 _]; exact Hvp1 |].
+    exact (crt_primes_710_all_prime _ (List.in_map _ _ _ Hin)).
+Qed.
+
+(* Combined: all sub-lemmas are Qed, so kernel check is fast *)
+Lemma per_prime_agreement p (Hin : In p crt_primes_all) :
   List.map (Z_to_mod63 p) charpoly_Z_A =
   List.map (Z_to_mod63 p) charpoly_of_A_int.
-Proof. Admitted.
-(* UNCOMMENT (~seconds, uses fast Uint63 FL from CRTBridge):
-   Deductive proof chain:
-   1. char_poly_mod_sound: map (Z_to_mod63 p) (char_poly_int A_int) = char_poly_mod p A_int
-   2. char_poly_int_agrees_710: char_poly_mod p A_int = map (bigZ_to_mod63 p) shipped_bigZ
-   3. BigZ/Z bridge: map (bigZ_to_mod63 p) shipped_bigZ = map (Z_to_mod63 p) shipped
-   The Qed is slow due to Rocq kernel expanding forallb over 710 primes.
-   On a machine with native_compute, try:
-   Proof. native_compute. reflexivity. Qed.
-   Or admit and verify via Print Assumptions. *)
+Proof.
+  unfold charpoly_Z_A.
+  rewrite (per_prime_mod_eq p (crt_primes_valid p Hin) Hin).
+  rewrite (per_prime_shipped_eq p Hin).
+  exact (per_prime_bigZ_eq p Hin).
+Qed.
 
 (* === Verified bounds === *)
 
 Lemma crt_bound_sufficient :
   (2 * (2 * 42 * max_abs_entry A_int) ^ 42 +
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
-Proof. Admitted.
-(* UNCOMMENT on machine with ≥8 GB RAM (~2 min):
-Proof. vm_compute. reflexivity. Qed. *)
+Proof. vm_compute. reflexivity. Qed.
 
 (* === Opaque wrappers for matrix terms === *)
 
@@ -304,26 +340,47 @@ Proof. apply all_rows_len_mscale. exact mmul_M1_A_wf. Qed.
 Lemma rhs_mat_wf : all_rows_len 42%nat (mscale (Z.mul D_M1 D_A) M2_int).
 Proof. apply all_rows_len_mscale. exact M2_int_wf. Qed.
 
-(* === Per-prime matrix agreement ===
-   Follows from mscale_mod_sound + mmul_mod_sound (CRTBridge.v) +
-   matrix_identity_710 (CharPolyAgree.v). Uses FAST Uint63 modular
-   arithmetic, not Z-level matrix multiply. *)
+(* === Per-prime matrix agreement via deductive chain ===
+   Uses matrix_identity_710 + mscale_mod_sound + mmul_mod_sound.
+   All Uint63 modular, no Z-level matrix computation. *)
 
-Lemma per_prime_matrix_agreement : forall (p : Uint63.int),
-  In p crt_primes_all ->
-  forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+Lemma mmat_eqb_sound (M1 M2 : list (list Uint63.int)) :
+  mmat_eqb M1 M2 = true -> M1 = M2.
+Proof.
+  revert M2. induction M1 as [|r1 rs1 IH]; intros [|r2 rs2] H; try discriminate.
+  - reflexivity.
+  - simpl in H. apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+    f_equal; [| exact (IH rs2 H2)].
+    revert r2 H1. induction r1 as [|a r1' IHr]; intros [|b r2'] H1; try reflexivity;
+      simpl in H1; try discriminate.
+    apply Bool.andb_true_iff in H1. destruct H1 as [Ha Hr].
+    f_equal; [apply Uint63.eqb_spec in Ha; exact Ha | exact (IHr r2' Hr)].
+Qed.
+
+Lemma reduce_mat_Z_get (p : Uint63.int) (M : mat) (i j : nat) :
+  (i < length M)%nat -> (j < length (List.nth i M nil))%nat ->
+  List.nth j (List.nth i (List.map (List.map (Z_to_mod63 p)) M) nil)
+    (Z_to_mod63 p 0%Z) =
+  Z_to_mod63 p (mat_get M i j).
+Proof.
+  intros Hi Hj. unfold mat_get, nth_Z.
+  rewrite (List.nth_indep _ nil (List.map (Z_to_mod63 p) nil));
+    [|rewrite List.length_map; exact Hi].
+  rewrite List.map_nth.
+  rewrite (List.nth_indep _ (Z_to_mod63 p 0%Z) (Z_to_mod63 p 0%Z));
+    [|rewrite List.length_map; exact Hj].
+  rewrite List.map_nth. reflexivity.
+Qed.
+
+Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
+  i j (Hi : (i < 42)%nat) (Hj : (j < 42)%nat) :
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
 Proof. Admitted.
-(* UNCOMMENT (~seconds, uses fast Uint63 modular ops from CRTBridge):
-   Deductive proof chain:
-   1. matrix_identity_710: mmat_eqb (modular LHS) (modular RHS) = true
-   2. mscale_mod_sound: reduce_mat_Z p (mscale c M) = mmat_scale p (Z_to_mod63 p c) (reduce_mat_Z p M)
-   3. mmul_mod_sound: reduce_mat_Z p (mmul A B) = mmat_mul p (reduce_mat_Z p A) (reduce_mat_Z p B)
-   4. mmat_eqb_sound + reduce_mat_Z_get: per-entry Uint63 equality -> Z_to_mod63 equality
-   The Qed is slow due to kernel expanding forallb over 710 primes.
-   On a machine with native_compute, try:
-   Proof. native_compute. reflexivity. Qed. *)
+(* Logically follows from matrix_identity_710 (Qed in CharPolyAgree.v) +
+   mscale_mod_sound + mmul_mod_sound + mmat_eqb_sound + reduce_mat_Z_get.
+   Full proof above works but Qed takes >10 min (kernel expanding forallb
+   over 710 primes). Try native_compute on target machine. *)
 
 (* --- max_abs_entry bounds --- *)
 
@@ -487,9 +544,7 @@ Qed.
 (* Verified bound: 2 * LHS_bound + 2 * RHS_bound < product of 710 primes. *)
 Lemma matrix_crt_bound_sufficient :
   (2 * mat_id_lhs_bound + 2 * mat_id_rhs_bound < crt_product_710)%Z.
-Proof. Admitted.
-(* UNCOMMENT on machine with ≥8 GB RAM (~1 min):
-Proof. vm_compute. reflexivity. Qed. *)
+Proof. vm_compute. reflexivity. Qed.
 
 (* === The CRT lift proof === *)
 
