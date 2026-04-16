@@ -112,7 +112,35 @@ Lemma fl_crt_bound :
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
 Proof. apply Z.ltb_lt. vm_compute. reflexivity. Qed.
 
-(* Generic FL loop bound (induction on fl_loop structure) *)
+(* --- Matrix operation bounds (simple, provable from entry-level reasoning) --- *)
+
+Lemma max_abs_entry_madd_le (A B : mat) (n : nat) :
+  mat_dim A = n -> mat_dim B = n -> all_rows_len n A -> all_rows_len n B ->
+  (max_abs_entry (madd A B) <= max_abs_entry A + max_abs_entry B)%Z.
+Proof. Admitted. (* ~25 lines: induction on rows, per-entry Z.abs_triangle *)
+
+Lemma max_abs_entry_mscale_le (c : Z) (M : mat) :
+  (max_abs_entry (mscale c M) <= Z.abs c * max_abs_entry M)%Z.
+Proof. Admitted. (* ~15 lines: per-entry Z.abs_mul *)
+
+Lemma max_abs_entry_mmul_le (A B : mat) (n : nat) :
+  mat_dim A = n -> mat_dim B = n -> all_rows_len n A -> all_rows_len n B ->
+  (max_abs_entry (mmul A B) <= Z.of_nat n * max_abs_entry A * max_abs_entry B)%Z.
+Proof. Admitted. (* ~20 lines: per-entry dot_int_bound + max_abs_entry_get *)
+
+Lemma max_abs_entry_meye_le (n : nat) : (max_abs_entry (meye n) <= 1)%Z.
+Proof. Admitted. (* ~10 lines: entries are 0 or 1 *)
+
+Lemma abs_mtrace_le (M : mat) (n : nat) :
+  mat_dim M = n -> all_rows_len n M ->
+  (Z.abs (mtrace M) <= Z.of_nat n * max_abs_entry M)%Z.
+Proof. Admitted. (* ~15 lines: triangle inequality on diagonal entries *)
+
+Lemma max_abs_entry_mzero (n : nat) : max_abs_entry (mzero n) = 0%Z.
+Proof. Admitted. (* ~5 lines: all entries are 0 *)
+
+(* --- FL loop induction --- *)
+
 Lemma fl_loop_coeff_bound (steps : nat) (k : Z) (A I_n M_prev : mat)
   (c_prev : Z) (acc : list Z) (n : nat) (B E_prev C_prev max_c : Z) :
   mat_dim A = n -> all_rows_len n A ->
@@ -120,27 +148,27 @@ Lemma fl_loop_coeff_bound (steps : nat) (k : Z) (A I_n M_prev : mat)
   mat_dim M_prev = n -> all_rows_len n M_prev ->
   (0 < k)%Z ->
   (max_abs_entry A <= B)%Z -> (0 <= B)%Z ->
-  (max_abs_entry M_prev <= E_prev)%Z ->
+  (max_abs_entry M_prev <= E_prev)%Z -> (0 <= E_prev)%Z ->
   (Z.abs c_prev <= C_prev)%Z ->
   (forall c, In c acc -> (Z.abs c <= max_c)%Z) ->
+  (0 <= max_c)%Z ->
   forall c, In c (fl_loop steps k A I_n M_prev c_prev acc) ->
   (Z.abs c <= fl_bound_aux steps k (Z.of_nat n) B E_prev C_prev max_c)%Z.
 Proof. Admitted.
-(* ~80 lines: induction on steps. Each step uses:
-   - max_abs_entry(madd (mmul A M_prev) (mscale c_prev I)) <= n*B*E_prev + |c_prev|
-   - |Z.div (Z.opp (mtrace (mmul A M_k))) k| <= n^2*B*E_k / k
-   - Z.max monotonicity for max_c tracking
-   All matrix op bounds are provable from dot_int_bound + max_abs_entry_get. *)
+(* The induction is straightforward: at each step, use the 6 matrix
+   bounds above to show the recurrence invariant is maintained.
+   ~60 lines: IH application + 6 bound lemma applications per step. *)
 
-(* Assembly: FL coefficients bounded => CRT lift works *)
+(* --- Assembly: FL coefficients bounded --- *)
+
 Lemma charpoly_coeff_bound : forall k,
   (k < 43)%nat ->
   (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
    fl_coeff_bound 42 (max_abs_entry A_int))%Z.
 Proof. Admitted.
-(* ~30 lines: unfold char_poly_int, use fl_loop_coeff_bound with
-   A=A_int, I_n=meye 42, M_prev=mzero 42, c_prev=1, acc=[].
-   Leading coefficient (k=42) is 1, handled separately. *)
+(* ~30 lines: unfold char_poly_int A_int = fl_loop 42 1 A_int (meye 42) (mzero 42) 1 [] ++ [1].
+   For k < 42: extract from fl_loop via fl_loop_coeff_bound.
+   For k = 42: the leading coefficient is 1, bounded by fl_coeff_bound. *)
 
 (* ================================================================ *)
 (*  Section: CRT prime infrastructure                                  *)
