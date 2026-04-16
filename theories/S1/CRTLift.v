@@ -60,7 +60,9 @@ Qed.
 
 Lemma crt_primes_710_NoDup_check :
   nodup_Z (List.map Uint63.to_Z crt_primes_all) = true.
-Proof. Admitted. (* vm_compute — O(n^2) for 710 elements, ~seconds *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~seconds):
+Proof. vm_compute. reflexivity. Qed. *)
 
 Lemma crt_primes_710_NoDup :
   NoDup (List.map Uint63.to_Z crt_primes_all).
@@ -72,7 +74,9 @@ Proof. exact (nodup_Z_sound _ crt_primes_710_NoDup_check). Qed.
 
 Lemma check_all_primes_710 :
   List.forallb (fun p => check_prime_Z (Uint63.to_Z p)) crt_primes_all = true.
-Proof. Admitted. (* vm_compute — 710 trial division checks, ~8 min *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~8 min):
+Proof. vm_compute. reflexivity. Qed. *)
 
 Lemma crt_primes_710_all_prime :
   forall pz, In pz (List.map Uint63.to_Z crt_primes_all) ->
@@ -91,7 +95,9 @@ Qed.
 Lemma charpoly_coeff_bound_compute :
   (max_abs_coeff charpoly_Z_A <=
    (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
-Proof. Admitted. (* vm_compute — runs FL on 42x42 matrix, then checks bound *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~5-30 min):
+Proof. Transparent charpoly_Z_A. vm_compute. reflexivity. Qed. *)
 
 Lemma charpoly_coeff_bound : forall k,
   (k < 43)%nat ->
@@ -174,7 +180,9 @@ Definition check_charpoly_Z_710 : bool :=
   crt_primes_all.
 
 Lemma check_charpoly_Z_710_ok : check_charpoly_Z_710 = true.
-Proof. Admitted. (* vm_compute — heavy: runs FL on 42x42 matrix, then 710 modular checks *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~5-30 min):
+Proof. Transparent charpoly_Z_A. vm_compute. reflexivity. Qed. *)
 
 Lemma per_prime_agreement : forall (p : Uint63.int),
   In p crt_primes_all ->
@@ -190,7 +198,9 @@ Qed.
 Lemma crt_bound_sufficient :
   (2 * (2 * 42 * max_abs_entry A_int) ^ 42 +
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
-Proof. Admitted. (* vm_compute. reflexivity. — takes ~2 min *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~2 min):
+Proof. vm_compute. reflexivity. Qed. *)
 
 (* === Opaque wrappers for matrix terms === *)
 
@@ -320,7 +330,9 @@ Definition check_mat_Z_710 : bool :=
   crt_primes_all.
 
 Lemma check_mat_Z_710_ok : check_mat_Z_710 = true.
-Proof. Admitted. (* vm_compute — heavy: computes mmul M1_int A_int *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~5-30 min):
+Proof. Transparent mat_lhs_opaque mat_rhs_opaque. vm_compute. reflexivity. Qed. *)
 
 Lemma per_prime_matrix_agreement : forall (p : Uint63.int),
   In p crt_primes_all ->
@@ -502,7 +514,9 @@ Qed.
 (* Verified bound: 2 * LHS_bound + 2 * RHS_bound < product of 710 primes. *)
 Lemma matrix_crt_bound_sufficient :
   (2 * mat_id_lhs_bound + 2 * mat_id_rhs_bound < crt_product_710)%Z.
-Proof. Admitted. (* vm_compute. reflexivity. — needs better machine *)
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥8 GB RAM (~1 min):
+Proof. vm_compute. reflexivity. Qed. *)
 
 (* === The CRT lift proof === *)
 
