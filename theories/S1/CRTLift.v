@@ -136,8 +136,56 @@ Lemma abs_mtrace_le (M : mat) (n : nat) :
   (Z.abs (mtrace M) <= Z.of_nat n * max_abs_entry M)%Z.
 Proof. Admitted. (* ~15 lines: triangle inequality on diagonal entries *)
 
+Lemma fold_left_zmax_le (l : list Z) (acc B : Z) :
+  (acc <= B)%Z -> (forall x, In x l -> (Z.abs x <= B)%Z) ->
+  (List.fold_left (fun a x => Z.max a (Z.abs x)) l acc <= B)%Z.
+Proof.
+  revert acc. induction l as [|x l IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
+  apply IH; [|intros y Hy; exact (Hall y (or_intror Hy))].
+  pose proof (Hall x (or_introl eq_refl)). lia.
+Qed.
+
+Lemma fold_left_zmax_outer_le (M : mat) (acc B : Z) :
+  (acc <= B)%Z ->
+  (forall row, In row M -> forall x, In x row -> (Z.abs x <= B)%Z) ->
+  (List.fold_left (fun a row =>
+    List.fold_left (fun a2 x => Z.max a2 (Z.abs x)) row a) M acc <= B)%Z.
+Proof.
+  revert acc. induction M as [|r M IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
+  apply IH; [|intros row Hr x Hx; exact (Hall row (or_intror Hr) x Hx)].
+  apply fold_left_zmax_le; [exact Hacc|exact (Hall r (or_introl eq_refl))].
+Qed.
+
+Lemma max_abs_entry_le_bound (M : mat) (B : Z) :
+  (0 <= B)%Z ->
+  (forall i j, (i < length M)%nat -> (j < length (List.nth i M nil))%nat ->
+    (Z.abs (mat_get M i j) <= B)%Z) ->
+  (max_abs_entry M <= B)%Z.
+Proof.
+  intros HB Hentry. unfold max_abs_entry.
+  apply fold_left_zmax_outer_le; [lia|].
+  intros row Hrow x Hx.
+  apply List.In_nth with (d := nil) in Hrow. destruct Hrow as [i [Hi Hri]].
+  apply List.In_nth with (d := 0%Z) in Hx. destruct Hx as [j [Hj Hxj]].
+  subst. exact (Hentry i j Hi Hj).
+Qed.
+
+Lemma fold_left_zmax_zrow_0 (n : nat) :
+  List.fold_left (fun (a : Z) (x : Z) => Z.max a (Z.abs x)) (zrow n) 0%Z = 0%Z.
+Proof.
+  induction n as [|k IH]; [reflexivity|].
+  simpl zrow. simpl fold_left. replace (Z.max 0 0) with 0%Z by lia. exact IH.
+Qed.
+
+Lemma max_abs_entry_mzero_aux (r c : nat) :
+  max_abs_entry (mzero_aux r c) = 0%Z.
+Proof.
+  unfold max_abs_entry. induction r as [|k IH]; [reflexivity|].
+  simpl mzero_aux. simpl fold_left. rewrite fold_left_zmax_zrow_0. exact IH.
+Qed.
+
 Lemma max_abs_entry_mzero (n : nat) : max_abs_entry (mzero n) = 0%Z.
-Proof. Admitted. (* ~5 lines: all entries are 0 *)
+Proof. exact (max_abs_entry_mzero_aux n n). Qed.
 
 (* --- FL loop induction --- *)
 
