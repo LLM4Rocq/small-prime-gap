@@ -92,6 +92,25 @@ Qed.
    Provable in ~200 lines from MathComp det_expand + triangle inequality.
    For now we state it as an axiom — the only axiom in the project.
    The concrete bound is verified computationally by crt_bound_sufficient. *)
+(* WITH native_compute (uncomment on target machine):
+Lemma charpoly_coeff_bound_compute :
+  (max_abs_coeff charpoly_Z_A <=
+   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+Proof. Transparent charpoly_Z_A. native_compute. reflexivity. Qed.
+
+Lemma charpoly_coeff_bound : forall k,
+  (k < 43)%nat ->
+  (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
+   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+Proof.
+  intros k Hk.
+  apply Z.le_trans with (max_abs_coeff charpoly_Z_A).
+  - apply max_abs_coeff_bound. apply List.nth_In.
+    rewrite length_charpoly_Z_A. exact Hk.
+  - exact charpoly_coeff_bound_compute.
+Qed.
+*)
+(* WITHOUT native_compute (remove when above is uncommented): *)
 Axiom charpoly_coeff_bound : forall k,
   (k < 43)%nat ->
   (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
@@ -180,10 +199,7 @@ Proof. exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _) bigZ_bridge_
 Lemma per_prime_shipped_eq p (Hin : In p crt_primes_all) :
   char_poly_mod p A_int = List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ.
 Proof. Admitted.
-(* Proof is: exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _)
-     (char_poly_int_agrees_710 : check_charpoly_710 = true) p Hin)).
-   Qed takes >10 min due to kernel expanding forallb over 710 primes.
-   Logically follows from char_poly_int_agrees_710 (Qed in CharPolyAgree.v). *)
+(* WITH native_compute: Proof. native_compute. reflexivity. Qed. *)
 
 (* Step 1: char_poly_mod_sound — deductive, fast Qed *)
 Lemma check_primes_gt_43 :
@@ -377,6 +393,8 @@ Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
 Proof. Admitted.
+(* WITH native_compute:
+Proof. Transparent mat_lhs_opaque mat_rhs_opaque. native_compute. reflexivity. Qed. *)
 (* Logically follows from matrix_identity_710 (Qed in CharPolyAgree.v) +
    mscale_mod_sound + mmul_mod_sound + mmat_eqb_sound + reduce_mat_Z_get.
    Full proof above works but Qed takes >10 min (kernel expanding forallb
