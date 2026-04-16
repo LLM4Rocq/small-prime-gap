@@ -13,3 +13,7 @@ Makefile.conf
 *.glob
 *.aux
 *.tar.gz
+
+# Rocq cache files
+.lia.cache
+.nia.cache
