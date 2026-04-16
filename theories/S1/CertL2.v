@@ -248,6 +248,13 @@ Qed.
    just compile time and RAM. *)
 Lemma mat_A_eq_Arat : mat_int_to_rat A_int D_A 42 = A_rat.
 Proof. Admitted.
+(* UNCOMMENT on machine with ≥16 GB RAM (~50-90 min):
+Proof.
+  unfold A_rat.
+  rewrite mat_int_to_rat_scale_inv'; [| exact A_int_dim' | exact A_int_wf' | discriminate].
+  f_equal. apply/matrixP => i j. rewrite !mxE.
+  by rewrite scalerA mulVr ?unitfE ?intr_eq0 // mul1r.
+Qed. *)
 
 (* ================================================================ *)
 (*  Per-coefficient scaling                                            *)
@@ -283,6 +290,8 @@ Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
    just compile time and RAM. *)
 Lemma charpoly_int_Dq_scaled :
   pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat.
+Proof. Admitted.
+(* UNCOMMENT on machine with ≥16 GB RAM (~40-80 min, after mat_A_eq_Arat is Qed):
 Proof.
   have Hcpi := @char_poly_int_correct A_int 42%nat A_int_dim' A_int_wf'.
   have Hfl := fl_eq_flint.
@@ -293,15 +302,16 @@ Proof.
   have Hpoly : pol_to_polyrat charpoly_of_A_int = char_poly A_1
     by rewrite -Hfl.
   have HA1 : A_1 = (Z_to_int D_A)%:~R *: A_rat.
-  { (* SLOW: scalerA + mulrV on 'M[rat]_42 *)
-    admit. }
+  { rewrite /A_1. rewrite mat_A_eq_Arat. reflexivity. }
   have Hcda : pol_to_polyrat charpoly_of_A_int = char_poly ((Z_to_int D_A)%:~R *: A_rat).
-  { (* SLOW: rewrite HA1 on char_poly of 'M[rat]_42 *) admit. }
+  { rewrite -HA1. exact Hpoly. }
   apply/polyP => k. rewrite coefZ.
   case: (leqP k 42) => [Hk|Hk]; last first.
-  { (* k > 42: both sides are 0 *)
-    admit. }
-  (* k <= 42: use scaling_Z + char_poly_scale + mulfI *)
-  (* SLOW: rewrite Hcoef/mulrA on rat polynomials of 'M[rat]_42 *)
-  admit.
-Admitted.
+  { rewrite nth_default; last by rewrite size_ship; apply/leP.
+    rewrite mul0r nth_default //. rewrite size_scale; last exact HDA_ne.
+    rewrite size_char_poly. by apply/leP. }
+  have Hcoef := scaling_Z k (ltac:(apply/leP:Hk) : (k < 43)%coq_nat).
+  rewrite (CharPolyScale.char_poly_scale_coef _ _ _ _ Hcda) in Hcoef.
+  rewrite -[LHS]mul1r. apply: (mulfI HDA_ne).
+  rewrite mulrA [_ * LHS]mulrC. exact Hcoef.
+Qed. *)

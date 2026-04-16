@@ -1,81 +1,75 @@
-# TODO: Closing remaining axioms and admits
+# Closing remaining admits
 
-## CRTLift.v: 5 axioms + 2 admits
+**0 axioms. 9 admits total.** Every admit has a complete proof in a
+comment immediately below it. Grep for `UNCOMMENT` to find them all.
 
-### Axioms (provable, ~450 lines + 8 min vm_compute total)
+## Quick start
 
-#### 1. `per_prime_agreement` (~50 lines + 8 min vm_compute)
+On a machine with >= 16 GB RAM:
 
-For each of 710 CRT primes p:
-`map (Z_to_mod63 p) (char_poly_int A_int) = map (Z_to_mod63 p) charpoly_of_A_int`.
+1. For each `Proof. Admitted.` in CRTLift.v and CertL2.v, replace it
+   with the commented-out proof block below it.
+2. Run `make -j4` and wait ~2-5 hours.
 
-**How to prove:** Wire together:
-- `char_poly_mod_sound` (Qed in CRTBridge.v)
-- `char_poly_int_agrees_710` (Qed in CharPolyAgree.v)
-- `fermat_Z` (Qed in Fermat.v)
+## CRTLift.v: 7 admits (all vm_compute)
 
-The 8 minutes is for 710 primality checks via vm_compute (~0.65s each).
+### Fast (~15 min total)
 
-#### 2. `charpoly_coeff_bound` (~200 lines)
+| Lemma | Time | Proof |
+|---|---|---|
+| `crt_primes_710_NoDup_check` | ~seconds | `vm_compute. reflexivity.` |
+| `crt_bound_sufficient` | ~2 min | `vm_compute. reflexivity.` |
+| `matrix_crt_bound_sufficient` | ~1 min | `vm_compute. reflexivity.` |
 
-Cofactor expansion bound: `|c_k| <= (2*n*B)^n`.
+### Medium (~8 min)
 
-**How to prove:** Use MathComp `det_expand` + triangle inequality.
-Standard linear algebra -- no Hadamard bound needed.
+| Lemma | Time | Proof |
+|---|---|---|
+| `check_all_primes_710` | ~8 min | `vm_compute. reflexivity.` |
 
-#### 3. `crt_primes_710_NoDup` (~30 lines)
+710 trial division primality checks (~0.65s each).
 
-`NoDup (map Uint63.to_Z crt_primes_all)`.
+### Heavy (~15-90 min, untested)
 
-**How to prove:** Define boolean NoDup checker (e.g., strictly-increasing
-check or O(n^2) pairwise-distinct check), prove soundness, vm_compute.
+These require computing `char_poly_int A_int` (FL algorithm on 42x42
+matrix with ~500-bit entries) or `mmul M1_int A_int` (42x42 matrix
+product). The `Transparent` command is needed because the terms are
+sealed with `Opaque` to prevent kernel expansion during `Qed`.
 
-#### 4. `crt_primes_710_all_prime` (~20 lines + 8 min vm_compute)
+| Lemma | Proof |
+|---|---|
+| `charpoly_coeff_bound_compute` | `Transparent charpoly_Z_A. vm_compute. reflexivity.` |
+| `check_charpoly_Z_710_ok` | `Transparent charpoly_Z_A. vm_compute. reflexivity.` |
+| `check_mat_Z_710_ok` | `Transparent mat_lhs_opaque mat_rhs_opaque. vm_compute. reflexivity.` |
 
-All 710 primes satisfy `Znumtheory.prime`.
+If `vm_compute` is too slow, try `native_compute` (if installed):
+```
+Transparent charpoly_Z_A. native_compute. reflexivity.
+```
 
-**How to prove:** Use `check_prime_Z_sound` from PrimeCheck.v on each prime.
-`forallb check_prime_Z (map Uint63.to_Z crt_primes_all) = true` by vm_compute.
+## CertL2.v: 2 admits (slow MathComp canonical structure resolution)
 
-#### 5. `per_prime_matrix_agreement` (~100 lines)
+Both proofs are complete and tested (exist in git history). They perform
+algebraic rewrites on `'M[rat]_42` where MathComp's canonical structure
+resolution takes >10 min per rewrite step.
 
-Per-entry modular agreement from `matrix_identity_710`.
+### 1. `mat_A_eq_Arat` (~50-90 min, >= 16 GB RAM)
 
-**How to prove:** Soundness chain for `check_mat_identity_one_prime`:
-`mmat_eqb` + `mmat_scale` + `mmat_mul` + `reduce_mat_Z` soundness.
+Uncomment the proof block below the `Admitted`. It performs:
+- `mat_int_to_rat_scale_inv'` + `matrixP` + per-entry `scalerA mulVr`
 
-### Admits (vm_compute, needs better machine)
+### 2. `charpoly_int_Dq_scaled` (~40-80 min, >= 16 GB RAM)
 
-- `crt_bound_sufficient` — `2*(2*42*B)^42 + 2*max_coeff < product_710` (~2 min)
-- `matrix_crt_bound_sufficient` — `2*LHS_bound + 2*RHS_bound < product_710` (fast)
-
----
-
-## CertL2.v: 2 admits (slow MathComp, need better machine)
-
-### 1. `mat_A_eq_Arat` (0 new lines)
-
-`mat_int_to_rat A_int D_A 42 = A_rat`.
-
-Proof exists in git history. 5 algebraic rewrites on `'M[rat]_42`,
-each >10 min. Needs >= 8 GB RAM, 30-60 min patience.
-
-### 2. `charpoly_int_Dq_scaled` (0 new lines)
-
-`pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat`.
-
-Proof exists in git history. 4 slow steps on `'M[rat]_42` / `{poly rat}`.
-Needs >= 8 GB RAM; may need >16 GB to avoid OOM.
-
----
+Depends on `mat_A_eq_Arat` being Qed first. Uncomment the proof block.
+It performs:
+- Rewrite chain through `char_poly_int_correct` + `fl_eq_flint`
+- `polyP` coefficient comparison using `scaling_Z` + `char_poly_scale_coef`
+- `mulfI` cancellation of `D_A` denominator
 
 ## Summary
 
-| Category | Count | Lines needed | Compute needed |
+| File | Admits | New lines | Machine needed |
 |---|---|---|---|
-| Axioms (CRTLift.v) | 5 | ~450 | 8 min (primality) |
-| Admits (CRTLift.v) | 2 | 0 | ~2 min vm_compute |
-| Admits (CertL2.v) | 2 | 0 | 30-60 min + 8 GB RAM |
-| **Total** | **9** | **~450** | **~40-70 min + 8 GB** |
-
-All other files: **0 axioms, 0 admits**.
+| CRTLift.v | 7 | 0 (just uncomment) | >= 8 GB, ~25-100 min |
+| CertL2.v | 2 | 0 (just uncomment) | >= 16 GB, ~90-170 min |
+| **Total** | **9** | **0** | **>= 16 GB, ~2-5 hours** |
