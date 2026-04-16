@@ -88,33 +88,59 @@ Qed.
 (*  Section: Charpoly coefficient bound                                *)
 (* ================================================================ *)
 
-(* Cofactor expansion bound: |c_k| <= (2nB)^n for the FL-computed charpoly.
-   Provable in ~200 lines from MathComp det_expand + triangle inequality.
-   For now we state it as an axiom — the only axiom in the project.
-   The concrete bound is verified computationally by crt_bound_sufficient. *)
-(* WITH native_compute (uncomment on target machine):
-Lemma charpoly_coeff_bound_compute :
-  (max_abs_coeff charpoly_Z_A <=
-   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
-Proof. Transparent charpoly_Z_A. native_compute. reflexivity. Qed.
+(* === FL coefficient bound via computable recurrence ===
+   The FL loop computes c_k = -tr(A*M_k)/k. We bound |c_k| by tracking
+   max_abs_entry(M_k) and |c_k| through the recurrence. The bound is
+   COMPUTABLE from (n, B), so we check it against the CRT product by
+   vm_compute — no MathComp det theory needed. *)
 
+Fixpoint fl_bound_aux (remaining : nat) (k n B E_prev C_prev max_c : Z) : Z :=
+  match remaining with
+  | O => max_c
+  | S s =>
+    let E_k := (n * B * E_prev + Z.abs C_prev)%Z in
+    let C_k := Z.div (n * n * B * E_k) k in
+    fl_bound_aux s (k + 1) n B E_k C_k (Z.max max_c (Z.abs C_k))
+  end.
+
+Definition fl_coeff_bound (sz : nat) (B : Z) : Z :=
+  fl_bound_aux sz 1 (Z.of_nat sz) B 0 1 1.
+
+(* FL bound fits within CRT product — vm_compute, ~2 min *)
+Lemma fl_crt_bound :
+  (2 * fl_coeff_bound 42 (max_abs_entry A_int) +
+   2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
+Proof. apply Z.ltb_lt. vm_compute. reflexivity. Qed.
+
+(* Generic FL loop bound (induction on fl_loop structure) *)
+Lemma fl_loop_coeff_bound (steps : nat) (k : Z) (A I_n M_prev : mat)
+  (c_prev : Z) (acc : list Z) (n : nat) (B E_prev C_prev max_c : Z) :
+  mat_dim A = n -> all_rows_len n A ->
+  I_n = meye n ->
+  mat_dim M_prev = n -> all_rows_len n M_prev ->
+  (0 < k)%Z ->
+  (max_abs_entry A <= B)%Z -> (0 <= B)%Z ->
+  (max_abs_entry M_prev <= E_prev)%Z ->
+  (Z.abs c_prev <= C_prev)%Z ->
+  (forall c, In c acc -> (Z.abs c <= max_c)%Z) ->
+  forall c, In c (fl_loop steps k A I_n M_prev c_prev acc) ->
+  (Z.abs c <= fl_bound_aux steps k (Z.of_nat n) B E_prev C_prev max_c)%Z.
+Proof. Admitted.
+(* ~80 lines: induction on steps. Each step uses:
+   - max_abs_entry(madd (mmul A M_prev) (mscale c_prev I)) <= n*B*E_prev + |c_prev|
+   - |Z.div (Z.opp (mtrace (mmul A M_k))) k| <= n^2*B*E_k / k
+   - Z.max monotonicity for max_c tracking
+   All matrix op bounds are provable from dot_int_bound + max_abs_entry_get. *)
+
+(* Assembly: FL coefficients bounded => CRT lift works *)
 Lemma charpoly_coeff_bound : forall k,
   (k < 43)%nat ->
   (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
-   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
-Proof.
-  intros k Hk.
-  apply Z.le_trans with (max_abs_coeff charpoly_Z_A).
-  - apply max_abs_coeff_bound. apply List.nth_In.
-    rewrite length_charpoly_Z_A. exact Hk.
-  - exact charpoly_coeff_bound_compute.
-Qed.
-*)
-(* WITHOUT native_compute (remove when above is uncommented): *)
-Axiom charpoly_coeff_bound : forall k,
-  (k < 43)%nat ->
-  (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
-   (2 * 42 * max_abs_entry A_int) ^ 42)%Z.
+   fl_coeff_bound 42 (max_abs_entry A_int))%Z.
+Proof. Admitted.
+(* ~30 lines: unfold char_poly_int, use fl_loop_coeff_bound with
+   A=A_int, I_n=meye 42, M_prev=mzero 42, c_prev=1, acc=[].
+   Leading coefficient (k=42) is 1, handled separately. *)
 
 (* ================================================================ *)
 (*  Section: CRT prime infrastructure                                  *)
@@ -229,7 +255,9 @@ Lemma per_prime_agreement p (Hin : In p crt_primes_all) :
   List.map (Z_to_mod63 p) charpoly_Z_A =
   List.map (Z_to_mod63 p) charpoly_of_A_int.
 Proof.
+  Transparent charpoly_Z_A.
   unfold charpoly_Z_A.
+  Opaque charpoly_Z_A.
   rewrite (per_prime_mod_eq p (crt_primes_valid p Hin) Hin).
   rewrite (per_prime_shipped_eq p Hin).
   exact (per_prime_bigZ_eq p Hin).
@@ -238,9 +266,9 @@ Qed.
 (* === Verified bounds === *)
 
 Lemma crt_bound_sufficient :
-  (2 * (2 * 42 * max_abs_entry A_int) ^ 42 +
+  (2 * fl_coeff_bound 42 (max_abs_entry A_int) +
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. exact fl_crt_bound. Qed.
 
 (* === Opaque wrappers for matrix terms === *)
 
@@ -303,7 +331,7 @@ Proof.
   { exact crt_product_710_pos. }
   { apply Z.le_lt_trans with (2 * Z.abs a + 2 * Z.abs b)%Z.
     { pose proof (Z.abs_triangle a (-b)). rewrite Z.abs_opp in H. lia. }
-    apply Z.le_lt_trans with (2 * (2 * 42 * max_abs_entry A_int) ^ 42 +
+    apply Z.le_lt_trans with (2 * fl_coeff_bound 42 (max_abs_entry A_int) +
                                 2 * max_abs_coeff charpoly_of_A_int)%Z.
     { apply Z.add_le_mono.
       { apply Z.mul_le_mono_nonneg_l; [lia|]. exact (charpoly_coeff_bound n Hn). }
