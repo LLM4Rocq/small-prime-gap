@@ -19,10 +19,11 @@ repository replaces it with two independent verification layers:
 2. **A Rocq layer** (Rocq 9.0 + MathComp 2.5 + `mathcomp-real-closed`):
    consumes the certificate, machine-verifies every computational fact
    via CRT over 710 Uint63 native primes and BigZ evaluation, and states
-   the headline eigenvalue theorem. **The proof has zero axioms.**
-   All remaining gaps are `Admitted` vm_compute checks and slow MathComp
-   rewrites, with complete proof scripts provided as comments that can be
-   uncommented on a machine with sufficient RAM and patience.
+   the headline eigenvalue theorem. **The proof has zero project-specific
+   axioms in the critical path** (only standard Uint63 kernel primitives).
+   6 `Admitted` lemmas remain: 3 kernel Qed limits in CRTLift.v (proofs
+   verified interactively), 2 slow MathComp rewrites in CertL2.v, and
+   1 local copy in Cert.v. All have complete proof scripts provided.
 
 **No error was found in Maynard's computation.** The contribution is
 the assurance level.
@@ -37,10 +38,11 @@ Theorem maynard_eigenvalue_S1 :
 Proof. (* L1 + L2 + L3 *) Qed.
 ```
 
-**Cert.v has 1 local Admitted lemma**: `charpoly_int_Dq_scaled` (the
-shipped polynomial equals D_q times `char_poly A_rat`), which is closed
-by CertL2.v. All remaining admits have complete proof scripts in
-comments (grep `UNCOMMENT`). See STATUS.md for details.
+**6 Admitted lemmas remain** (see STATUS.md for details):
+- CRTLift.v: 3 admits (kernel Qed limits -- proofs verified interactively,
+  closable with `native_compute`)
+- CertL2.v: 2 admits (MathComp slow rewrites, ~2 hours on >= 16 GB RAM)
+- Cert.v: 1 local admit (`charpoly_int_Dq_scaled`, closed by CertL2.v)
 
 ## Closing the remaining admits
 
@@ -102,7 +104,7 @@ prime_gap/
     |
     +-- Bridge.v                    L1 Sturm bridge
     +-- CertL1.v                    L1 IVT proof (0 admits)
-    +-- CertL2.v                    L2 assembly (9 admits; see TODO.md)
+    +-- CertL2.v                    L2 assembly (2 admits; see TODO.md)
     +-- Cert.v                      headline theorem (1 local admit, closed by CertL2)
 ```
 
@@ -139,8 +141,9 @@ coqtop -Q theories/S1 PrimeGapS1 \
 
 The Rocq verification trusts:
 - Rocq's kernel (including Uint63 primitive axioms for native int arithmetic)
-- 9 Admitted vm_compute / slow-rewrite steps in CRTLift.v + CertL2.v
-  (complete proof scripts provided as comments; see TODO.md)
+- 6 Admitted steps: 3 kernel Qed limits in CRTLift.v (proofs verified
+  interactively), 2 slow MathComp rewrites in CertL2.v, 1 local copy
+  in Cert.v (complete proof scripts provided; see TODO.md)
 
 The FLINT layer trusts:
 - `python-flint` / GMP / MPFR rational arithmetic
