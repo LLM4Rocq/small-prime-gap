@@ -1,85 +1,64 @@
-# Closing the remaining admits — Opacity Strategy
+# Closing the remaining admits — Opacity Strategy (in progress)
 
-**Expert insight (translated from French):**
-> "Stop trying to compute expressions with casts going into `rat`. There are
+**Status: 6 of 9 CRTLift admits closed. 3 admits + 2 CertL2 admits + 1 Cert admit remain.**
+
+## Expert insight
+
+> Stop trying to compute expressions with casts going into `rat`. There are
 > proofs in these expressions and reduction gets lost in irrelevant subterms.
 > These casts must be **opaque** and pushed as far **outside** as possible,
-> until we can compute below only with representations suited for that."
+> until we can compute below only with representations suited for that.
 
-## Root cause analysis
+## Investigation findings
 
-`mat_int_to_rat`, `pol_to_polyrat`, `Z_to_int`, and especially MathComp's
-`intr` (int → rat coercion via `%:~R`) are all **transparent**. When the
-kernel encounters expressions like `map_mx (intr : int -> rat) A_int` on
-the concrete 42×42 matrix `A_int`, it tries to normalize each rat entry,
-which involves:
-1. Reducing `intr` applications (transparent in MathComp)
-2. Normalizing `Z_to_int` (transparent in CharPoly.v)
-3. Field axiom resolution on `(_)%:~R / (_)%:~R` divisions
+The core issue is that several MathComp/CharPoly definitions are transparent:
 
-At dimension 42, this is exponential.
+- `intr` (int → rat coercion via `%:~R`): MathComp standard, transparent
+- `Z_to_int`: declared `Opaque` in CertL2.v line 92, but too late
+- `mat_int_to_rat`: transparent everywhere
+- `pol_to_polyrat`: transparent everywhere
+- `fl_bound_aux` (a Fixpoint): transparent — when applied to `42`, kernel
+  unfolds 42 times during conversion, creating exponential-sized terms
+  on symbolic `B = max_abs_entry A_int`
+- `char_poly_int A_int`: when unfolded, the kernel reduces the FL loop
+  on the concrete 42×42 matrix
 
-## Strategy: Opaque + Push Outside
+## Existing well-structured proof in git
 
-### Step 1: Make rat casts opaque locally
+Commit `ad3b1ca` has the FULL proof for `mat_A_eq_Arat` that already
+follows the expert advice (push casts outside via `mat_int_to_rat_scale_inv'`
++ `invmxZ` + `mulKVmx`). It was tested before and takes 50-90 min on
+16 GB RAM — too slow for current hardware.
 
-In CharPoly.v and CertL2.v:
-```coq
-Local Strategy 100 [intr Z_to_int mat_int_to_rat pol_to_polyrat].
-```
-Or use `Opaque` after the proof of equational properties.
+## Attempted strategy (incomplete)
 
-### Step 2: Restructure mat_A_eq_Arat to push casts outside
+1. Add `Local Strategy 1000 [intr Z_to_int]` before slow proofs
+2. Add `Opaque fl_bound_aux fl_coeff_bound` before `charpoly_coeff_bound`
+3. Add bridge lemma `charpoly_Z_A_eq` to avoid `change` triggering kernel reduction
+4. Use existing proof structure from commit ad3b1ca for `mat_A_eq_Arat`
 
-Current:
-```coq
-Lemma mat_A_eq_Arat : mat_int_to_rat A_int D_A 42 = A_rat.
-```
+**Problem**: Each compile attempt takes 30-60+ minutes due to the
+existing vm_compute steps (10+ min) plus the `per_prime_agreement` Qed
+(~35 min on this machine). Iterating on opacity strategies is impractical
+without faster compile times.
 
-The proof rewrites *inside* `'M[rat]_42` (each entry is a division). Better:
-prove a generic lemma about `mat_int_to_rat M D` that doesn't unfold to
-divisions, and apply it once:
-```coq
-Lemma mat_int_to_rat_eq_invD_scale_int (M : mat) (D : Z) (n : nat) :
-  D <> 0%Z ->
-  mat_int_to_rat M D n =
-  (Z_to_int D)%:~R^-1 *: mat_int_to_rat M 1 n.
-```
-This lemma is proved ONCE (generically), then applied to specific A_int.
-The key: the `intr` cast on `D` stays at the OUTSIDE as `^-1 *: ...`,
-not inside each entry.
+## Path forward
 
-### Step 3: Restructure charpoly_int_Dq_scaled
+To close the remaining admits, the practical approach is:
+1. Get a machine with ≥ 16 GB RAM and `native_compute` enabled
+2. For the 2 CertL2 admits: uncomment the proofs from commit `ad3b1ca`
+   (fix the 2 bugs: wrong arg count for `mat_int_to_rat_scale_inv'`,
+   wrong lemma name `char_poly_scale_coef` → `char_poly_scale`)
+3. For the 3 CRTLift admits:
+   - `per_prime_shipped_eq`: replace with `Proof. native_compute. reflexivity. Qed.`
+   - `per_prime_matrix_agreement`: same with `Transparent` first
+   - `charpoly_coeff_bound`: needs the opacity strategy to work
 
-Push the `(Z_to_int D_q)%:~R` scalar OUTSIDE all polynomial operations.
-Use `char_poly_scale` (already Qed in CharPolyScale.v) to extract the
-scalar as a single multiplication, not as a per-coefficient cast.
+## Resources budget
 
-### Step 4: For charpoly_coeff_bound
+On a 60 GB / 16-core machine with native_compute:
+- vm_compute steps: ~5 min total (with native_compute much faster)
+- per_prime_agreement Qed: ~5 min (without rat reduction triggers)
+- 5 CertL2 admits: ~50-90 min total
 
-The Qed hangs because `change charpoly_Z_A with (char_poly_int A_int)`
-forces conversion that triggers `fl_c_rat_is_int` reduction (which
-internally uses MathComp's `map_char_poly` on the rat-lifted matrix).
-
-Fix: avoid `change` entirely. Use only the generic structural lemmas
-`char_poly_int_nth_lt` and `char_poly_int_nth_leading` (already proved).
-Make `fl_all_divisible_from_L2` more opaque — wrap it in a Qed lemma
-specialized to A_int that hides the rat manipulations.
-
-### Step 5: For per_prime_agreement
-
-Same `Transparent/unfold/Opaque` pattern triggers slow conversion.
-Use a similar opacity strategy.
-
-## Implementation order
-
-1. Add opacity declarations in CharPoly.v (local Strategy 100 for intr)
-2. Refactor `mat_A_eq_Arat` to use the generic outside-cast lemma
-3. Refactor `charpoly_int_Dq_scaled` similarly
-4. Refactor `charpoly_coeff_bound` to avoid `change` on charpoly_Z_A
-5. Test each compile incrementally
-
-## Goal
-
-Close all 6 admits (3 in CRTLift.v, 2 in CertL2.v, 1 in Cert.v) on this
-machine. Resource budget: <30 min compile time per proof, <16 GB RAM.
+**Total estimated**: 1-2 hours on suitable hardware.
