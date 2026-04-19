@@ -1,6 +1,6 @@
 # Project status
 
-**24 Rocq files. 1 axiom + 2 admits in CRTLift.v, 2 admits in CertL2.v. All other files 0 admits.**
+**24 Rocq files. 0 axioms in critical path. 3 admits in CRTLift.v, 2 admits in CertL2.v, 1 admit in Cert.v.**
 
 ## Headline theorem
 
@@ -11,25 +11,34 @@ Theorem maynard_eigenvalue_S1 :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-Qed in Cert.v.
+Qed in Cert.v. `Print Assumptions` shows 1 project admit (`charpoly_int_Dq_scaled`)
+plus ~30 standard Uint63 kernel primitives. Zero classical logic axioms.
 
-## CRTLift.v (1 axiom, 2 admits)
+## CRTLift.v (0 axioms, 3 admits)
 
-**Axiom** (provable in ~200 lines via MathComp det_expand):
-- `charpoly_coeff_bound` — cofactor expansion bound `|c_k| <= (2nB)^n`
+**Admits** (all kernel Qed limits -- complete proofs exist, kernel check >10 min):
+- `charpoly_coeff_bound` -- FL coefficient bound assembly. Proof verified
+  interactively via rocq-mcp. Qed hangs because `change charpoly_Z_A with
+  (char_poly_int A_int)` forces the kernel to evaluate the FL loop on the
+  concrete 42x42 matrix.
+- `per_prime_shipped_eq` -- follows from `char_poly_int_agrees_710` (Qed in
+  CharPolyAgree.v). Needs `native_compute` to close.
+- `per_prime_matrix_agreement` -- follows from `matrix_identity_710` +
+  `mscale_mod_sound` + `mmul_mod_sound`. Needs `native_compute` to close.
 
-**Admits** (complete deductive proofs exist, Qed >10 min due to kernel):
-- `per_prime_shipped_eq` — follows from `char_poly_int_agrees_710` (Qed in CharPolyAgree.v)
-- `per_prime_matrix_agreement` — follows from `matrix_identity_710` + `mscale_mod_sound` + `mmul_mod_sound`
+**Qed proofs (closed):**
+- 6 matrix operation bounds: `max_abs_entry_meye_le`, `max_abs_entry_mscale_le`,
+  `max_abs_entry_madd_le`, `max_abs_entry_mmul_le`, `abs_mtrace_le`,
+  `fl_loop_coeff_bound` -- all Qed
+- All vm_compute checks: NoDup, primality, FL bound, BigZ bridge, matrix CRT bound
+- CRT lift proofs: `fl_eq_flint`, `matrix_identity_Z` -- both Qed
 
-Both admits have the same root cause: Rocq's kernel takes >10 min to
-type-check proofs that extract from `forallb` over a 710-element list.
-The proofs are logically complete. `native_compute` may close them.
+## CRTCheck.v (2 axioms, NOT in critical path)
 
-**Qed vm_compute** (closed on this machine, ~20 min total):
-- `crt_primes_710_NoDup_check`, `check_all_primes_710` (~8 min),
-  `check_primes_gt_43`, `bigZ_bridge_710` (~5 min),
-  `crt_bound_sufficient` (~2 min), `matrix_crt_bound_sufficient`
+- `modular_step_sound` -- Uint63/BigZ bridge for PRS chain CRT check.
+  Sound but not formally proved. **Not imported by Cert.v.**
+- `crt_primes_Z_all_prime` -- 10-prime primality. Trivially true.
+  **Not imported by Cert.v.**
 
 ## CertL2.v (0 axioms, 2 admits)
 
@@ -39,9 +48,16 @@ The proofs are logically complete. `native_compute` may close them.
 | `charpoly_int_Dq_scaled` | ~40-80 min | >= 16 GB |
 
 Both have complete proofs in comments (grep `UNCOMMENT`).
+Note: the commented proof for `mat_A_eq_Arat` has a known bug
+(wrong arg count for `mat_int_to_rat_scale_inv'`); fix before uncommenting.
+
+## Cert.v (1 local admit)
+
+- `charpoly_int_Dq_scaled` -- local copy, closed when CertL2.v compiles.
 
 ## Estimated closure time (60 GB machine)
 
-CRTLift admits: try `native_compute` (~seconds if available).
-CertL2 admits: ~90-170 min (slow MathComp canonical structure resolution).
+CRTLift: try `native_compute` for 2 admits (~seconds if available).
+`charpoly_coeff_bound`: may close with `native_compute` or on faster kernel.
+CertL2: ~90-170 min (slow MathComp canonical structure resolution).
 **Total: ~2-3 hours.**
