@@ -55,6 +55,10 @@ Definition charpoly_Z_A : list Z := char_poly_int A_int.
 Lemma length_charpoly_Z_A : length charpoly_Z_A = 43%nat.
 Proof. unfold charpoly_Z_A. exact length_char_poly_int_A. Qed.
 
+(* Bridge: opaque equation to use in proofs without triggering kernel unfold *)
+Lemma charpoly_Z_A_eq : charpoly_Z_A = char_poly_int A_int.
+Proof. reflexivity. Qed.
+
 Opaque charpoly_Z_A.
 
 (* ================================================================ *)
@@ -93,7 +97,7 @@ Proof. exact (nodup_Z_sound _ crt_primes_710_NoDup_check). Qed.
 
 Lemma check_all_primes_710 :
   List.forallb (fun p => check_prime_Z (Uint63.to_Z p)) crt_primes_all = true.
-Proof. (* HEAVY-1: vm_compute ~8 min. Admitted for fast iteration; restore: vm_compute. reflexivity. Qed. *) Admitted.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma crt_primes_710_all_prime :
   forall pz, In pz (List.map Uint63.to_Z crt_primes_all) ->
@@ -131,7 +135,7 @@ Definition fl_coeff_bound (sz : nat) (B : Z) : Z :=
 Lemma fl_crt_bound :
   (2 * fl_coeff_bound 42 (max_abs_entry A_int) +
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
-Proof. (* HEAVY-2: vm_compute ~2 min. Admitted; restore: apply Z.ltb_lt. vm_compute. reflexivity. Qed. *) Admitted.
+Proof. apply Z.ltb_lt. native_compute. reflexivity. Qed.
 
 (* --- max_abs_entry infrastructure --- *)
 
@@ -572,10 +576,7 @@ Lemma charpoly_coeff_bound : forall k,
    fl_coeff_bound 42 (max_abs_entry A_int))%Z.
 Proof.
   intros k Hk.
-  (* Use charpoly_Z_A = char_poly_int A_int without unfolding char_poly_int *)
-  Transparent charpoly_Z_A.
-  change charpoly_Z_A with (char_poly_int A_int).
-  Opaque charpoly_Z_A.
+  rewrite charpoly_Z_A_eq.
   destruct (Nat.eq_dec k 42) as [->|Hne].
   - (* k = 42: leading coefficient is 1 *)
     rewrite (char_poly_int_nth_leading A_int 42 A_int_dim). simpl.
@@ -603,10 +604,7 @@ Proof.
         [exact A_int_dim | exact (forallb_all_rows_len 42%nat A_int A_int_rows_42)].
     + apply List.nth_In. rewrite fl_loop_length. simpl. exact Hk'.
 Admitted.
-(* Proof verified interactively via rocq-mcp (rocq_check). Qed hangs >10 min
-   on kernel conversion: `change charpoly_Z_A with (char_poly_int A_int)`
-   forces the kernel to evaluate char_poly_int on the concrete 42x42 matrix.
-   Same kernel limit as per_prime_shipped_eq / per_prime_matrix_agreement. *)
+(* Qed hangs >25 min even with bridge lemma. Kernel reduces something heavy. *)
 
 (* ================================================================ *)
 (*  Section: CRT prime infrastructure                                  *)
@@ -680,18 +678,19 @@ Definition f_bigZ_bridge (p : Uint63.int) : bool :=
              (List.map (Z_to_mod63 p) charpoly_of_A_int).
 
 Lemma bigZ_bridge_710 : List.forallb f_bigZ_bridge crt_primes_all = true.
-Proof. (* HEAVY-3: vm_compute ~5 min. Admitted; restore: vm_compute. reflexivity. Qed. *) Admitted.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma per_prime_bigZ_eq p (Hin : In p crt_primes_all) :
   List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ =
   List.map (Z_to_mod63 p) charpoly_of_A_int.
 Proof. exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _) bigZ_bridge_710 p Hin)). Qed.
 
-(* Step 2: from char_poly_int_agrees_710 (Qed in CharPolyAgree.v) *)
+(* Step 2: from char_poly_int_agrees_710 (Qed in CharPolyAgree.v).
+   Both `unfold check_charpoly_710` and direct `forallb_forall` cause
+   kernel hang during Qed (>25 min). Needs deeper opacity work. *)
 Lemma per_prime_shipped_eq p (Hin : In p crt_primes_all) :
   char_poly_mod p A_int = List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ.
 Proof. Admitted.
-(* WITH native_compute: Proof. native_compute. reflexivity. Qed. *)
 
 (* Step 1: char_poly_mod_sound — deductive, fast Qed *)
 Lemma check_primes_gt_43 :
@@ -716,22 +715,16 @@ Proof.
     exact (crt_primes_710_all_prime _ (List.in_map _ _ _ Hin)).
 Qed.
 
-(* Combined: all sub-lemmas are Qed/Admitted. Despite that, the Qed of this
-   lemma takes >35 min because the unfolded goal contains char_poly_int A_int
-   which the kernel apparently tries to reduce.
-   HEAVY-5: Admitted for fast iteration. *)
+(* Use opaque bridge lemma to avoid kernel reducing char_poly_int A_int. *)
 Lemma per_prime_agreement p (Hin : In p crt_primes_all) :
   List.map (Z_to_mod63 p) charpoly_Z_A =
   List.map (Z_to_mod63 p) charpoly_of_A_int.
-Proof. Admitted.
-(* Restore proof:
-  Transparent charpoly_Z_A.
-  unfold charpoly_Z_A.
-  Opaque charpoly_Z_A.
+Proof.
+  rewrite charpoly_Z_A_eq.
   rewrite (per_prime_mod_eq p (crt_primes_valid p Hin) Hin).
   rewrite (per_prime_shipped_eq p Hin).
   exact (per_prime_bigZ_eq p Hin).
-Qed. *)
+Qed.
 
 (* === Verified bounds === *)
 
@@ -850,30 +843,72 @@ Proof. apply all_rows_len_mscale. exact M2_int_wf. Qed.
    Uses matrix_identity_710 + mscale_mod_sound + mmul_mod_sound.
    All Uint63 modular, no Z-level matrix computation. *)
 
-Lemma mmat_eqb_sound (M1 M2 : list (list Uint63.int)) :
-  mmat_eqb M1 M2 = true -> M1 = M2.
-Proof. (* HEAVY-6/BROKEN: mmat_eqb uses combine which ignores length mismatch.
-   Original proof handled only equal-length case but failed compile.
-   Admitted; needs proper length precondition or different proof. *) Admitted.
+(* mmat_eqb is unsound for length-mismatch (uses combine which truncates).
+   Don't use mmat_eqb_sound; use these per-entry extraction lemmas instead. *)
+Lemma mmat_eqb_get_row (M1 M2 : list (list Uint63.int)) (i : nat) :
+  mmat_eqb M1 M2 = true ->
+  (i < length M1)%nat ->
+  List.forallb (fun '(a, b) => Uint63.eqb a b)
+    (List.combine (List.nth i M1 nil) (List.nth i M2 nil)) = true.
+Proof.
+  revert i M2. induction M1 as [|r1 rs1 IH]; intros i M2 H Hi.
+  - simpl in Hi. lia.
+  - destruct M2 as [|r2 rs2]; [simpl in H; discriminate|].
+    simpl in H. apply Bool.andb_true_iff in H.
+    destruct i as [|i'].
+    + simpl. exact (proj1 H).
+    + simpl. apply IH; [exact (proj2 H) | simpl in Hi; lia].
+Qed.
+
+Lemma forallb_combine_get (l1 l2 : list Uint63.int) (j : nat) :
+  List.forallb (fun '(a, b) => Uint63.eqb a b) (List.combine l1 l2) = true ->
+  (j < length l1)%nat -> (j < length l2)%nat ->
+  Uint63.eqb (List.nth j l1 0%uint63) (List.nth j l2 0%uint63) = true.
+Proof.
+  revert j l2. induction l1 as [|a l1' IH]; intros j l2 H H1 H2.
+  - simpl in H1. lia.
+  - destruct l2 as [|b l2']; [simpl in H2; lia|].
+    simpl in H. apply Bool.andb_true_iff in H.
+    destruct j as [|j'].
+    + simpl. exact (proj1 H).
+    + simpl. apply IH; [exact (proj2 H) | simpl in H1; lia | simpl in H2; lia].
+Qed.
+
+Lemma mmat_eqb_get (M1 M2 : list (list Uint63.int)) (i j : nat) :
+  mmat_eqb M1 M2 = true ->
+  (i < length M1)%nat ->
+  (j < length (List.nth i M1 nil))%nat ->
+  (j < length (List.nth i M2 nil))%nat ->
+  List.nth j (List.nth i M1 nil) 0%uint63 =
+  List.nth j (List.nth i M2 nil) 0%uint63.
+Proof.
+  intros H Hi Hj1 Hj2.
+  apply Uint63.eqb_spec.
+  apply forallb_combine_get; [|exact Hj1|exact Hj2].
+  apply mmat_eqb_get_row; [exact H|exact Hi].
+Qed.
 
 Lemma reduce_mat_Z_get (p : Uint63.int) (M : mat) (i j : nat) :
   (i < length M)%nat -> (j < length (List.nth i M nil))%nat ->
   List.nth j (List.nth i (List.map (List.map (Z_to_mod63 p)) M) nil)
     (Z_to_mod63 p 0%Z) =
   Z_to_mod63 p (mat_get M i j).
-Proof. (* BROKEN: same nth_indep on identical defaults. Admitted. *) Admitted.
+Proof.
+  intros Hi Hj. unfold mat_get, nth_Z.
+  rewrite (List.nth_indep _ nil (List.map (Z_to_mod63 p) nil));
+    [|rewrite List.length_map; exact Hi].
+  rewrite List.map_nth.
+  apply List.map_nth.
+Qed.
 
 Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
   i j (Hi : (i < 42)%nat) (Hj : (j < 42)%nat) :
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
 Proof. Admitted.
-(* WITH native_compute:
-Proof. Transparent mat_lhs_opaque mat_rhs_opaque. native_compute. reflexivity. Qed. *)
-(* Logically follows from matrix_identity_710 (Qed in CharPolyAgree.v) +
-   mscale_mod_sound + mmul_mod_sound + mmat_eqb_sound + reduce_mat_Z_get.
-   Full proof above works but Qed takes >10 min (kernel expanding forallb
-   over 710 primes). Try native_compute on target machine. *)
+(* Strategy: extract from matrix_identity_710 via mmat_eqb_get,
+   bridge via mscale_mod_sound + mmul_mod_sound + reduce_mat_Z_get.
+   See git history for partial proof. *)
 
 (* --- Entry bounds (proved, not axioms) --- *)
 
@@ -930,7 +965,7 @@ Qed.
 (* Verified bound: 2 * LHS_bound + 2 * RHS_bound < product of 710 primes. *)
 Lemma matrix_crt_bound_sufficient :
   (2 * mat_id_lhs_bound + 2 * mat_id_rhs_bound < crt_product_710)%Z.
-Proof. (* HEAVY-4: vm_compute ~2 min. Admitted; restore: vm_compute. reflexivity. Qed. *) Admitted.
+Proof. vm_compute. reflexivity. Qed.
 
 (* === The CRT lift proof === *)
 
