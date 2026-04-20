@@ -964,15 +964,135 @@ Proof.
   rewrite List.map_nth. subst f. simpl. apply List.length_map.
 Qed.
 
-(* per_prime_matrix_agreement: proof structure is clear via
-   matrix_per_prime + reduce_mat_Z_get + mscale_mod_sound + mmul_mod_sound + mmat_eqb_get,
-   but the well-formedness obligation (length (mmat_trans (map (map _) A_int)) = 42)
-   requires a sound length_mmat_trans_fuel lemma not yet available here. *)
+(* Helpers for mmat_trans_fuel length *)
+Lemma mmat_tails_preserves (M : list (list Uint63.int)) (r' : list Uint63.int) :
+  In r' (mmat_tails M) ->
+  exists r, In r M /\ (r = nil /\ r' = nil \/ exists a, r = a :: r').
+Proof.
+  induction M as [|r0 rs IH]; intros Hin; simpl in Hin.
+  - contradiction.
+  - destruct r0 as [|a r00]; simpl in Hin.
+    + destruct Hin as [Heq|Hin].
+      * exists nil. split; [left; reflexivity|left; split; [reflexivity|auto]].
+      * destruct (IH Hin) as [r [Hin' Hp]].
+        exists r. split; [right; exact Hin'|exact Hp].
+    + destruct Hin as [Heq|Hin].
+      * subst r00. exists (a :: r'). split; [left; reflexivity|right; exists a; reflexivity].
+      * destruct (IH Hin) as [r [Hin' Hp]].
+        exists r. split; [right; exact Hin'|exact Hp].
+Qed.
+
+Lemma length_mmat_trans_fuel_wellformed (fuel : nat) (M : list (list Uint63.int)) :
+  M <> nil ->
+  (forall r, In r M -> (fuel <= length r)%nat) ->
+  length (mmat_trans_fuel fuel M) = fuel.
+Proof.
+  revert M. induction fuel as [|f IH]; intros M HMne Hlen; simpl.
+  - reflexivity.
+  - destruct M as [|r0 rs]; [contradiction|].
+    assert (Hr0_len : (S f <= length r0)%nat) by (apply Hlen; left; reflexivity).
+    destruct r0 as [|a r0']; [simpl in Hr0_len; lia|].
+    simpl. f_equal.
+    apply IH.
+    + destruct rs; simpl; discriminate.
+    + intros r Hr. simpl in Hr. destruct Hr as [<-|Hr].
+      * simpl in Hr0_len. lia.
+      * destruct (mmat_tails_preserves _ _ Hr) as [r_orig [Hin_orig Hp]].
+        assert (Horig_len : (S f <= length r_orig)%nat)
+          by (apply Hlen; right; exact Hin_orig).
+        destruct Hp as [[-> ->]|[b ->]]; simpl in *; lia.
+Qed.
+
+(* Per-prime matrix agreement via deductive chain.
+   NOTE: proof tactics succeed but Qed hangs >25 min (same kernel-limit
+   pattern as per_prime_shipped_eq). The proof term involves concrete
+   A_int/M1_int/M2_int operations that the kernel tries to reduce. *)
 Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
   i j (Hi : (i < 42)%nat) (Hj : (j < 42)%nat) :
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
 Proof. Admitted.
+(* Proof body (tactics succeed; Qed hangs):
+  pose proof (matrix_per_prime p Hin) as Heq.
+  unfold check_mat_identity_one_prime in Heq.
+  assert (Hvp : valid_prime p) by exact (crt_primes_valid p Hin).
+  rewrite <- (reduce_mat_Z_get p mat_lhs_opaque i j).
+  2:{ rewrite length_mat_lhs. exact Hi. }
+  2:{ rewrite (mat_lhs_wf i ltac:(rewrite length_mat_lhs; exact Hi)). exact Hj. }
+  rewrite <- (reduce_mat_Z_get p mat_rhs_opaque i j).
+  2:{ rewrite length_mat_rhs. exact Hi. }
+  2:{ rewrite (mat_rhs_wf i ltac:(rewrite length_mat_rhs; exact Hi)). exact Hj. }
+  Transparent mat_lhs_opaque mat_rhs_opaque.
+  unfold mat_lhs_opaque, mat_rhs_opaque.
+  Opaque mat_lhs_opaque mat_rhs_opaque.
+  rewrite (mscale_mod_sound p D_M2 (mmul M1_int A_int) Hvp).
+  rewrite (mscale_mod_sound p (Z.mul D_M1 D_A) M2_int Hvp).
+  rewrite (mmul_mod_sound p M1_int A_int Hvp).
+  2:{ intros k Hk. rewrite (M1_int_wf k ltac:(rewrite M1_int_len in *; exact Hk)).
+      change 42%nat with (mat_dim A_int). symmetry. exact A_int_dim. }
+  2:{ intros k Hk. change (length A_int) with (mat_dim A_int) in Hk. rewrite A_int_dim in Hk.
+      rewrite (A_int_wf k ltac:(change (length A_int) with (mat_dim A_int);
+        rewrite A_int_dim; exact Hk)).
+      change 42%nat with (mat_dim A_int). symmetry. exact A_int_dim. }
+  (* Well-formedness of the resulting LHS row (length = 42) *)
+  assert (HlhsRow : length (List.nth i
+    (mmat_scale p (Z_to_mod63 p D_M2)
+      (mmat_mul p (List.map (List.map (Z_to_mod63 p)) M1_int)
+                  (List.map (List.map (Z_to_mod63 p)) A_int))) nil) = 42%nat).
+  { rewrite mmat_scale_row_length. rewrite mmat_mul_row_length.
+    2:{ rewrite List.length_map, M1_int_len. exact Hi. }
+    unfold mmat_trans.
+    set (A' := List.map (List.map (Z_to_mod63 p)) A_int).
+    assert (HA'len : length A' = 42%nat).
+    { unfold A'. rewrite List.length_map.
+      change (length A_int) with (mat_dim A_int). exact A_int_dim. }
+    destruct A' as [|r0 rs0] eqn:EA'.
+    - simpl in HA'len. lia.
+    - (* mmat_trans_fuel uses fuel = length r0.
+         We show length r0 = 42 and all rows have length >= 42. *)
+      assert (Hr0_def : r0 = List.map (Z_to_mod63 p) (List.nth 0 A_int nil)).
+      { assert (Hnth : List.nth 0 (r0 :: rs0) nil = r0) by reflexivity.
+        rewrite <- Hnth. rewrite <- EA'. unfold A'.
+        rewrite (List.nth_indep _ nil (List.map (Z_to_mod63 p) nil));
+          [|rewrite List.length_map; change (length A_int) with (mat_dim A_int);
+            rewrite A_int_dim; lia].
+        apply List.map_nth. }
+      assert (Hr0_len : length r0 = 42%nat).
+      { rewrite Hr0_def, List.length_map.
+        rewrite (A_int_wf 0%nat); [reflexivity|].
+        change (length A_int) with (mat_dim A_int). rewrite A_int_dim. lia. }
+      rewrite Hr0_len.
+      apply length_mmat_trans_fuel_wellformed; [discriminate|].
+      intros r Hr. simpl in Hr. destruct Hr as [<-|Hr].
+      + lia.
+      + (* r in rs0; rs0 is in A' \ r0 *)
+        assert (HrA' : In r A') by (rewrite EA'; right; exact Hr).
+        unfold A' in HrA'. apply List.in_map_iff in HrA'.
+        destruct HrA' as [row [Hreq Hrow]]. subst r.
+        rewrite List.length_map. apply List.In_nth with (d := nil) in Hrow.
+        destruct Hrow as [k [Hk Hrk]]. subst row.
+        rewrite (A_int_wf k ltac:(change (length A_int) with (mat_dim A_int);
+          rewrite A_int_dim; change (length A_int) with (mat_dim A_int) in Hk;
+          rewrite A_int_dim in Hk; exact Hk)).
+        lia. }
+  assert (HrhsRow : length (List.nth i
+    (mmat_scale p (Z_to_mod63 p (D_M1 * D_A)%Z)
+      (List.map (List.map (Z_to_mod63 p)) M2_int)) nil) = 42%nat).
+  { rewrite mmat_scale_row_length.
+    rewrite (List.nth_indep _ nil (List.map (Z_to_mod63 p) nil));
+      [|rewrite List.length_map, M2_int_len; exact Hi].
+    rewrite List.map_nth. rewrite List.length_map.
+    apply M2_int_wf. rewrite M2_int_len. exact Hi. }
+  rewrite (List.nth_indep _ (Z_to_mod63 p 0) 0%uint63); [|rewrite HlhsRow; exact Hj].
+  symmetry.
+  rewrite (List.nth_indep _ (Z_to_mod63 p 0) 0%uint63); [|rewrite HrhsRow; exact Hj].
+  symmetry.
+  apply mmat_eqb_get.
+  - exact Heq.
+  - rewrite mmat_scale_length, mmat_mul_length, List.length_map, M1_int_len. exact Hi.
+  - rewrite HlhsRow. exact Hj.
+  - rewrite HrhsRow. exact Hj.
+Qed. *)
 
 (* --- Entry bounds (proved, not axioms) --- *)
 
