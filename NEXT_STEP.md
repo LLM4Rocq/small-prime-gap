@@ -1,64 +1,68 @@
-# Closing the remaining admits — Opacity Strategy (in progress)
+# Closing the remaining admits
 
-**Status: 6 of 9 CRTLift admits closed. 3 admits + 2 CertL2 admits + 1 Cert admit remain.**
+**Status: CRTLift.v compiles in ~18 min** (was infinite hang).
+**3 admits in CRTLift.v, 2 in CertL2.v, 1 in Cert.v = 6 total.**
 
-## Expert insight
+## Key insight: the bridge lemma technique
 
-> Stop trying to compute expressions with casts going into `rat`. There are
-> proofs in these expressions and reduction gets lost in irrelevant subterms.
-> These casts must be **opaque** and pushed as far **outside** as possible,
-> until we can compute below only with representations suited for that.
+The `per_prime_agreement` Qed used to hang forever because:
+```coq
+Transparent charpoly_Z_A.
+unfold charpoly_Z_A.       (* exposes char_poly_int A_int in goal *)
+Opaque charpoly_Z_A.
+rewrite (per_prime_mod_eq ...).
+```
+After the `unfold`, the proof term contained `char_poly_int A_int`,
+which the kernel tried to reduce on the concrete 42×42 matrix.
 
-## Investigation findings
+**Fix**: prove a small bridge lemma BEFORE Opaque:
+```coq
+Lemma charpoly_Z_A_eq : charpoly_Z_A = char_poly_int A_int.
+Proof. reflexivity. Qed.
+Opaque charpoly_Z_A.
+```
+Then use `rewrite charpoly_Z_A_eq` (opaque rewrite) instead of `unfold`.
+The proof term references the opaque equation, no kernel reduction.
 
-The core issue is that several MathComp/CharPoly definitions are transparent:
+## Remaining admits — same kernel-reduction problem
 
-- `intr` (int → rat coercion via `%:~R`): MathComp standard, transparent
-- `Z_to_int`: declared `Opaque` in CertL2.v line 92, but too late
-- `mat_int_to_rat`: transparent everywhere
-- `pol_to_polyrat`: transparent everywhere
-- `fl_bound_aux` (a Fixpoint): transparent — when applied to `42`, kernel
-  unfolds 42 times during conversion, creating exponential-sized terms
-  on symbolic `B = max_abs_entry A_int`
-- `char_poly_int A_int`: when unfolded, the kernel reduces the FL loop
-  on the concrete 42×42 matrix
+All 3 CRTLift admits hang Qed >25 min for similar reasons:
 
-## Existing well-structured proof in git
+### `charpoly_coeff_bound` (line 606)
+The proof applies `fl_loop_coeff_bound 42 ... A_int ...` with
+`fl_all_divisible_from_L2 A_int 42 ...` as an argument.
+The kernel tries to verify the type involving `fl_all_divisible 42 ...`
+on the concrete A_int (42 levels of `(k | mtrace ...)` conjunction).
 
-Commit `ad3b1ca` has the FULL proof for `mat_A_eq_Arat` that already
-follows the expert advice (push casts outside via `mat_int_to_rat_scale_inv'`
-+ `invmxZ` + `mulKVmx`). It was tested before and takes 50-90 min on
-16 GB RAM — too slow for current hardware.
+**Possible fixes**:
+- Wrap `fl_all_divisible_from_L2 A_int 42 ...` in a separate Qed lemma
+- Make `fl_all_divisible` opaque BEFORE the lemma (already done via `Opaque fl_all_divisible`)
+- Try `Strategy 1000` for fl_loop, mtrace, mscale, mmul, meye
+- Use native_compute (currently disabled at configure)
 
-## Attempted strategy (incomplete)
+### `per_prime_shipped_eq` (line 693)
+The proof extracts a per-prime fact from `char_poly_int_agrees_710`
+(forallb over 710 primes). Both `unfold check_charpoly_710` and direct
+`forallb_forall` cause kernel hang.
 
-1. Add `Local Strategy 1000 [intr Z_to_int]` before slow proofs
-2. Add `Opaque fl_bound_aux fl_coeff_bound` before `charpoly_coeff_bound`
-3. Add bridge lemma `charpoly_Z_A_eq` to avoid `change` triggering kernel reduction
-4. Use existing proof structure from commit ad3b1ca for `mat_A_eq_Arat`
+**Possible fixes**:
+- Add per-element extraction lemma in CharPolyAgree.v as a separate Qed
+- Use `pose proof` and avoid exposing the 710-element forallb
 
-**Problem**: Each compile attempt takes 30-60+ minutes due to the
-existing vm_compute steps (10+ min) plus the `per_prime_agreement` Qed
-(~35 min on this machine). Iterating on opacity strategies is impractical
-without faster compile times.
+### `per_prime_matrix_agreement` (line 908)
+Helper lemmas exist (mmat_eqb_get, reduce_mat_Z_get) but the full
+proof using mscale_mod_sound + mmul_mod_sound triggers similar slow
+kernel verification.
 
-## Path forward
+## CertL2.v: 2 slow MathComp rewrites (need ≥16 GB RAM machine)
 
-To close the remaining admits, the practical approach is:
-1. Get a machine with ≥ 16 GB RAM and `native_compute` enabled
-2. For the 2 CertL2 admits: uncomment the proofs from commit `ad3b1ca`
-   (fix the 2 bugs: wrong arg count for `mat_int_to_rat_scale_inv'`,
-   wrong lemma name `char_poly_scale_coef` → `char_poly_scale`)
-3. For the 3 CRTLift admits:
-   - `per_prime_shipped_eq`: replace with `Proof. native_compute. reflexivity. Qed.`
-   - `per_prime_matrix_agreement`: same with `Transparent` first
-   - `charpoly_coeff_bound`: needs the opacity strategy to work
+- `mat_A_eq_Arat` (~50-90 min)
+- `charpoly_int_Dq_scaled` (~40-80 min)
 
-## Resources budget
+Use the proofs from git commit ad3b1ca (with bug fixes):
+- Remove `[| ... | ... | ...]` from rewrite mat_int_to_rat_scale_inv'
+- Change `char_poly_scale_coef` to `char_poly_scale`
 
-On a 60 GB / 16-core machine with native_compute:
-- vm_compute steps: ~5 min total (with native_compute much faster)
-- per_prime_agreement Qed: ~5 min (without rat reduction triggers)
-- 5 CertL2 admits: ~50-90 min total
+## Cert.v: 1 local admit
 
-**Total estimated**: 1-2 hours on suitable hardware.
+`charpoly_int_Dq_scaled` (line 60) — closed when CertL2.v compiles.

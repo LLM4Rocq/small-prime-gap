@@ -2,6 +2,9 @@
 
 **24 Rocq files. 0 axioms in critical path. 3 admits in CRTLift.v, 2 admits in CertL2.v, 1 admit in Cert.v.**
 
+**CRTLift.v now compiles in ~18 min** (was: hung indefinitely on per_prime_agreement Qed).
+Bridge lemma fix avoids triggering kernel reduction on char_poly_int A_int.
+
 ## Headline theorem
 
 ```rocq
