@@ -24,16 +24,20 @@ plus ~30 standard Uint63 kernel primitives. Zero classical logic axioms.
 
 ## CRTLift.v (0 axioms, 2 admits)
 
-**Admits** (both kernel Qed limits on extracting per-prime facts from 710-element forallb):
-- `per_prime_shipped_eq` -- should follow from `char_poly_int_agrees_710`
-  (Qed in CharPolyAgree.v), but extraction via `forallb_forall` hangs
-  because `check_charpoly_710` uses an inline lambda that the kernel
-  cannot unify with `forallb f l` in reasonable time. Needs a reformulation
-  of check_charpoly_710 with a NAMED function (like check_mat_identity_710).
-- `per_prime_matrix_agreement` -- proof structure exists via extraction +
-  mscale_mod_sound + mmul_mod_sound + mmat_eqb_get, but requires
-  `length (mmat_trans (map (map _) A_int)) = 42` which needs a
-  `length_mmat_trans_fuel` helper (non-trivial due to mmat_all_empty check).
+**Admits** (both kernel Qed limits when using the vm_compute Qeds from CharPolyAgree.v):
+- `per_prime_shipped_eq` -- extraction via `forallb_forall` from
+  `char_poly_int_agrees_710` hangs. The kernel cannot unify
+  `check_charpoly_710 = true` (opaque Qed of vm_compute proof) with
+  `forallb f l = true` in reasonable time. Even `exact_no_check` hangs at Qed.
+- `per_prime_matrix_agreement` -- full proof drafted in comments using
+  `matrix_per_prime` extraction (works via bridge lemma
+  `check_mat_identity_as_forallb`), `length_mmat_trans_fuel_wellformed` helper,
+  `mscale_mod_sound`, `mmul_mod_sound`, and `mmat_eqb_get`. Tactics succeed
+  but Qed hangs >25 min (proof term contains concrete matrix operations
+  the kernel tries to reduce).
+
+Both admits could close with `native_compute` which is disabled at
+configure time on this machine.
 
 **Qed proofs (closed):**
 - 6 matrix operation bounds: `max_abs_entry_meye_le`, `max_abs_entry_mscale_le`,
