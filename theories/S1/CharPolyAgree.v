@@ -1087,12 +1087,13 @@ Definition crt_primes_all : list int :=
   crt_primes_local ++ crt_primes_extra.
 
 (* CRT check: char_poly_int(A_int) = charpoly_of_A_int mod ALL 710 primes *)
+Definition check_charpoly_one_prime_710 (p : int) : bool :=
+  let computed := char_poly_mod p A_int in
+  let shipped := List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ in
+  list_eqb63 computed shipped.
+
 Definition check_charpoly_710 : bool :=
-  List.forallb (fun p =>
-    let computed := char_poly_mod p A_int in
-    let shipped := List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ in
-    list_eqb63 computed shipped
-  ) crt_primes_all.
+  List.forallb check_charpoly_one_prime_710 crt_primes_all.
 
 Lemma char_poly_int_agrees_710 :
   check_charpoly_710 = true.
