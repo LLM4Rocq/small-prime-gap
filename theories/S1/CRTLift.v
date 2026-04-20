@@ -917,14 +917,62 @@ Proof.
   apply List.map_nth.
 Qed.
 
+(* Bridge: check_mat_identity_710 as a forallb (provable by reflexivity because
+   check_mat_identity_one_prime is a named function, not an inline lambda) *)
+Lemma check_mat_identity_as_forallb :
+  check_mat_identity_710 = List.forallb check_mat_identity_one_prime crt_primes_all.
+Proof. reflexivity. Qed.
+
+(* Per-prime matrix check via the bridge *)
+Lemma matrix_per_prime (p : Uint63.int) (Hin : In p crt_primes_all) :
+  check_mat_identity_one_prime p = true.
+Proof.
+  assert (H : List.forallb check_mat_identity_one_prime crt_primes_all = true).
+  { rewrite <- check_mat_identity_as_forallb. exact matrix_identity_710. }
+  exact ((proj1 (List.forallb_forall _ _) H) p Hin).
+Qed.
+
+(* Well-formedness helpers for mmat_scale/mmat_mul outputs *)
+Lemma mmat_scale_length p c A : length (mmat_scale p c A) = length A.
+Proof. unfold mmat_scale. apply List.length_map. Qed.
+
+Lemma mmat_mul_length p A B : length (mmat_mul p A B) = length A.
+Proof. unfold mmat_mul. apply List.length_map. Qed.
+
+Lemma mmat_scale_row_length p c A i :
+  length (List.nth i (mmat_scale p c A) nil) = length (List.nth i A nil).
+Proof.
+  unfold mmat_scale.
+  destruct (Nat.lt_ge_cases i (length A)) as [Hlt|Hge].
+  - rewrite (List.nth_indep _ nil (mmat_vscale p c nil));
+      [|rewrite List.length_map; exact Hlt].
+    rewrite List.map_nth. unfold mmat_vscale. apply List.length_map.
+  - rewrite List.nth_overflow with (l := List.map _ A);
+      [|rewrite List.length_map; lia].
+    rewrite List.nth_overflow with (l := A); [simpl; reflexivity|lia].
+Qed.
+
+Lemma mmat_mul_row_length p A B i :
+  (i < length A)%nat ->
+  length (List.nth i (mmat_mul p A B) nil) = length (mmat_trans B).
+Proof.
+  intros Hi. unfold mmat_mul.
+  remember (fun row : list Uint63.int =>
+             List.map (fun col : list Uint63.int => dot_mod p row col) (mmat_trans B))
+    as f eqn:Heqf.
+  rewrite (List.nth_indep _ nil (f nil)); [|rewrite List.length_map; exact Hi].
+  rewrite List.map_nth. subst f. simpl. apply List.length_map.
+Qed.
+
+(* per_prime_matrix_agreement: proof structure is clear via
+   matrix_per_prime + reduce_mat_Z_get + mscale_mod_sound + mmul_mod_sound + mmat_eqb_get,
+   but the well-formedness obligation (length (mmat_trans (map (map _) A_int)) = 42)
+   requires a sound length_mmat_trans_fuel lemma not yet available here. *)
 Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
   i j (Hi : (i < 42)%nat) (Hj : (j < 42)%nat) :
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
 Proof. Admitted.
-(* Strategy: extract from matrix_identity_710 via mmat_eqb_get,
-   bridge via mscale_mod_sound + mmul_mod_sound + reduce_mat_Z_get.
-   See git history for partial proof. *)
 
 (* --- Entry bounds (proved, not axioms) --- *)
 
