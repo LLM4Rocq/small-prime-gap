@@ -570,6 +570,40 @@ Qed.
 (* Prevent kernel from expanding fl_all_divisible on concrete 42x42 matrix *)
 Opaque fl_all_divisible.
 
+(* Helper: specialize fl_all_divisible_from_L2 to A_int as a separate Qed.
+   This makes the divisibility fact OPAQUE when used in charpoly_coeff_bound,
+   preventing kernel reduction on the huge proof term. *)
+Lemma A_int_fl_all_divisible :
+  fl_all_divisible 42 Z.one A_int (meye 42) (mzero 42) Z.one.
+Proof.
+  apply fl_all_divisible_from_L2;
+    [exact A_int_dim | exact (forallb_all_rows_len 42%nat A_int A_int_rows_42)].
+Qed.
+
+(* Helper: specialize fl_loop_coeff_bound to our A_int FL loop as a separate Qed. *)
+Lemma A_int_fl_loop_coeff (k : nat) (Hk : (k < 42)%nat) :
+  (Z.abs (List.nth k (fl_loop 42 Z.one A_int (meye 42) (mzero 42) Z.one nil) 0%Z)
+   <= fl_bound_aux 42 1 (Z.of_nat 42) (max_abs_entry A_int) 0 1 1)%Z.
+Proof.
+  apply (fl_loop_coeff_bound 42 Z.one A_int (meye 42) (mzero 42) Z.one
+            nil 42 (max_abs_entry A_int) 0 1 1).
+  + exact A_int_dim.
+  + exact (forallb_all_rows_len 42%nat A_int A_int_rows_42).
+  + reflexivity.
+  + exact (mat_dim_mzero 42).
+  + apply all_rows_len_mzero.
+  + reflexivity.
+  + reflexivity.
+  + apply max_abs_entry_nonneg.
+  + rewrite max_abs_entry_mzero. reflexivity.
+  + reflexivity.
+  + reflexivity.
+  + intros c' Hc'. destruct Hc'.
+  + lia.
+  + apply A_int_fl_all_divisible.
+  + apply List.nth_In. rewrite fl_loop_length. simpl. exact Hk.
+Qed.
+
 Lemma charpoly_coeff_bound : forall k,
   (k < 43)%nat ->
   (Z.abs (List.nth k charpoly_Z_A 0%Z) <=
@@ -581,30 +615,12 @@ Proof.
   - (* k = 42: leading coefficient is 1 *)
     rewrite (char_poly_int_nth_leading A_int 42 A_int_dim). simpl.
     unfold fl_coeff_bound. apply fl_bound_aux_mono. lia.
-  - (* k < 42: coefficient from fl_loop *)
+  - (* k < 42: coefficient from fl_loop, use pre-proved opaque helper *)
     assert (Hk' : (k < 42)%nat) by lia.
     rewrite (char_poly_int_nth_lt A_int 42 k A_int_dim Hk').
     unfold fl_coeff_bound.
-    apply (fl_loop_coeff_bound 42 Z.one A_int (meye 42) (mzero 42) Z.one
-              nil 42 (max_abs_entry A_int) 0 1 1).
-    + exact A_int_dim.
-    + exact (forallb_all_rows_len 42%nat A_int A_int_rows_42).
-    + reflexivity.
-    + exact (mat_dim_mzero 42).
-    + apply all_rows_len_mzero.
-    + reflexivity.
-    + reflexivity.
-    + apply max_abs_entry_nonneg.
-    + rewrite max_abs_entry_mzero. reflexivity.
-    + reflexivity.
-    + reflexivity.
-    + intros c' Hc'. destruct Hc'.
-    + lia.
-    + apply fl_all_divisible_from_L2;
-        [exact A_int_dim | exact (forallb_all_rows_len 42%nat A_int A_int_rows_42)].
-    + apply List.nth_In. rewrite fl_loop_length. simpl. exact Hk'.
-Admitted.
-(* Qed hangs >25 min even with bridge lemma. Kernel reduces something heavy. *)
+    exact (A_int_fl_loop_coeff k Hk').
+Qed.
 
 (* ================================================================ *)
 (*  Section: CRT prime infrastructure                                  *)
