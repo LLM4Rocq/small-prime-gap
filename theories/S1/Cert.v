@@ -7,10 +7,9 @@
      L2 (root transfer)      — Qed, via rootZ + map_polyZ
      L3 (root ↔ eigenvalue)  — Qed, via map_char_poly
      L4 (Maynard bridge)     — Qed, via ltr_pdivrMr
-     charpoly_int_Dq_scaled  — Admitted locally, closed by CertL2.v
 
-   1 local Admitted: `charpoly_int_Dq_scaled`. Closed by compiling
-   CertL2.v (needs >= 8 GB RAM) and importing it here.
+   charpoly_int_Dq_scaled is imported from CertL2.v (where it is
+   Admitted -- see STATUS.md). Zero local Admitted in this file.
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List.
@@ -20,18 +19,13 @@ From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1.
-(* On a machine with >= 8 GB RAM, replace the above with:
-   From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
-   and remove the local charpoly_int_Dq_scaled Admitted below. *)
+From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
 Open Scope ring_scope.
 
-Definition A_rat : 'M[rat]_42 :=
-  ((invmx (mat_int_to_rat M1_int D_M1 42))
-     *m mat_int_to_rat M2_int D_M2 42)%R.
+(* A_rat is defined in CertL2.v; imported via Require above. *)
 
 (* ------------------------------------------------------------------
    L1 — Sturm count of the chain shipped in WitnessChain.v equals
@@ -53,11 +47,8 @@ Lemma sturm_count_correct :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof. exact maynard_L1_concrete. Qed.
 
-(* charpoly_int_Dq_scaled: proved in CertL2.v on a machine with >= 8 GB RAM.
-   On this machine, left Admitted for compilation. *)
-Lemma charpoly_int_Dq_scaled :
-  pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat.
-Admitted.
+(* charpoly_int_Dq_scaled: imported from CertL2.v (where it is proved or
+   Admitted depending on compilation resources). *)
 
 (* ------------------------------------------------------------------
    L2 — root transfer (Qed): a root of the shipped polynomial is also

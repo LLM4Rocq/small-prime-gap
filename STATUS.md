@@ -1,6 +1,6 @@
 # Project status
 
-**24 Rocq files. 0 axioms in critical path. 2 admits in CRTLift.v, 2 admits in CertL2.v, 1 admit in Cert.v.**
+**24 Rocq files. 0 axioms in critical path. 2 admits in CRTLift.v, 2 admits in CertL2.v, 0 admits in Cert.v.**
 
 **CRTLift.v now compiles in ~18 min** (was: hung indefinitely).
 Key fixes:
@@ -64,9 +64,11 @@ Both have complete proofs in comments (grep `UNCOMMENT`).
 Note: the commented proof for `mat_A_eq_Arat` has a known bug
 (wrong arg count for `mat_int_to_rat_scale_inv'`); fix before uncommenting.
 
-## Cert.v (1 local admit)
+## Cert.v (0 admits)
 
-- `charpoly_int_Dq_scaled` -- local copy, closed when CertL2.v compiles.
+Cert.v now imports CertL2.v directly. The local duplicate of
+`charpoly_int_Dq_scaled` has been removed. All theorem assembly
+(L1, L2, L3, L4) is Qed in Cert.v itself.
 
 ## Estimated closure time (60 GB machine)
 
