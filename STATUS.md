@@ -1,9 +1,14 @@
 # Project status
 
-**24 Rocq files. 0 axioms in critical path. 3 admits in CRTLift.v, 2 admits in CertL2.v, 1 admit in Cert.v.**
+**24 Rocq files. 0 axioms in critical path. 2 admits in CRTLift.v, 2 admits in CertL2.v, 1 admit in Cert.v.**
 
-**CRTLift.v now compiles in ~18 min** (was: hung indefinitely on per_prime_agreement Qed).
-Bridge lemma fix avoids triggering kernel reduction on char_poly_int A_int.
+**CRTLift.v now compiles in ~18 min** (was: hung indefinitely).
+Key fixes:
+1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
+   `reflexivity` avoids kernel reducing `char_poly_int A_int`.
+2. **charpoly_coeff_bound** (was hanging Qed): extract
+   `A_int_fl_all_divisible` and `A_int_fl_loop_coeff` as separate Qed helpers
+   so the main proof uses opaque references.
 
 ## Headline theorem
 
@@ -17,17 +22,18 @@ Theorem maynard_eigenvalue_S1 :
 Qed in Cert.v. `Print Assumptions` shows 1 project admit (`charpoly_int_Dq_scaled`)
 plus ~30 standard Uint63 kernel primitives. Zero classical logic axioms.
 
-## CRTLift.v (0 axioms, 3 admits)
+## CRTLift.v (0 axioms, 2 admits)
 
-**Admits** (all kernel Qed limits -- complete proofs exist, kernel check >10 min):
-- `charpoly_coeff_bound` -- FL coefficient bound assembly. Proof verified
-  interactively via rocq-mcp. Qed hangs because `change charpoly_Z_A with
-  (char_poly_int A_int)` forces the kernel to evaluate the FL loop on the
-  concrete 42x42 matrix.
-- `per_prime_shipped_eq` -- follows from `char_poly_int_agrees_710` (Qed in
-  CharPolyAgree.v). Needs `native_compute` to close.
-- `per_prime_matrix_agreement` -- follows from `matrix_identity_710` +
-  `mscale_mod_sound` + `mmul_mod_sound`. Needs `native_compute` to close.
+**Admits** (both kernel Qed limits on extracting per-prime facts from 710-element forallb):
+- `per_prime_shipped_eq` -- should follow from `char_poly_int_agrees_710`
+  (Qed in CharPolyAgree.v), but extraction via `forallb_forall` hangs
+  because `check_charpoly_710` uses an inline lambda that the kernel
+  cannot unify with `forallb f l` in reasonable time. Needs a reformulation
+  of check_charpoly_710 with a NAMED function (like check_mat_identity_710).
+- `per_prime_matrix_agreement` -- proof structure exists via extraction +
+  mscale_mod_sound + mmul_mod_sound + mmat_eqb_get, but requires
+  `length (mmat_trans (map (map _) A_int)) = 42` which needs a
+  `length_mmat_trans_fuel` helper (non-trivial due to mmat_all_empty check).
 
 **Qed proofs (closed):**
 - 6 matrix operation bounds: `max_abs_entry_meye_le`, `max_abs_entry_mscale_le`,
