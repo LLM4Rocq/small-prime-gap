@@ -1,6 +1,10 @@
 # Project status
 
-**25 Rocq files. 0 axioms in critical path. 0 admits in CRTLift.v, 1 admit in CertL2.v, 0 admits in Cert.v.**
+**25 Rocq files. Headline proof is NOT complete: it depends on 1 project admit.**
+
+- 0 explicit `Axiom` declarations in critical path (the 2 Axioms in CRTCheck.v are not imported by Cert.v).
+- 1 `Admitted` lemma on the critical path: `CertL2.charpoly_int_Dq_scaled`. From the kernel's view (via `Print Assumptions`), this IS an axiom.
+- 0 admits in CRTLift.v, 0 admits in Cert.v.
 
 **CRTLift.v now compiles fully** (no more admits). Key fixes:
 1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
