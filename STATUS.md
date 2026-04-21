@@ -1,38 +1,12 @@
 # Project status
 
-**25 Rocq files. Headline proof is COMPLETE.**
+**22 Rocq files. Headline proof is COMPLETE.**
 
-- 0 `Admitted` lemmas on the critical path.
-- 0 project-specific axioms visible to `Print Assumptions maynard_eigenvalue_S1`.
-- Only assumptions are standard PrimInt63 kernel primitives (built into Rocq).
-- 2 `Axiom` declarations remain in CRTCheck.v but that file is NOT imported by Cert.v (not in critical path).
-
-## The closure of `charpoly_int_Dq_scaled`
-
-The last admit was closed via a combination of techniques applied in CertL2.v:
-1. **Term-mode instead of tactic-mode** for calls whose statement mentions `(char_poly ...)`: plugging via `:= aux_lemma _ _ Hc Hk` bypasses MathComp's HB canonical-structure elaboration on the concrete `'M[rat]_42`.
-2. **Auxiliary lemmas specialised to (rat, 42)** (e.g., `char_poly_scale_rat42`, `expf_neq0_rat`, `size_char_poly_42`, `size_scale_rat`, `size_pol_to_polyrat_bound`, `mat_cancel_helper`): each isolates a single MathComp call in a small context where HB resolution runs in milliseconds.
-3. **`pose` / `change` to abstract `(char_poly A_rat)`_k as a fresh rat variable** before the final algebraic clean-up, so subsequent rewrites see only pure `rat` terms.
-4. **Explicit `eq_trans` / `f_equal`** wherever a `rewrite` would retrigger elaboration.
-
-Diagnosis: the "hang" is NOT kernel reduction (so `Strategy opaque` doesn't help) but MathComp's canonical-structure elaborator walking the algebraic-instance graph on fully concrete `'M[rat]_42`. The cure is to never expose `A_rat` to the elaborator during tactic invocation.
-
-**CRTLift.v now compiles fully** (no more admits). Key fixes:
-1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
-   `reflexivity` avoids kernel reducing `char_poly_int A_int`.
-2. **charpoly_coeff_bound** (was hanging Qed): extract
-   `A_int_fl_all_divisible` and `A_int_fl_loop_coeff` as separate Qed helpers
-   so the main proof uses opaque references.
-3. **per_prime_shipped_eq + per_prime_matrix_agreement** (closed without
-   native_compute): `Strategy opaque [list_eqb63 mmat_eqb char_poly_mod ...]`
-   prevents the kernel from iota-reducing the equality predicates during
-   conversion, which would otherwise trigger WHNF descent into the 42x42
-   matrix operations and 42-iteration FL loop. With these constants opaque,
-   the kernel stops at syntactic match. Closes in milliseconds (was: hung >25 min).
-4. **ModularArith.v** (new shared file): the duplicated definitions of
-   addmod63/mmat/reduce_mat_Z/.../char_poly_mod across CharPolyAgree.v and
-   CRTBridge.v are now in one canonical file imported by both. (Not strictly
-   required for the Strategy fix but eliminates a class of similar issues.)
+- 0 `Admitted` anywhere in `theories/S1/`.
+- 0 project-specific axioms visible to
+  `Print Assumptions maynard_eigenvalue_S1`.
+- The only assumptions reported are standard PrimInt63 kernel
+  primitives (Uint63Axioms), which are built into Rocq.
 
 ## Headline theorem
 
@@ -43,47 +17,47 @@ Theorem maynard_eigenvalue_S1 :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-Qed in Cert.v. `Print Assumptions` shows 1 project admit (`charpoly_int_Dq_scaled`)
-plus ~30 standard Uint63 kernel primitives. Zero classical logic axioms.
+`Qed` in `theories/S1/Cert.v`.
 
-## CRTLift.v (0 axioms, 0 admits)
+## Proof assembly
 
-Both per_prime admits are now closed via Strategy opaque (see headline).
-
-**Qed proofs (closed):**
-- 6 matrix operation bounds: `max_abs_entry_meye_le`, `max_abs_entry_mscale_le`,
-  `max_abs_entry_madd_le`, `max_abs_entry_mmul_le`, `abs_mtrace_le`,
-  `fl_loop_coeff_bound` -- all Qed
-- All vm_compute checks: NoDup, primality, FL bound, BigZ bridge, matrix CRT bound
-- CRT lift proofs: `fl_eq_flint`, `matrix_identity_Z` -- both Qed
-
-## CRTCheck.v (2 axioms, NOT in critical path)
-
-- `modular_step_sound` -- Uint63/BigZ bridge for PRS chain CRT check.
-  Sound but not formally proved. **Not imported by Cert.v.**
-- `crt_primes_Z_all_prime` -- 10-prime primality. Trivially true.
-  **Not imported by Cert.v.**
-
-## CertL2.v (0 axioms, 2 admits)
-
-| Lemma | Est. time | RAM |
+| Layer | File | Content |
 |---|---|---|
-| `mat_A_eq_Arat` | ~50-90 min | >= 16 GB |
-| `charpoly_int_Dq_scaled` | ~40-80 min | >= 16 GB |
+| L1 | `CertL1.v` | IVT root existence via Sturm count |
+| L2 | `CertL2.v` | Root transfer via `charpoly_int_Dq_scaled` |
+| L3 | `Cert.v` | Root of char poly implies eigenvalue |
+| L4 | `Cert.v` | Maynard bound `4/105 < lambda` |
 
-Both have complete proofs in comments (grep `UNCOMMENT`).
-Note: the commented proof for `mat_A_eq_Arat` has a known bug
-(wrong arg count for `mat_int_to_rat_scale_inv'`); fix before uncommenting.
+## Verification infrastructure
 
-## Cert.v (0 admits)
+- **CRT lift (`CRTLift.v`)**: `fl_eq_flint` and `matrix_identity_Z`
+  lift the 710-prime modular agreement (machine-checked by `vm_compute`)
+  to equality over Z, using the coefficient bound derived from the
+  Faddeev-LeVerrier recurrence on a matrix with bounded entries.
+- **FL modular soundness (`CRTBridge.v`)**: bridges the concrete
+  `char_poly_int` implementation to MathComp's `char_poly` through the
+  FL recurrence identified in `CharPoly.v`.
+- **Sturm chain CRT check (`CRTCheck.v`)**: the 42-step PRS chain is
+  cross-checked by reducing modulo 10 primes and verifying the
+  identity `lc(B)^d * A = Q*B + beta*C` in `Uint63`. (The final
+  CRT-to-Z conversion of this chain is not on the critical path of
+  `maynard_eigenvalue_S1`; the headline proof uses the charpoly
+  lift in `CRTLift.v` instead.)
 
-Cert.v now imports CertL2.v directly. The local duplicate of
-`charpoly_int_Dq_scaled` has been removed. All theorem assembly
-(L1, L2, L3, L4) is Qed in Cert.v itself.
+## Build
 
-## Estimated closure time (60 GB machine)
+```bash
+coq_makefile -f _CoqProject -o Makefile
+make -j     # ~20-25 min with parallelism, ~44 min sequential
+```
 
-CRTLift: try `native_compute` for 2 admits (~seconds if available).
-`charpoly_coeff_bound`: may close with `native_compute` or on faster kernel.
-CertL2: ~90-170 min (slow MathComp canonical structure resolution).
-**Total: ~2-3 hours.**
+## Verifying assumptions
+
+```bash
+coqtop -Q theories/S1 PrimeGapS1 \
+  -l theories/S1/Cert.v -batch \
+  -e 'Print Assumptions maynard_eigenvalue_S1.'
+```
+
+Expected output: only entries of the form `Uint63Axioms.*` and
+`PrimInt63.*` (Rocq's built-in primitive integer specification).

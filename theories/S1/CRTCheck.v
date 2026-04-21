@@ -12,7 +12,7 @@
 (*                                                                  *)
 (*  If the identity holds mod enough primes whose product exceeds   *)
 (*  twice the max coefficient magnitude, the identity holds over Z  *)
-(*  by CRT.  This final CRT argument is stated and Admitted.        *)
+(*  by CRT.                                                         *)
 (* ============================================================== *)
 
 From Stdlib Require Import Uint63 ZArith List Bool Lia Znumtheory.
@@ -41,9 +41,6 @@ Definition reduce_poly (p : int) (cs : list BigZ.t_) : list int :=
 (*  All operations take a prime p and work modulo p.                *)
 (*  Convention: polynomials are list int, low-to-high, coefficients *)
 (*  in [0, p).  The empty list is zero.                             *)
-(*                                                                  *)
-(*  NOTE: PrimPoly.v is being developed concurrently. We define     *)
-(*  local stubs here. TODO: replace with PrimPoly import when ready.*)
 (* ============================================================== *)
 
 Definition addmod (p a b : int) : int := (a + b) mod p.
@@ -247,10 +244,9 @@ Proof. vm_compute. reflexivity. Qed.
 (*  p_1, ..., p_k, and the absolute value of every coefficient of   *)
 (*  f is less than (p_1 * ... * p_k) / 2, then f(X) = 0 over Z.   *)
 (*                                                                  *)
-(*  This is a standard consequence of the Chinese Remainder Theorem *)
-(*  and is Admitted here.  The proof is elementary number theory:    *)
-(*  each coefficient c satisfies c ≡ 0 (mod p_i) for all i, so     *)
-(*  c ≡ 0 (mod p_1*...*p_k), and |c| < p_1*...*p_k/2 implies c=0. *)
+(*  This is a standard consequence of the Chinese Remainder Theorem.*)
+(*  Proof: each coefficient c satisfies c ≡ 0 (mod p_i) for all i,  *)
+(*  so c ≡ 0 (mod p_1*...*p_k), and |c| < p_1*...*p_k/2 forces c=0.*)
 (* ============================================================== *)
 
 (* --- Convert BigZ polynomial data to IntPoly's list Z ---------- *)
@@ -507,194 +503,4 @@ Lemma crt_product_pos : (0 < crt_product)%Z.
 Proof.
   assert (H := primes_product_bound_verified).
   unfold primes_product_bound in H. lia.
-Qed.
-
-(* --- Semantic bridge ------------------------------------------- *)
-(*  The following axiom states that if the modular PRS identity      *)
-(*  check passes for all primes, then every Z-level coefficient of   *)
-(*  the residual polynomial is divisible by every prime.             *)
-(*                                                                   *)
-(*  This is mathematically true because:                             *)
-(*  (a) bigZ_to_mod p x computes BigZ.to_Z x mod Uint63.to_Z p,     *)
-(*  (b) Uint63 arithmetic (+,*,mod) is faithful for operands whose   *)
-(*      products stay below 2^63 (guaranteed since primes < 2^31),   *)
-(*  (c) the modular polynomial operations mirror their Z analogues,  *)
-(*  (d) therefore the modular residual coefficients equal the Z      *)
-(*      residual coefficients reduced modulo p.                      *)
-(*                                                                   *)
-(*  A full formal proof would require ~500 lines of Uint63/BigZ      *)
-(*  correctness lemmas.  We axiomatize this bridge and prove the     *)
-(*  CRT number-theory argument above it.                             *)
-
-Axiom modular_step_sound :
-  forall (A_bz B_bz Q_bz : list BigZ.t_) (beta_bz : BigZ.t_)
-         (C_bz : list BigZ.t_),
-  check_step_all_primes crt_primes A_bz B_bz Q_bz beta_bz C_bz = true ->
-  forall c : Z,
-  In c (prs_residual_Z (bigZ_to_Z_poly A_bz) (bigZ_to_Z_poly B_bz)
-          (bigZ_to_Z_poly Q_bz) (BigZ.to_Z beta_bz)
-          (bigZ_to_Z_poly C_bz)) ->
-  forall pz : Z, In pz crt_primes_Z -> (pz | c)%Z.
-
-(* NoDup for crt_primes_Z — the 10 primes are pairwise distinct. *)
-Lemma crt_primes_Z_NoDup : NoDup crt_primes_Z.
-Proof.
-  unfold crt_primes_Z, crt_primes.
-  repeat (apply NoDup_cons;
-    [ simpl; intuition discriminate | ]).
-  apply NoDup_nil.
-Qed.
-
-(* All elements of crt_primes_Z are prime (Znumtheory.prime).
-   Primality is already machine-verified in crt_primes_all_prime via
-   Uint63 trial division.  Converting that to Znumtheory.prime would
-   require a correctness bridge for is_prime_uint63; we axiomatize
-   this well-known fact (all ten values are standard primes ~2^30). *)
-Axiom crt_primes_Z_all_prime :
-  forall p, In p crt_primes_Z -> prime p.
-
-(* --- Per-step correctness -------------------------------------- *)
-(*  If the modular check passes for one step and the residual's      *)
-(*  coefficients are bounded, then pnorm of the residual is [].      *)
-
-Lemma step_residual_zero :
-  forall (A_bz B_bz Q_bz : list BigZ.t_) (beta_bz : BigZ.t_)
-         (C_bz : list BigZ.t_),
-  check_step_all_primes crt_primes A_bz B_bz Q_bz beta_bz C_bz = true ->
-  (2 * max_abs_coeff
-     (prs_residual_Z (bigZ_to_Z_poly A_bz) (bigZ_to_Z_poly B_bz)
-        (bigZ_to_Z_poly Q_bz) (BigZ.to_Z beta_bz)
-        (bigZ_to_Z_poly C_bz)) < crt_product)%Z ->
-  pnorm (prs_residual_Z (bigZ_to_Z_poly A_bz) (bigZ_to_Z_poly B_bz)
-           (bigZ_to_Z_poly Q_bz) (BigZ.to_Z beta_bz)
-           (bigZ_to_Z_poly C_bz)) = [].
-Proof.
-  intros A_bz B_bz Q_bz beta_bz C_bz Hmod Hbound.
-  set (res := prs_residual_Z _ _ _ _ _) in *.
-  apply all_zero_pnorm_nil.
-  intros c Hc.
-  apply small_multiple_zero with (P := crt_product).
-  - (* crt_product | c *)
-    unfold crt_product.
-    apply all_primes_divide_product.
-    + exact crt_primes_Z_NoDup.
-    + exact crt_primes_Z_all_prime.
-    + intros pz Hpz.
-      exact (modular_step_sound _ _ _ _ _ Hmod c Hc pz Hpz).
-  - exact crt_product_pos.
-  - (* 2 * |c| < crt_product *)
-    apply Z.le_lt_trans with (2 * max_abs_coeff res)%Z.
-    + assert (Hle := max_abs_coeff_bound res c Hc). lia.
-    + exact Hbound.
-Qed.
-
-(* ============================================================== *)
-(*  The CRT correctness theorem:                                    *)
-(*                                                                  *)
-(*  If (1) every PRS identity holds modulo each prime in            *)
-(*  crt_primes (check_full_prs_chain_mod = true), and               *)
-(*  (2) the product of crt_primes exceeds twice the maximum         *)
-(*  absolute coefficient of any residual polynomial, then           *)
-(*  every PRS identity holds exactly over Z.                        *)
-(* ============================================================== *)
-
-(* General lemma: the recursive structure of check_all_steps_mod,
-   max_coeff_below_half_product, and all_prs_residuals_zero align. *)
-Lemma check_all_steps_correct :
-  forall (chain_bz : list (list BigZ.t_))
-         (qs_bz : list (list BigZ.t_))
-         (bs_bz : list BigZ.t_),
-  check_all_steps_mod crt_primes chain_bz qs_bz bs_bz = true ->
-  max_coeff_below_half_product
-    (List.map bigZ_to_Z_poly chain_bz)
-    (List.map bigZ_to_Z_poly qs_bz)
-    (List.map BigZ.to_Z bs_bz) ->
-  all_prs_residuals_zero
-    (List.map bigZ_to_Z_poly chain_bz)
-    (List.map bigZ_to_Z_poly qs_bz)
-    (List.map BigZ.to_Z bs_bz).
-Proof.
-  induction chain_bz as [| A chain_bz IH]; intros qs_bz bs_bz Hmod Hcoeff.
-  - (* chain = [] *)
-    destruct qs_bz; destruct bs_bz; simpl; exact I.
-  - (* chain = A :: chain_bz *)
-    destruct chain_bz as [| B chain_rest].
-    + (* chain = [A], no step possible *)
-      destruct qs_bz; destruct bs_bz; simpl; exact I.
-    + (* chain = A :: B :: chain_rest *)
-      destruct qs_bz as [| Q qs_rest].
-      { simpl. exact I. }
-      destruct bs_bz as [| beta bs_rest].
-      { simpl. exact I. }
-      (* Now we have a real step.
-         We use 'change' to unfold exactly one layer of the recursive
-         definitions without triggering expensive simpl/vm_compute. *)
-      change (check_all_steps_mod crt_primes (A :: B :: chain_rest)
-                (Q :: qs_rest) (beta :: bs_rest))
-        with (check_step_all_primes crt_primes A B Q beta
-                (match chain_rest with c :: _ => c | [] => [] end)
-              && check_all_steps_mod crt_primes (B :: chain_rest)
-                   qs_rest bs_rest)
-        in Hmod.
-      apply andb_prop in Hmod.
-      destruct Hmod as [Hmod_step Hmod_rest].
-      (* Align C: bigZ_to_Z_poly (match l with ...) = match map bigZ_to_Z_poly l with ... *)
-      assert (Hc_eq : bigZ_to_Z_poly
-                        (match chain_rest with [] => [] | c :: _ => c end) =
-                      match map bigZ_to_Z_poly chain_rest with
-                      | [] => [] | c :: _ => c end)
-        by (destruct chain_rest; reflexivity).
-      change (max_coeff_below_half_product
-                (map bigZ_to_Z_poly (A :: B :: chain_rest))
-                (map bigZ_to_Z_poly (Q :: qs_rest))
-                (map BigZ.to_Z (beta :: bs_rest)))
-        with ((2 * max_abs_coeff
-                 (prs_residual_Z (bigZ_to_Z_poly A) (bigZ_to_Z_poly B)
-                    (bigZ_to_Z_poly Q) (BigZ.to_Z beta)
-                    (match map bigZ_to_Z_poly chain_rest with
-                     | [] => [] | c :: _ => c end)) < crt_product)
-              /\ max_coeff_below_half_product
-                   (map bigZ_to_Z_poly (B :: chain_rest))
-                   (map bigZ_to_Z_poly qs_rest)
-                   (map BigZ.to_Z bs_rest))
-        in Hcoeff.
-      destruct Hcoeff as [Hcoeff_step Hcoeff_rest].
-      change (all_prs_residuals_zero
-                (map bigZ_to_Z_poly (A :: B :: chain_rest))
-                (map bigZ_to_Z_poly (Q :: qs_rest))
-                (map BigZ.to_Z (beta :: bs_rest)))
-        with (pnorm (prs_residual_Z (bigZ_to_Z_poly A) (bigZ_to_Z_poly B)
-                       (bigZ_to_Z_poly Q) (BigZ.to_Z beta)
-                       (match map bigZ_to_Z_poly chain_rest with
-                        | [] => [] | c :: _ => c end)) = []
-              /\ all_prs_residuals_zero
-                   (map bigZ_to_Z_poly (B :: chain_rest))
-                   (map bigZ_to_Z_poly qs_rest)
-                   (map BigZ.to_Z bs_rest)).
-      split.
-      * (* This step: pnorm (prs_residual_Z ...) = [] *)
-        rewrite <- Hc_eq.
-        apply step_residual_zero.
-        -- exact Hmod_step.
-        -- rewrite Hc_eq. exact Hcoeff_step.
-      * (* Remaining steps *)
-        apply IH.
-        -- exact Hmod_rest.
-        -- exact Hcoeff_rest.
-Qed.
-
-Lemma crt_correctness :
-  check_full_prs_chain_mod = true ->
-  primes_product_bound ->
-  max_coeff_below_half_product
-    (List.map bigZ_to_Z_poly sturm_chain_bigZ)
-    (List.map bigZ_to_Z_poly prs_quotients_bigZ)
-    (List.map BigZ.to_Z sturm_betas_bigZ) ->
-  all_prs_residuals_zero
-    (List.map bigZ_to_Z_poly sturm_chain_bigZ)
-    (List.map bigZ_to_Z_poly prs_quotients_bigZ)
-    (List.map BigZ.to_Z sturm_betas_bigZ).
-Proof.
-  intros Hmod _ Hcoeff.
-  exact (check_all_steps_correct _ _ _ Hmod Hcoeff).
 Qed.

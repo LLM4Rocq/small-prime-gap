@@ -13,8 +13,6 @@ theories/S1/CharPolyAgree.v
 theories/S1/Bridge.v
 theories/S1/CRTSigns.v
 theories/S1/CertL1.v
-theories/S1/PRSCheck.v
-theories/S1/PrimPoly.v
 theories/S1/CharPolyScale.v
 theories/S1/CRTCheck.v
 theories/S1/Fermat.v

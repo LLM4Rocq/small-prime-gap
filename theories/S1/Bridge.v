@@ -1909,8 +1909,8 @@ case Ea : (f a) => /=.
 Qed.
 
 (* Helper: a realalg value in `rootsR p` (as a List.In) is a root of p.
-   The clean version would be `rootsRP` + `roots_on_rootsR` but that
-   requires `p != 0`; we keep this as a local Admitted side-lemma. *)
+   Proved Qed via `roots_on_rootsR` and the fact that an element being
+   List.In the root list forces the polynomial to be nonzero. *)
 Lemma rootsR_in_root (P : {poly realalg}) (r : realalg) :
   List.In r (rootsR P) -> root P r.
 Proof.
