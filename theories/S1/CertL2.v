@@ -355,19 +355,122 @@ Proof.
   apply: IH. simpl in Hk. by apply/leP; lia.
 Qed.
 
-(* Strategy opaque on A_rat and char_poly_int prevents the kernel from
-   descending into the concrete 42x42 matrix / its charpoly during Qed's
-   conversion check — mirrors the CRTLift Strategy-opaque fix. *)
-(* [charpoly_int_Dq_scaled]: REMAINING ADMIT.
-   Per-coefficient proof structure is in place (mat_A_scale_eq_Arat is Qed,
-   char_poly_int_correct is Qed, fl_eq_flint is Qed, scaling_Z is Qed,
-   pol_to_polyrat_coef is Qed). The blocker: `apply: char_poly_scale`
-   at concrete dim n=42 hangs >2 min during elaboration. This is the
-   SAME MathComp canonical-structure-resolution slowdown documented in
-   PLAN_SLOW_MATHCOMP.md, but distinct from the kernel WHNF issue we
-   already solved with `Strategy opaque` on list_eqb63 / mmat_eqb.
-   Neither Strategy opaque nor explicit type annotations
-   (@char_poly_scale [the fieldType of rat] 42 ...) bypass this hang. *)
+(* === KEY: abstract-field auxiliary lemmas to bypass the canonical-structure
+       elaboration hang at concrete dim n=42.
+
+   DIAGNOSIS: Tactics like `apply: char_poly_scale`, `exact: expf_neq0`, and
+   `rewrite Hcpi` (where Hcpi mentions `char_poly (mat_int_to_rat A_int 1 42)`)
+   all trigger MathComp's canonical-structure resolution to elaborate the
+   `char_poly` / `char_poly_mx` / `map_mx` instances at fully-concrete dim 42.
+   This resolution does not unfold any specific term quickly — instead it walks
+   the HB instance graph looking for the right scalar/field structure, which
+   becomes quadratic-ish in the goal term size once A_rat (a 42x42 invmx *m
+   matrix over rat) appears in the goal.
+
+   FIX: Extract the slow MathComp steps into `Lemma char_poly_scale_rat42`
+   (only specialised to rat, dim 42) and `Lemma expf_neq0_rat` / `Lemma
+   size_char_poly_42`. Inside these aux lemmas the context is SMALL, so
+   elaboration is fast. At the call site we plug them in via term-mode
+   (`:= aux_lemma _ _`), completely bypassing apply/exact tactic elaboration.
+
+   Also: `pose c := (char_poly A_rat)`_k; change (char_poly ..)`_k with c`
+   abstracts the offending term out of the goal BEFORE subsequent
+   rewrite/apply tactics, so the final algebra reasoning is on pure-rat
+   variables. *)
+
+Lemma char_poly_scale_rat42 (c : rat) (M : 'M[rat]_42) (k : nat) :
+  c != 0 -> (k <= 42)%N ->
+  (char_poly (c *: M))`_k = c ^+ (42 - k) * (char_poly M)`_k.
+Proof. exact: char_poly_scale. Qed.
+
+Lemma expf_neq0_rat (c : rat) (n : nat) : c != 0 -> c ^+ n != 0.
+Proof. exact: expf_neq0. Qed.
+
+Lemma size_char_poly_42 (M : 'M[rat]_42) : size (char_poly M) = 43.
+Proof. exact: size_char_poly. Qed.
+
+Lemma size_scale_rat (c : rat) (p : {poly rat}) : c != 0 -> size (c *: p) = size p.
+Proof. exact: size_scale. Qed.
+
+Lemma size_pol_to_polyrat_bound (l : list Z) :
+  (size (pol_to_polyrat l) <= List.length l)%nat.
+Proof.
+  rewrite /pol_to_polyrat.
+  apply: leq_trans (size_Poly _) _.
+  have : seq.size (ListDef.map (fun z => (Z_to_int z)%:~R : rat) l) = List.length l.
+  { elim: l => //= a xs IH. by rewrite IH. }
+  move=> ->. by [].
+Qed.
+
+(* Generic-rat cancellation: at the final step the goal is of the form
+   a = e * c. We have Hb_eq : b = d * c, Hab : a * d = e * b, Hd_ne : d != 0.
+   This is purely rat-level so no canonical-structure hang occurs. *)
+Lemma mat_cancel_helper (a b c d e : rat)
+  (Hb_eq : b = d * c) (Hab : a * d = e * b) (Hd_ne : d != 0) : a = e * c.
+Proof.
+  apply: (mulIf Hd_ne).
+  rewrite Hab Hb_eq. by rewrite mulrCA mulrC.
+Qed.
+
 Lemma charpoly_int_Dq_scaled :
   pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat.
-Proof. Admitted.
+Proof.
+  have Hcpi := @char_poly_int_correct A_int 42%nat A_int_dim' A_int_wf'.
+  have Hfl := fl_eq_flint.
+  have HDA : D_A <> BinInt.Z0 by discriminate.
+  have HDA_ne : (Z_to_int D_A)%:~R != (0 : rat)
+    by rewrite intr_eq0; exact: Z_to_int_neq0'.
+  have HA1 : mat_int_to_rat A_int 1 42 = (Z_to_int D_A)%:~R *: A_rat
+    by exact: mat_A_scale_eq_Arat.
+  (* Build Hcda via term-mode to avoid slow `rewrite Hcpi` elaboration. *)
+  have Hfl' : char_poly_int A_int = charpoly_of_A_int.
+  { rewrite -charpoly_Z_A_eq. exact Hfl. }
+  have Hcda : pol_to_polyrat charpoly_of_A_int = char_poly ((Z_to_int D_A)%:~R *: A_rat)
+    := eq_trans (f_equal pol_to_polyrat (esym Hfl'))
+         (eq_trans Hcpi (f_equal (@char_poly _ 42) HA1)).
+  apply/polyP => k.
+  rewrite coefZ.
+  case: (leqP k 42) => [Hk|Hk]; last first.
+  { (* k > 42 branch: both sides are 0 *)
+    have Hlhs_z : (pol_to_polyrat charpoly_int)`_k = 0.
+    { apply: nth_default. apply: leq_trans (size_pol_to_polyrat_bound _) _.
+      by rewrite length_charpoly_int. }
+    have Hrhs_z : (char_poly A_rat)`_k = 0.
+    { apply: nth_default. by rewrite size_char_poly_42. }
+    by rewrite Hlhs_z Hrhs_z mulr0. }
+  (* k <= 42 branch: term-mode construction of the key facts *)
+  have HdApow : (Z_to_int D_A)%:~R ^+ (42 - k) != (0 : rat)
+    := expf_neq0_rat _ _ HDA_ne.
+  have Hscale : (char_poly ((Z_to_int D_A)%:~R *: A_rat))`_k =
+                (Z_to_int D_A)%:~R ^+ (42 - k) * (char_poly A_rat)`_k
+    := char_poly_scale_rat42 _ _ _ HDA_ne Hk.
+  have Hk' : (k < 43)%coq_nat by apply/ltP; rewrite ltnS.
+  have Hlenint : (k < List.length charpoly_int)%nat
+    by rewrite length_charpoly_int; apply/ltP; lia.
+  have HlencpA : (k < List.length charpoly_of_A_int)%nat
+    by rewrite length_charpoly_of_A_int; apply/ltP; lia.
+  have Hpp_int_k : (pol_to_polyrat charpoly_int)`_k =
+    (Z_to_int (List.nth k charpoly_int Z0))%:~R
+    := pol_to_polyrat_coef _ _ Hlenint.
+  have Hpp_cpA_k : (pol_to_polyrat charpoly_of_A_int)`_k =
+    (Z_to_int (List.nth k charpoly_of_A_int Z0))%:~R
+    := pol_to_polyrat_coef _ _ HlencpA.
+  have HcpA_of_A : (Z_to_int (List.nth k charpoly_of_A_int Z0))%:~R =
+    (Z_to_int D_A)%:~R ^+ (42 - k) * (char_poly A_rat)`_k :> rat.
+  { rewrite -Hpp_cpA_k Hcda. exact Hscale. }
+  rewrite Hpp_int_k.
+  (* Lift the Z identity to rat via term-mode reasoning. *)
+  have HZ := scaling_Z k Hk'.
+  have HZrat : (Z_to_int (List.nth k charpoly_int Z0))%:~R *
+               (Z_to_int D_A)%:~R ^+ (42 - k) =
+               (Z_to_int D_q)%:~R *
+               (Z_to_int (List.nth k charpoly_of_A_int Z0))%:~R :> rat.
+  { have Hlift := f_equal (fun z : Z => (Z_to_int z)%:~R : rat) HZ.
+    move: Hlift. rewrite !Z_to_int_mul !intrM Z_to_int_Zpow_rat. exact id. }
+  (* Abstract (char_poly A_rat)`_k as `c` before the final manipulation to
+     avoid repeated canonical-structure elaboration. *)
+  pose c : rat := (char_poly A_rat)`_k.
+  rewrite -/c in HcpA_of_A.
+  change (char_poly A_rat)`_k with c.
+  apply: mat_cancel_helper; [exact HcpA_of_A | exact HZrat | exact HdApow].
+Qed.
