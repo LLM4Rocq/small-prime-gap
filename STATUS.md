@@ -1,6 +1,6 @@
 # Project status
 
-**25 Rocq files. 0 axioms in critical path. 0 admits in CRTLift.v, 2 admits in CertL2.v, 0 admits in Cert.v.**
+**25 Rocq files. 0 axioms in critical path. 0 admits in CRTLift.v, 1 admit in CertL2.v, 0 admits in Cert.v.**
 
 **CRTLift.v now compiles fully** (no more admits). Key fixes:
 1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
