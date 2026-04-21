@@ -2,7 +2,7 @@
    NO MathComp imports to avoid scope issues and slow type resolution. *)
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
-From PrimeGapS1 Require Import IntMat CharPoly Witness CharPolyAgree.
+From PrimeGapS1 Require Import IntMat CharPoly Witness ModularArith CharPolyAgree.
 From PrimeGapS1 Require Import CRTBridge CRTCheck Fermat PrimeCheck.
 
 Definition max_abs_entry (M : list (list Z)) : Z :=
@@ -702,11 +702,33 @@ Lemma per_prime_bigZ_eq p (Hin : In p crt_primes_all) :
 Proof. exact (list_eqb63_sound _ _ (proj1 (List.forallb_forall _ _) bigZ_bridge_710 p Hin)). Qed.
 
 (* Step 2: from char_poly_int_agrees_710 (Qed in CharPolyAgree.v).
-   Both `unfold check_charpoly_710` and direct `forallb_forall` cause
-   kernel hang during Qed (>25 min). Needs deeper opacity work. *)
+   Closed via named-predicate pattern mirroring matrix_per_prime. *)
+Lemma check_charpoly_as_forallb :
+  check_charpoly_710 = List.forallb check_charpoly_one_prime_710 crt_primes_all.
+Proof. reflexivity. Qed.
+
+Lemma shipped_per_prime (p : Uint63.int) (Hin : In p crt_primes_all) :
+  check_charpoly_one_prime_710 p = true.
+Proof.
+  assert (H : List.forallb check_charpoly_one_prime_710 crt_primes_all = true).
+  { rewrite <- check_charpoly_as_forallb. exact char_poly_int_agrees_710. }
+  exact ((proj1 (List.forallb_forall _ _) H) p Hin).
+Qed.
+
+(* Strategy opaque [list_eqb63 ...] is essential here. Without it, the kernel
+   tries to iota-reduce list_eqb63 X Y during conversion, which forces WHNF
+   of X = char_poly_mod p A_int, which triggers 42 iterations of FL over the
+   concrete 42x42 matrix — hanging >25 min. With list_eqb63 opaque, the
+   conversion stops at syntactic match on the list_eqb63 head. *)
+Strategy opaque [list_eqb63 char_poly_mod A_int charpoly_of_A_int_bigZ
+                 bigZ_to_mod63 reduce_mat_Z mmat_eye mmat_zero fl_mod_loop].
 Lemma per_prime_shipped_eq p (Hin : In p crt_primes_all) :
   char_poly_mod p A_int = List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ.
-Proof. Admitted.
+Proof.
+  apply list_eqb63_sound. exact (shipped_per_prime p Hin).
+Qed.
+Strategy transparent [list_eqb63 char_poly_mod A_int charpoly_of_A_int_bigZ
+                      bigZ_to_mod63 reduce_mat_Z mmat_eye mmat_zero fl_mod_loop].
 
 (* Step 1: char_poly_mod_sound — deductive, fast Qed *)
 Lemma check_primes_gt_43 :
@@ -1004,15 +1026,17 @@ Proof.
 Qed.
 
 (* Per-prime matrix agreement via deductive chain.
-   NOTE: proof tactics succeed but Qed hangs >25 min (same kernel-limit
-   pattern as per_prime_shipped_eq). The proof term involves concrete
-   A_int/M1_int/M2_int operations that the kernel tries to reduce. *)
+   Strategy opaque [mmat_eqb check_mat_identity_one_prime ...] prevents
+   the kernel from reducing mmat_eqb during conversion, which would
+   otherwise trigger WHNF descent into the 42x42 matrix operations
+   (same pattern as per_prime_shipped_eq). *)
+Strategy opaque [mmat_eqb
+                 Z_to_mod63 list_eqb63 char_poly_mod fl_mod_loop].
 Lemma per_prime_matrix_agreement p (Hin : In p crt_primes_all)
   i j (Hi : (i < 42)%nat) (Hj : (j < 42)%nat) :
   Z_to_mod63 p (mat_get mat_lhs_opaque i j) =
   Z_to_mod63 p (mat_get mat_rhs_opaque i j).
-Proof. Admitted.
-(* Proof body (tactics succeed; Qed hangs):
+Proof.
   pose proof (matrix_per_prime p Hin) as Heq.
   unfold check_mat_identity_one_prime in Heq.
   assert (Hvp : valid_prime p) by exact (crt_primes_valid p Hin).
@@ -1092,7 +1116,9 @@ Proof. Admitted.
   - rewrite mmat_scale_length, mmat_mul_length, List.length_map, M1_int_len. exact Hi.
   - rewrite HlhsRow. exact Hj.
   - rewrite HrhsRow. exact Hj.
-Qed. *)
+Qed.
+Strategy transparent [mmat_eqb
+                      Z_to_mod63 list_eqb63 char_poly_mod fl_mod_loop].
 
 (* --- Entry bounds (proved, not axioms) --- *)
 
