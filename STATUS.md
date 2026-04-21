@@ -1,10 +1,21 @@
 # Project status
 
-**25 Rocq files. Headline proof is NOT complete: it depends on 1 project admit.**
+**25 Rocq files. Headline proof is COMPLETE.**
 
-- 0 explicit `Axiom` declarations in critical path (the 2 Axioms in CRTCheck.v are not imported by Cert.v).
-- 1 `Admitted` lemma on the critical path: `CertL2.charpoly_int_Dq_scaled`. From the kernel's view (via `Print Assumptions`), this IS an axiom.
-- 0 admits in CRTLift.v, 0 admits in Cert.v.
+- 0 `Admitted` lemmas on the critical path.
+- 0 project-specific axioms visible to `Print Assumptions maynard_eigenvalue_S1`.
+- Only assumptions are standard PrimInt63 kernel primitives (built into Rocq).
+- 2 `Axiom` declarations remain in CRTCheck.v but that file is NOT imported by Cert.v (not in critical path).
+
+## The closure of `charpoly_int_Dq_scaled`
+
+The last admit was closed via a combination of techniques applied in CertL2.v:
+1. **Term-mode instead of tactic-mode** for calls whose statement mentions `(char_poly ...)`: plugging via `:= aux_lemma _ _ Hc Hk` bypasses MathComp's HB canonical-structure elaboration on the concrete `'M[rat]_42`.
+2. **Auxiliary lemmas specialised to (rat, 42)** (e.g., `char_poly_scale_rat42`, `expf_neq0_rat`, `size_char_poly_42`, `size_scale_rat`, `size_pol_to_polyrat_bound`, `mat_cancel_helper`): each isolates a single MathComp call in a small context where HB resolution runs in milliseconds.
+3. **`pose` / `change` to abstract `(char_poly A_rat)`_k as a fresh rat variable** before the final algebraic clean-up, so subsequent rewrites see only pure `rat` terms.
+4. **Explicit `eq_trans` / `f_equal`** wherever a `rewrite` would retrigger elaboration.
+
+Diagnosis: the "hang" is NOT kernel reduction (so `Strategy opaque` doesn't help) but MathComp's canonical-structure elaborator walking the algebraic-instance graph on fully concrete `'M[rat]_42`. The cure is to never expose `A_rat` to the elaborator during tactic invocation.
 
 **CRTLift.v now compiles fully** (no more admits). Key fixes:
 1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
