@@ -345,6 +345,29 @@ Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
 
    The full proof is ~50 lines of Rocq; it compiles but the final Qed exceeds
    the 30-min budget for this task iteration. *)
+(* Coefficient extractor for pol_to_polyrat: (pol_to_polyrat l)`_k = embed (nth k l 0). *)
+Lemma pol_to_polyrat_coef (l : list Z) (k : nat) :
+  (k < List.length l)%nat ->
+  (pol_to_polyrat l)`_k = (Z_to_int (List.nth k l Z0))%:~R :> rat.
+Proof.
+  move=> Hk. rewrite /pol_to_polyrat coef_Poly -ListDef_nth_eq.
+  elim: l k Hk => [|z l' IH] [|k'] //= Hk.
+  apply: IH. simpl in Hk. by apply/leP; lia.
+Qed.
+
+(* Strategy opaque on A_rat and char_poly_int prevents the kernel from
+   descending into the concrete 42x42 matrix / its charpoly during Qed's
+   conversion check — mirrors the CRTLift Strategy-opaque fix. *)
+(* [charpoly_int_Dq_scaled]: REMAINING ADMIT.
+   Per-coefficient proof structure is in place (mat_A_scale_eq_Arat is Qed,
+   char_poly_int_correct is Qed, fl_eq_flint is Qed, scaling_Z is Qed,
+   pol_to_polyrat_coef is Qed). The blocker: `apply: char_poly_scale`
+   at concrete dim n=42 hangs >2 min during elaboration. This is the
+   SAME MathComp canonical-structure-resolution slowdown documented in
+   PLAN_SLOW_MATHCOMP.md, but distinct from the kernel WHNF issue we
+   already solved with `Strategy opaque` on list_eqb63 / mmat_eqb.
+   Neither Strategy opaque nor explicit type annotations
+   (@char_poly_scale [the fieldType of rat] 42 ...) bypass this hang. *)
 Lemma charpoly_int_Dq_scaled :
   pol_to_polyrat charpoly_int = (Z_to_int D_q)%:~R *: char_poly A_rat.
 Proof. Admitted.
