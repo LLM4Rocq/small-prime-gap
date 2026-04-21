@@ -1,14 +1,23 @@
 # Project status
 
-**24 Rocq files. 0 axioms in critical path. 2 admits in CRTLift.v, 2 admits in CertL2.v, 0 admits in Cert.v.**
+**25 Rocq files. 0 axioms in critical path. 0 admits in CRTLift.v, 2 admits in CertL2.v, 0 admits in Cert.v.**
 
-**CRTLift.v now compiles in ~18 min** (was: hung indefinitely).
-Key fixes:
+**CRTLift.v now compiles fully** (no more admits). Key fixes:
 1. **per_prime_agreement** (was slow Qed): bridge lemma `charpoly_Z_A_eq` via
    `reflexivity` avoids kernel reducing `char_poly_int A_int`.
 2. **charpoly_coeff_bound** (was hanging Qed): extract
    `A_int_fl_all_divisible` and `A_int_fl_loop_coeff` as separate Qed helpers
    so the main proof uses opaque references.
+3. **per_prime_shipped_eq + per_prime_matrix_agreement** (closed without
+   native_compute): `Strategy opaque [list_eqb63 mmat_eqb char_poly_mod ...]`
+   prevents the kernel from iota-reducing the equality predicates during
+   conversion, which would otherwise trigger WHNF descent into the 42x42
+   matrix operations and 42-iteration FL loop. With these constants opaque,
+   the kernel stops at syntactic match. Closes in milliseconds (was: hung >25 min).
+4. **ModularArith.v** (new shared file): the duplicated definitions of
+   addmod63/mmat/reduce_mat_Z/.../char_poly_mod across CharPolyAgree.v and
+   CRTBridge.v are now in one canonical file imported by both. (Not strictly
+   required for the Strategy fix but eliminates a class of similar issues.)
 
 ## Headline theorem
 
@@ -22,22 +31,9 @@ Theorem maynard_eigenvalue_S1 :
 Qed in Cert.v. `Print Assumptions` shows 1 project admit (`charpoly_int_Dq_scaled`)
 plus ~30 standard Uint63 kernel primitives. Zero classical logic axioms.
 
-## CRTLift.v (0 axioms, 2 admits)
+## CRTLift.v (0 axioms, 0 admits)
 
-**Admits** (both kernel Qed limits when using the vm_compute Qeds from CharPolyAgree.v):
-- `per_prime_shipped_eq` -- extraction via `forallb_forall` from
-  `char_poly_int_agrees_710` hangs. The kernel cannot unify
-  `check_charpoly_710 = true` (opaque Qed of vm_compute proof) with
-  `forallb f l = true` in reasonable time. Even `exact_no_check` hangs at Qed.
-- `per_prime_matrix_agreement` -- full proof drafted in comments using
-  `matrix_per_prime` extraction (works via bridge lemma
-  `check_mat_identity_as_forallb`), `length_mmat_trans_fuel_wellformed` helper,
-  `mscale_mod_sound`, `mmul_mod_sound`, and `mmat_eqb_get`. Tactics succeed
-  but Qed hangs >25 min (proof term contains concrete matrix operations
-  the kernel tries to reduce).
-
-Both admits could close with `native_compute` which is disabled at
-configure time on this machine.
+Both per_prime admits are now closed via Strategy opaque (see headline).
 
 **Qed proofs (closed):**
 - 6 matrix operation bounds: `max_abs_entry_meye_le`, `max_abs_entry_mscale_le`,
