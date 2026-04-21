@@ -15,9 +15,9 @@ homepage: "https://github.com/prime-gap-audit/prime_gap"
 bug-reports: "https://github.com/prime-gap-audit/prime_gap/issues"
 depends: [
   # Pinned to the exact versions used to verify the headline theorem.
+  # Last full-rebuild validation: Rocq 9.1.1 + MathComp 2.5.0, ~29 min make -j.
   # Any version drift should be re-validated with a full rebuild.
-  "rocq-prover" {= "9.0.0"}
-  "rocq-core" {= "9.0.1"}
+  "rocq-core" {= "9.1.1"}
   "rocq-mathcomp-ssreflect" {= "2.5.0"}
   "rocq-mathcomp-boot" {= "2.5.0"}
   "rocq-mathcomp-order" {= "2.5.0"}
@@ -25,16 +25,15 @@ depends: [
   "rocq-mathcomp-algebra" {= "2.5.0"}
   "rocq-mathcomp-solvable" {= "2.5.0"}
   "rocq-mathcomp-field" {= "2.5.0"}
-  "rocq-mathcomp-character" {= "2.5.0"}
   "coq-mathcomp-real-closed" {= "2.0.3"}
   "coq-mathcomp-multinomials" {= "2.4.0"}
   "coq-mathcomp-algebra-tactics" {= "1.2.7"}
   "coq-mathcomp-bigenough" {= "1.0.4"}
   "coq-mathcomp-finmap" {= "2.2.2"}
   "coq-mathcomp-zify" {= "1.6.0+2.3+8.18"}
-  "rocq-bignums" {= "9.0.0+rocq9.0"}
+  "rocq-bignums" {= "9.0.0+rocq9.1"}
   "rocq-hierarchy-builder" {= "1.10.2"}
-  "rocq-elpi" {= "3.2.0"}
+  "rocq-elpi" {= "3.3.1"}
 ]
 build: [
   ["bash" "-c" "grep '\\.v$' _CoqProject | while read f; do coqc -Q theories/S1 PrimeGapS1 \"$f\"; done"]
