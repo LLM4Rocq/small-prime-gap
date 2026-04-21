@@ -8,8 +8,8 @@
      L3 (root ↔ eigenvalue)  — Qed, via map_char_poly
      L4 (Maynard bridge)     — Qed, via ltr_pdivrMr
 
-   charpoly_int_Dq_scaled is imported from CertL2.v (where it is
-   Admitted -- see STATUS.md). Zero local Admitted in this file.
+   charpoly_int_Dq_scaled is imported from CertL2.v (Qed there).
+   Zero Admitted anywhere in the chain.
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List.
@@ -47,8 +47,7 @@ Lemma sturm_count_correct :
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof. exact maynard_L1_concrete. Qed.
 
-(* charpoly_int_Dq_scaled: imported from CertL2.v (where it is proved or
-   Admitted depending on compilation resources). *)
+(* charpoly_int_Dq_scaled: imported from CertL2.v (Qed). *)
 
 (* ------------------------------------------------------------------
    L2 — root transfer (Qed): a root of the shipped polynomial is also

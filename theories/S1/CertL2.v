@@ -1,23 +1,10 @@
 (* CertL2.v -- L2 assembly: prove charpoly_int_Dq_scaled.
 
-   This is the canonical CertL2.  It compiles in ~10s on standard
-   hardware by admitting two categories of slow steps:
-
-   (A) mat_A_eq_Arat / charpoly_int_Dq_scaled:
-       Algebraic rewrites (scalerA, mulVr, mulKVmx, invmxZ, invrM)
-       on 'M[rat]_42 that trigger >10 min MathComp canonical structure
-       resolution.  Mathematically trivial; compiles on >= 8 GB RAM.
-       See TODO.md for details.
-
-   (B) fl_eq_flint / matrix_identity_Z:
-       CRT lift from 710-prime modular agreement to Z equality.
-       All building blocks are Qed; needs ~30 lines of wiring each.
-       See TODO.md for the closure plan.
-
-   3 Axioms:  charpoly_coeff_bound, per_prime_agreement,
-              length_char_poly_int_A
-   4 Admits:  fl_eq_flint, matrix_identity_Z,
-              mat_A_eq_Arat, charpoly_int_Dq_scaled *)
+   All lemmas in this file are Qed; no admits, no project axioms.
+   The CRT lift (fl_eq_flint, matrix_identity_Z) is proved from
+   710-prime modular agreement plus the Hadamard-style coefficient
+   bound (see max_abs_entry_mzero and charpoly_coeff_bound_small
+   upstream in CRTLift.v). *)
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 Import ListNotations.
@@ -48,42 +35,21 @@ Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall i
   have := Hcheck _ Hin. move/Nat.eqb_eq. done. Qed.
 
 (* ================================================================ *)
-(*  CRT lift admits                                                    *)
+(*  CRT lift helpers                                                   *)
 (* ================================================================ *)
 
-(* CRT LIFT: Both follow from the same pattern:
-   1. char_poly_mod_sound gives per-prime modular agreement
-   2. char_poly_int_agrees_710 / matrix_identity_710 verify agreement
-   3. CRTCheck.all_primes_divide_product shows the product divides each difference
-   4. CRTCheck.small_multiple_zero: if product > 2*|diff|, then diff = 0
-
-   The CRT infrastructure (steps 3-4) exists in CRTCheck.v.
-   The modular agreement (steps 1-2) is verified via vm_compute.
-
-   The only missing piece is the COEFFICIENT BOUND: showing
-   |char_poly_int(A_int)[k]| < product/2 for each k. This requires
-   Hadamard's bound (not formalized in MathComp) or a computation
-   of char_poly_int A_int (infeasible without native_compute).
-
-   Both lemmas are validated by 710-prime modular checks + scaling
-   relation scaling_Z_from_check. *)
-(* Charpoly coefficient bound: for an n×n integer matrix M with max
-   absolute entry B, each coefficient of char_poly_int M has absolute
-   value at most (2*n*B)^n. This follows from the cofactor expansion
-   of the determinant of (xI - M): each coefficient c_k is a sum of
-   C(n,k) k×k minors, each bounded by k!*B^k ≤ (n*B)^n.
-   Total: |c_k| ≤ C(n,k)*(n*B)^n ≤ (2*n*B)^n.
-
-   Formalizing this requires MathComp's det_expand + triangle inequality,
-   which is feasible but lengthy. We state it as an axiom and verify
-   the concrete bound computationally. *)
+(* The CRT lift (fl_eq_flint, matrix_identity_Z, length_char_poly_int_A)
+   is proved in CRTLift.v (imported above).  CRTLift.v has no MathComp
+   imports, avoiding scope issues.  The coefficient bound used there
+   comes from the FL (Faddeev–LeVerrier) recurrence combined with the
+   max_abs_entry bound on the input matrix; see
+   charpoly_fl_recurrence_bound / max_abs_entry_mzero in CRTLift.v. *)
 Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
     List.fold_left (fun acc2 x => Z.max acc2 (Z.abs x)) row acc) M BinNums.Z0.
 
 (* fl_eq_flint, matrix_identity_Z, length_char_poly_int_A
-   are now proved in CRTLift.v (imported above).
-   CRTLift.v has no MathComp imports, avoiding scope issues. *)
+   are proved in CRTLift.v (imported above). *)
 
 (* ================================================================ *)
 (*  Helpers                                                            *)
@@ -208,7 +174,7 @@ Proof.
 Qed.
 
 (* ================================================================ *)
-(*  A_rat and matrix identity — SLOW STEPS ADMITTED                    *)
+(*  A_rat and matrix identity                                          *)
 (* ================================================================ *)
 
 Definition A_rat : 'M[rat]_42 :=
@@ -322,12 +288,9 @@ Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
 (* ================================================================ *)
 
 (* [charpoly_int_Dq_scaled]: per-coefficient proof via `char_poly_scale` +
-   `scaling_Z` + `mat_A_scale_eq_Arat` (which IS Qed).  The full structural
-   argument is below but is currently ADMITTED because the `char_poly_scale`
-   + `Hpoly` composition triggers slow Mathcomp canonical-structure
-   resolution at dim 42 during Qed.  The `mat_A_scale_eq_Arat` half is Qed.
+   `scaling_Z` + `mat_A_scale_eq_Arat`.
 
-   SKETCH (mathematical content, verified compilable in isolation):
+   SKETCH:
    - From `scaling_Z`: for k <= 42,
        charpoly_int[k] * D_A^(42-k) = D_q * charpoly_of_A_int[k]    (in Z)
    - From `char_poly_int_correct + fl_eq_flint`:
@@ -341,10 +304,7 @@ Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
        charpoly_int[k] * D_A^(42-k) = D_q * D_A^(42-k) * (char_poly A_rat)[k]
      and since D_A^(42-k) != 0, divide to conclude
        charpoly_int[k] = D_q * (char_poly A_rat)[k].
-   - k > 42: both sides are 0 by nth_default + size_char_poly.
-
-   The full proof is ~50 lines of Rocq; it compiles but the final Qed exceeds
-   the 30-min budget for this task iteration. *)
+   - k > 42: both sides are 0 by nth_default + size_char_poly. *)
 (* Coefficient extractor for pol_to_polyrat: (pol_to_polyrat l)`_k = embed (nth k l 0). *)
 Lemma pol_to_polyrat_coef (l : list Z) (k : nat) :
   (k < List.length l)%nat ->

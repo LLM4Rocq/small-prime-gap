@@ -20,36 +20,25 @@
    - MathComp algebra   (for the abstract `char_poly` spec).
 
    ===============================================================
-   PROOF OUTLINE for `char_poly_int_correct`  (L2, PLAN_S1.md)
+   PROOF OUTLINE for `char_poly_int_correct`  (L2)
    ===============================================================
 
    Goal:
      pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n)
 
-   --- Proof chain ---
+   Proof chain (all Qed, zero Admitted):
 
-   Step 0 [Qed]:
-     Structural trivia (meye_aux_len, mat_dim_meye, mzero_aux_len,
+   Step 0: Structural trivia (meye_aux_len, mat_dim_meye, mzero_aux_len,
      mat_dim_mzero) — proved by list induction.
 
-   Step 1 [Qed]:
-     All 6 bridge lemmas (mat_int_to_rat_meye/mzero/mmul/madd/mscale,
-     mtrace_int_to_rat) are fully proved.
+   Step 1: Bridge lemmas (mat_int_to_rat_meye/mzero/mmul/madd/mscale,
+     mtrace_int_to_rat).
 
-   Steps 2-3 [Qed modulo Z_rem_of_intr_eq]:
-     FL loop invariant (fl_invariant_L2) — Qed for the inductive step
-       under hypotheses; wrapper Admitted pending fl_divisibility_L2.
-     FL = char_poly (fl_loop_rat_is_char_poly_L2) — Qed via
-       adj_coef_jacobi (Jacobi's formula proved from Leibniz).
+   Steps 2-3: FL loop invariant (fl_invariant_L2) and
+     fl_loop_rat_is_char_poly_L2 (via adj_coef_jacobi, itself proved
+     from Leibniz's formula).
 
-   Step 4 [Admitted]:
-     char_poly_int_correct — assembly of Steps 1-3.
-
-   Current status:
-     Step 0: Qed.
-     Step 1: Qed.
-     Steps 2-3: mostly Qed; fl_divisibility_L2 Admitted.
-     Step 4: Admitted (assembly).
+   Step 4: Assembly of Steps 1-3 into char_poly_int_correct.
    --------------------------------------------------------------- *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -126,8 +115,7 @@ Fixpoint fl_loop
    Cert.v does not call `char_poly_int` directly (it only mentions
    it in comments and uses `char_poly_int_correct` / `mat_int_to_rat`
    / `pol_to_polyrat` through opaque bridges), so we are free to
-   expose the cleaner 1-argument signature. The bridging names
-   below keep the public API expected by PLAN_S1.md.
+   expose the cleaner 1-argument signature.
    ------------------------------------------------------------------ *)
 Definition char_poly_int (A : mat) : pol :=
   let n := mat_dim A in
@@ -136,7 +124,7 @@ Definition char_poly_int (A : mat) : pol :=
   coeffs ++ [Z.one].
 
 (* ==================================================================
-   Bridging definitions — concrete (no longer Admitted).
+   Bridging definitions.
 
    These functions are plumbing between our `list Z`-based computational
    layer and MathComp's `'M[rat]_n` / `{poly rat}` spec layer. They are
@@ -1924,7 +1912,7 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------
-   L2 (PLAN_S1.md section 3) — the load-bearing correctness lemma.
+   L2 — the load-bearing correctness lemma.
 
    `char_poly_int M` computes `det(lambda*I - M)` for an integer matrix M.
    `mat_int_to_rat M 1 n` lifts M to `'M[rat]_n` with denominator 1
