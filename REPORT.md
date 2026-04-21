@@ -14,7 +14,7 @@ Theorem maynard_eigenvalue_S1 :
 
 is `Qed` in `theories/S1/Cert.v`. `Print Assumptions maynard_eigenvalue_S1`
 exposes only the standard `PrimInt63` / `Uint63Axioms` kernel primitives
-shipped with Rocq 9.0 (native 63-bit integers, used by `vm_compute` on the
+shipped with Rocq 9.0/9.1 (native 63-bit integers, used by `vm_compute` on the
 CRT and Sturm-chain computations). There are no project-specific `Axiom` or
 `Admitted` lemmas on the critical path.
 
@@ -92,7 +92,7 @@ Two *independent* verification layers:
    chain over exact rationals (via `python-flint`, i.e. GMP/MPFR), and
    emits a JSON certificate.
 
-2. A **Rocq 9.0 layer** (`theories/S1/*.v`) that consumes the
+2. A **Rocq 9.0/9.1 layer** (`theories/S1/*.v`) that consumes the
    certificate as compile-time data, re-does *every* arithmetic step
    inside the Rocq kernel, and proves the headline theorem at the level
    of MathComp's abstract `eigenvalue` predicate.
@@ -479,9 +479,9 @@ and proves:
   lift) → `mat_A_scale_eq_Arat` (structural equality above) →
   `CharPolyScale.char_poly_scale` (the *c^(n-k)* formula).
 
-All of CertL2.v is `Qed`; the two slow steps described in older
-`STATUS.md` revisions were closed using the generic-n-helper technique
-described in §4d.
+All of CertL2.v is `Qed`; the two previously-slow steps
+(`mat_A_eq_Arat` and `charpoly_int_Dq_scaled`) were closed using the
+generic-n-helper technique described in §4d.
 
 **`Cert.v`**. **The headline assembly.** Four small lemmas glue L1–L4
 together; the full proof of `maynard_eigenvalue_S1` is a few tactic
@@ -872,7 +872,7 @@ directly.
 
 `Print Assumptions maynard_eigenvalue_S1` after `coqc` of Cert.v prints
 only the standard `PrimInt63` primitives (and their `Z` / `Uint63`
-specifications) shipped with Rocq 9.0 and the `Bignums` library: things
+specifications) shipped with Rocq 9.0/9.1 and the `Bignums` library: things
 like `Uint63.add`, `Uint63.mul`, `Uint63.to_Z`, `BigN.succ_spec`.
 
 These are not project-specific axioms; they are Rocq's declaration that
@@ -882,7 +882,7 @@ Equivalent statements appear in any proof that uses `vm_compute` on
 
 **Concretely, a reviewer who trusts:**
 
-1. The Rocq 9.0 kernel's type-checking algorithm.
+1. The Rocq 9.0/9.1 kernel's type-checking algorithm.
 2. The `Uint63` and `BigN` primitive axioms (i.e., that the OCaml
    implementation of 63-bit integer arithmetic is faithful to the
    spec).

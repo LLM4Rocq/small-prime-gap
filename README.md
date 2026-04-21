@@ -16,7 +16,7 @@ repository replaces it with two independent verification layers:
    verified), computes the characteristic polynomial and Brown-Traub
    Sturm chain, and emits a JSON certificate.
 
-2. **A Rocq layer** (Rocq 9.0 + MathComp 2.5 + `mathcomp-real-closed`):
+2. **A Rocq layer** (Rocq 9.0/9.1 + MathComp 2.5 + `mathcomp-real-closed`):
    consumes the certificate, machine-verifies every computational fact
    via CRT over 710 Uint63 native primes and BigZ evaluation, and proves
    the headline eigenvalue theorem.
@@ -46,9 +46,10 @@ Proof. (* L1 + L2 + L3 + L4 *) Qed.
 
 ```
 prime_gap/
-+-- coq-prime-gap.opam              opam package file
++-- coq-prime-gap.opam              opam package file (pinned deps)
++-- requirements.txt                pinned python-flint for the FLINT layer
 +-- README.md                       this file
-+-- STATUS.md                       detailed project status
++-- REPORT.md                       detailed technical walkthrough
 +-- _CoqProject                     22 .v files in dependency order
 |
 +-- flint_probe.py                  M1, M2 builder
@@ -94,9 +95,11 @@ prime_gap/
 ## Prerequisites
 
 - **Python >= 3.11** + **`python-flint` 0.8.0**
-- **Rocq 9.0** with: `rocq-mathcomp-ssreflect`, `rocq-mathcomp-algebra`,
-  `rocq-mathcomp-field`, `rocq-mathcomp-real-closed`, `rocq-bignums`,
-  `coq-mathcomp-multinomials`, `coq-mathcomp-algebra-tactics`
+- **Rocq 9.0 or 9.1** with: `rocq-mathcomp-ssreflect`, `rocq-mathcomp-algebra`,
+  `rocq-mathcomp-field`, `coq-mathcomp-real-closed`, `rocq-bignums`,
+  `coq-mathcomp-multinomials`, `coq-mathcomp-algebra-tactics` (all 2.5.0
+  for MathComp, 2.0.3 for real-closed; see `coq-prime-gap.opam` for
+  exact pins validated by the most recent full rebuild).
 - Or simply: `opam install ./coq-prime-gap.opam --deps-only`
 
 ## How to use
