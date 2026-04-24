@@ -119,36 +119,19 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma all_match_M2Z_true : all_match_M2Z = true.
 Proof. vm_compute. reflexivity. Qed.
 
-(* ------------------------------------------------------------------
-   Optional rat-level restatement.
+(* The two bool facts above carry the full numerical content:
+   for every (i, j) in [0, 42) x [0, 42),
 
-   These are stated so a MathComp-side user can refer to the
-   spec as a single matrix equality.  They are left as `Axiom`
-   only because closing them by `apply/matrixP => i j; ...`
-   triggers the HB canonical-structure blow-up documented in
-   REPORT.md §4d at the concrete dimension 42.  The content is
-   the already-Qed bool facts above, modulo the standard rat
-   identity `a/b = c/d  <==>  a*d = c*b`.
+     m1_num(i,j) * D_M1  =  M1_int[i][j] * m1_den(i,j)    (in Z)
+     m2_num(i,j) * D_M2  =  M2_int[i][j] * m2_den(i,j)    (in Z)
 
-   The headline theorem `maynard_eigenvalue_S1` (in Cert.v) does
-   NOT import this file, so these axioms do NOT pollute its
-   assumption set.  Verified by `Print Assumptions
-   maynard_eigenvalue_S1` after this file is added to the build.
-   ------------------------------------------------------------------ *)
+   i.e., the shipped integer entries, divided by their denominators,
+   equal Maynard's closed-form rational values (via the standard
+   rat identity  a/b = c/d  <==>  a*d = b*c  on positive b, d).
 
-Definition M1_rat : 'M[rat]_42 := mat_int_to_rat Witness.M1_int Witness.D_M1 42.
-Definition M2_rat : 'M[rat]_42 := mat_int_to_rat Witness.M2_int Witness.D_M2 42.
-
-Definition f_M1 (i j : nat) : rat :=
-  ((Z_to_int (m1_num i j))%:~R / (Z_to_int (m1_den i j))%:~R)%R.
-
-Definition f_M2 (i j : nat) : rat :=
-  ((Z_to_int (m2_num i j))%:~R / (Z_to_int (m2_den i j))%:~R)%R.
-
-Definition M1_spec : 'M[rat]_42 := \matrix_(i, j) f_M1 (nat_of_ord i) (nat_of_ord j).
-Definition M2_spec : 'M[rat]_42 := \matrix_(i, j) f_M2 (nat_of_ord i) (nat_of_ord j).
-
-(* Follows from all_match_M1Z_true + standard rat cross-multiplication,
-   but MathComp HB elaboration at dim 42 makes the `Qed` prohibitive. *)
-Axiom M1_correct : M1_rat = M1_spec.
-Axiom M2_correct : M2_rat = M2_spec.
+   We deliberately do NOT promote this to a rat-level matrix
+   equality `\matrix_(i, j) ... = \matrix_(i, j) ...` at dim 42
+   here: `apply/matrixP => i j; ...` on `'M[rat]_42` triggers
+   MathComp HB canonical-structure elaboration (REPORT.md §4d)
+   and stalls the Qed well beyond the project's compile budget,
+   while adding no numerical content beyond the bool facts. *)
