@@ -121,8 +121,9 @@ source .venv/bin/activate && python python/build_certificate.py
 # 2. Regenerate Rocq witness files (optional -- pre-built)
 python tools/json_to_v.py --with-chain
 
-# 3. Build all Rocq files (~50-60 min with `make -j`; ~80 min sequential)
-#    Most of the wall-clock time is in two single-threaded vm_compute steps:
+# 3. Build all Rocq files (~37 min with `make -j` on a multi-core box;
+#    ~80 min sequential).  Most of the wall-clock time is two
+#    single-threaded vm_compute phases that overlap under `make -j`:
 #      - CharPolyAgree.v + CRTLift.v: ~25 min combined (710-prime CRT checks)
 #      - MaynardVerify.v: ~35 min for the 42x42 M2 spec cross-check
 coq_makefile -f _CoqProject -o Makefile

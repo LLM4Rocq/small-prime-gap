@@ -1027,8 +1027,9 @@ has zero `Axiom` declarations and zero `Admitted` lemmas anywhere.
 - **Cauchy bound.** The IVT step uses MathComp's `cauchy_bound` — an
   explicit rational upper bound on all real roots of the polynomial,
   derived from the coefficients. No custom bound is needed.
-- **Build time.** `make -j` completes in ~50–60 min on a multi-core
-  machine, ~80 min sequential. The dominant costs are:
+- **Build time.** `make -j` completes in ~37 min on a multi-core
+  machine (measured: 36 min 49 s on this box), ~80 min sequential.
+  The dominant costs are:
   - `MaynardVerify.all_match_M2Z_true`: ~35 min (single-threaded
     `vm_compute` over 1764 entries each summing up to 36 rational
     terms with ~10^7000-digit accumulator denominators).
