@@ -124,7 +124,7 @@ prime_gap/
 +-- README.md                       this file
 +-- REPORT.md                       detailed technical walkthrough
 +-- SPEC_TO_PAPER.md                line-level mapping MaynardSpec -> arXiv §8
-+-- _CoqProject                     27 .v files in dependency order
++-- _CoqProject                     26 .v files in dependency order
 |
 +-- flint_probe.py                  M1, M2 builder
 +-- m1m2.pkl                        cached exact-rational M1, M2
@@ -164,7 +164,6 @@ prime_gap/
     +-- MaynardBasis.v              42-element basis with Witness bridge
     +-- MaynardSpec.v               G_{n,2}(k), M1_entry, M2_entry closed forms
     +-- MaynardVerify.v             kernel-verifies M1_int, M2_int match the spec
-    +-- MaynardBridge.v             symmetry of M1, M2 (rat- and Z-level)
     |
     +-- Bridge.v                    L1 Sturm bridge
     +-- CertL1.v                    L1 IVT proof
