@@ -1,0 +1,132 @@
+name: Deploy Blueprint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: coq-community/docker-coq-action@v1
+        with:
+          opam_file: coq-prime-gap.opam
+          coq_version: '9.1.1'
+          ocaml_version: 'default'
+          before_script: |
+            startGroup "Workaround permission issue"
+              sudo chown -R 1000:1000 .
+            endGroup
+          # The full Rocq build of this project is ~37 minutes (vm_compute on
+          # 710-prime CRT plus the 42x42 MaynardVerify cross-check), too long
+          # for a standard GitHub Action runner. We only build coqdoc HTML
+          # for the lighter-weight files used by the blueprint cross-refs.
+          # If you have access to a self-hosted runner, replace the body of
+          # the after_script below with `make -f Makefile.doc html` to build
+          # full coqdoc.
+          after_script: |
+            startGroup "Build coqdoc (skeleton only)"
+              if ! command -v rocq >/dev/null 2>&1 ; then
+                coq_makefile -f _CoqProject -o Makefile.doc
+              else
+                rocq makefile -f _CoqProject -o Makefile.doc
+              fi
+              # Best effort: build whatever compiles within the runner
+              # budget. The blueprint links to coqdoc HTML; missing pages
+              # render as plain anchors.
+              mkdir -p html
+              make -f Makefile.doc html || true
+            endGroup
+            sudo chown -R $(id -u):$(id -g) html/ || true
+
+      - name: Revert permissions
+        if: ${{ always() }}
+        run: sudo chown -R 1001:116 . || true
+
+      - name: Upload coqdoc artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coqdoc-html
+          path: html/
+          if-no-files-found: ignore
+
+  build-blueprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz libgraphviz-dev texlive-latex-base texlive-latex-extra texlive-xetex texlive-fonts-extra latexmk
+
+      - name: Install rocqblueprint
+        run: pip install rocqblueprint
+
+      - name: Build blueprint (web)
+        run: rocqblueprint web
+
+      - name: Build blueprint (pdf, best-effort)
+        run: rocqblueprint pdf || true
+
+      - name: Stage site
+        run: |
+          mkdir -p site
+          cp -r blueprint/web site/blueprint || true
+          if [ -f blueprint/print/print.pdf ]; then
+            cp blueprint/print/print.pdf site/blueprint.pdf
+          fi
+
+      - name: Upload blueprint artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blueprint-site
+          path: site/
+
+  combine-and-deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-docs, build-blueprint]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download blueprint
+        uses: actions/download-artifact@v4
+        with:
+          name: blueprint-site
+          path: site/
+
+      - name: Download coqdoc
+        uses: actions/download-artifact@v4
+        with:
+          name: coqdoc-html
+          path: site/docs/
+        continue-on-error: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

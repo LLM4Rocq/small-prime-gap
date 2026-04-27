@@ -1,0 +1,50 @@
+% Math macros and theorem environments shared by web.tex and print.tex.
+%
+% The dep-graph collects environments definition, lemma, proposition,
+% theorem and corollary by default. We add `proposition` for L0/L4-style
+% summary statements.
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newtheorem*{convention}{Convention}
+
+% Project-specific math macros.
+
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Fp}{\mathbb{F}_p}
+\newcommand{\realalg}{\mathbb{R}_{\mathrm{alg}}}
+
+\newcommand{\Mone}{M_1}
+\newcommand{\Mtwo}{M_2}
+\newcommand{\Mk}{M_k}
+\newcommand{\lammax}{\lambda_{\max}}
+\newcommand{\Arat}{A_{\mathrm{rat}}}
+\newcommand{\Aint}{A_{\mathrm{int}}}
+\newcommand{\charpolysym}{\chi}
+\newcommand{\Dq}{D_q}
+\newcommand{\DA}{D_A}
+\newcommand{\DMone}{D_{M_1}}
+\newcommand{\DMtwo}{D_{M_2}}
+
+\newcommand{\Gnk}[2]{G_{#1, 2}(#2)}
+\newcommand{\Bnd}{\mathrm{Bnd}}
+\newcommand{\Cff}{\mathrm{Cff}}
+\newcommand{\Vsig}{\mathcal{V}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\lcoeff}{\operatorname{lc}}
+\newcommand{\trace}{\operatorname{tr}}
+
+\newcommand{\Uintsf}{\mathsf{Uint63}}
+\newcommand{\BigZ}{\mathsf{BigZ}}
+\newcommand{\vmcompute}{\texttt{vm\_compute}}

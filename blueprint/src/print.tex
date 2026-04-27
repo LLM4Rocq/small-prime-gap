@@ -1,0 +1,22 @@
+% PDF entry point for the prime_gap blueprint.
+% This file is processed by `rocqblueprint pdf` (xelatex via latexmk).
+
+\documentclass[a4paper]{report}
+
+\usepackage{geometry}
+\usepackage{expl3}
+\usepackage{amssymb, amsthm, mathtools}
+\usepackage[unicode,colorlinks=true,linkcolor=blue,urlcolor=magenta,citecolor=blue]{hyperref}
+\usepackage[warnings-off={mathtools-colon,mathtools-overbracket}]{unicode-math}
+
+\input{macros/common}
+\input{macros/print}
+
+\title{Maynard's $M_{105} > 4$: a Rocq audit}
+\author{Guillaume Baudart with Claude Opus 4.7 and Rocq-MCP}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\input{content}
+\end{document}
