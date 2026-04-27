@@ -135,7 +135,7 @@ Definition fl_coeff_bound (sz : nat) (B : Z) : Z :=
 Lemma fl_crt_bound :
   (2 * fl_coeff_bound 42 (max_abs_entry A_int) +
    2 * max_abs_coeff charpoly_of_A_int < crt_product_710)%Z.
-Proof. apply Z.ltb_lt. native_compute. reflexivity. Qed.
+Proof. apply Z.ltb_lt. vm_compute. reflexivity. Qed.
 
 (* --- max_abs_entry infrastructure --- *)
 
