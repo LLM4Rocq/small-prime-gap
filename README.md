@@ -67,6 +67,40 @@ A single `Print Assumptions maynard_M105_certified` therefore covers
 both the 1764+1764 input-matrix entries (each kernel-checked against
 Maynard's closed form) and the eigenvalue-above-`4/105` statement.
 
+## What this proves, and what stays paper-side
+
+The contractual chain underlying `M_{105} > 4`:
+
+```
+   [ Rocq, kernel-checked  ]            [ Maynard's paper, Lemma 8.3 ]
+
+   λ_max(M₁⁻¹M₂) > 4/105      ────►     M_{105} = 105·λ_max > 4
+```
+
+This Rocq project closes the **left box** with kernel assurance — the
+same step the Mathematica notebook closes (notebook does it via a
+rational Rayleigh-quotient witness; we do it via a Sturm-chain / IVT
+witness on `char_poly(M₁⁻¹M₂)`). The right arrow is Maynard's Lemma 8.3
+(`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`), proved in the Annals
+paper and refereed there; it is **not** formalised in this repository,
+and the Mathematica notebook didn't formalise it either. The project's
+scope is to replace the unrefereed *computational* black box, not to
+re-formalise Maynard's paper.
+
+Concretely:
+
+- A reader who trusts **Rocq's kernel + Maynard's Annals paper** gets
+  `M_{105} > 4` end-to-end.
+- A reader who trusts **only Rocq's kernel** gets `λ_max > 4/105` for a
+  specific kernel-verified 42×42 ℚ-matrix pencil — the harder-to-trust
+  half of Maynard's original argument, now machine-checked.
+
+In both readings, Lemma 8.2 (the closed-form matrix entries) is on the
+Rocq side: `MaynardVerify.all_match_M{1,2}Z_true` checks all 1764+1764
+entries against the paper's formulas (`MaynardSpec.{M1,M2}_entry`)
+inside the kernel. See `SPEC_TO_PAPER.md` for the line-level mapping
+from `MaynardSpec` to arXiv §8.
+
 ## Relation to Maynard's notebook
 
 Maynard's `Computations.nb` certifies `M_{105} > 4` via the *eigenvector
