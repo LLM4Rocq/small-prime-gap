@@ -1,0 +1,24 @@
+% Web (HTML) entry point for the prime_gap blueprint.
+% This file is processed by plasTeX via `rocqblueprint web`.
+
+\documentclass{report}
+
+\usepackage{amssymb, amsthm, amsmath}
+\usepackage{hyperref}
+\usepackage[dep_graph]{blueprint}
+
+\input{macros/common}
+\input{macros/web}
+
+% Adjust on first push: GitHub user/org and repo name determine these.
+\home{https://gbaudart.github.io/prime_gap/}
+\github{https://github.com/gbaudart/prime_gap}
+\dochome{https://gbaudart.github.io/prime_gap/docs}
+
+\title{Maynard's $M_{105} > 4$: a Rocq audit}
+\author{Guillaume Baudart with Claude Opus 4.7 and Rocq-MCP}
+
+\begin{document}
+\maketitle
+\input{content}
+\end{document}

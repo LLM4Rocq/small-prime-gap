@@ -1,0 +1,9 @@
+# Python dependencies for building the blueprint locally.
+# Install with:  pip install -r blueprint/requirements.txt
+#
+# The CI workflow (.github/workflows/blueprint.yml) installs the same
+# package directly. graphviz / libgraphviz-dev must also be installed
+# at the OS level (`sudo apt install graphviz libgraphviz-dev` on
+# Debian/Ubuntu).
+
+rocqblueprint

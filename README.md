@@ -1,5 +1,8 @@
 # Maynard `M_{105} > 4` — independent FLINT + Rocq audit
 
+[![Blueprint](https://img.shields.io/badge/blueprint-online-blue)](https://gbaudart.github.io/prime_gap/blueprint/)
+[![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
+
 An independently auditable re-implementation of the numerical
 computation underlying **Proposition 4.3 / formula (8.15)** of James
 Maynard's *Small gaps between primes*
