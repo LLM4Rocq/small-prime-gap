@@ -16,39 +16,55 @@
 \newtheorem*{remark}{Remark}
 \newtheorem*{convention}{Convention}
 
+% ---------------------------------------------------------------------
 % Project-specific math macros.
 %
-% All math macros are wrapped in \ensuremath{} so they can be invoked
-% from text mode as well as math mode without LaTeX errors.
+% Usage convention: every macro below is called from inside math mode
+% (i.e., between $...$ or inside an equation environment) — VERIFIED
+% by an audit of content.tex. So they are defined as plain math-mode
+% commands. Wrapping them in \ensuremath{} is tempting but breaks
+% interactions with unicode-math when used as superscripts or
+% subscripts (e.g. M_k^\Q triggers a "Missing { inserted" because the
+% \ensuremath expansion confuses unicode-math's __um_group_begin).
+%
+% The two exceptions below (\Uintsf, \BigZ) ARE called from text mode
+% in several places ("the \Uintsf kernel", "$43$ \BigZ\ coefficients")
+% and are sans-serif, never used in super/subscripts. They use
+% \ensuremath to be safe in both contexts.
+% ---------------------------------------------------------------------
 
-\newcommand{\Z}{\ensuremath{\mathbb{Z}}}
-\newcommand{\Q}{\ensuremath{\mathbb{Q}}}
-\newcommand{\R}{\ensuremath{\mathbb{R}}}
-\newcommand{\N}{\ensuremath{\mathbb{N}}}
-\newcommand{\Fp}{\ensuremath{\mathbb{F}_p}}
-\newcommand{\realalg}{\ensuremath{\mathbb{R}_{\mathrm{alg}}}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Fp}{\mathbb{F}_p}
+\newcommand{\realalg}{\mathbb{R}_{\mathrm{alg}}}
 
-\newcommand{\Mone}{\ensuremath{M_1}}
-\newcommand{\Mtwo}{\ensuremath{M_2}}
-\newcommand{\Mk}{\ensuremath{M_k}}
-\newcommand{\lammax}{\ensuremath{\lambda_{\max}}}
-\newcommand{\Arat}{\ensuremath{A_{\mathrm{rat}}}}
-\newcommand{\Aint}{\ensuremath{A_{\mathrm{int}}}}
-\newcommand{\charpolysym}{\ensuremath{\chi}}
-\newcommand{\Dq}{\ensuremath{D_q}}
-\newcommand{\DA}{\ensuremath{D_A}}
-\newcommand{\DMone}{\ensuremath{D_{M_1}}}
-\newcommand{\DMtwo}{\ensuremath{D_{M_2}}}
+\newcommand{\Mone}{M_1}
+\newcommand{\Mtwo}{M_2}
+\newcommand{\Mk}{M_k}
+\newcommand{\lammax}{\lambda_{\max}}
+\newcommand{\Arat}{A_{\mathrm{rat}}}
+\newcommand{\Aint}{A_{\mathrm{int}}}
+\newcommand{\charpolysym}{\chi}
+\newcommand{\Dq}{D_q}
+\newcommand{\DA}{D_A}
+\newcommand{\DMone}{D_{M_1}}
+\newcommand{\DMtwo}{D_{M_2}}
 
-\newcommand{\Gnk}[2]{\ensuremath{G_{#1, 2}(#2)}}
-\newcommand{\Bnd}{\ensuremath{\mathrm{Bnd}}}
-\newcommand{\Cff}{\ensuremath{\mathrm{Cff}}}
-\newcommand{\Vsig}{\ensuremath{\mathcal{V}}}
-\newcommand{\sgn}{\ensuremath{\operatorname{sgn}}}
-\newcommand{\lcoeff}{\ensuremath{\operatorname{lc}}}
-\newcommand{\trace}{\ensuremath{\operatorname{tr}}}
+\newcommand{\Gnk}[2]{G_{#1, 2}(#2)}
+\newcommand{\Bnd}{\mathrm{Bnd}}
+\newcommand{\Cff}{\mathrm{Cff}}
+\newcommand{\Vsig}{\mathcal{V}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\lcoeff}{\operatorname{lc}}
+\newcommand{\trace}{\operatorname{tr}}
 
+% These two are sometimes called from text mode; \ensuremath makes
+% them safe in both contexts. Never used in super/subscripts.
 \newcommand{\Uintsf}{\ensuremath{\mathsf{Uint63}}}
 \newcommand{\BigZ}{\ensuremath{\mathsf{BigZ}}}
+
+% Text-only:
 \newcommand{\vmcompute}{\texttt{vm\_compute}}
 \newcommand{\Qed}{\texttt{Qed}}
