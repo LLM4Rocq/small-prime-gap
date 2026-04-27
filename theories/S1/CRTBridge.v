@@ -7,10 +7,10 @@
      char_poly_mod_sound :
        List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M
 
-   This is the key bridge needed to close the CRT lift admits in
-   CertL2.v: once we know the Uint63 FL equals the Z FL reduced mod p,
-   we can conclude that agreement of the Uint63 FL with the FLINT
-   polynomial mod 710 primes implies Z-level agreement.
+   This is the key bridge used by CertL2.v's CRT lift (now Qed):
+   once we know the Uint63 FL equals the Z FL reduced mod p,
+   agreement of the Uint63 FL with the FLINT polynomial mod 710
+   primes implies Z-level agreement.
 
    NOTE: This file does NOT import CharPolyAgree.v (to avoid loading
    the 710-prime table). It re-defines the necessary Uint63 matrix

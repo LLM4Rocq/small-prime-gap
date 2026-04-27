@@ -48,16 +48,15 @@
    at the concrete dimension 42 (see REPORT.md §4d) — proofs that
    run in seconds at abstract `n` stall for >30 min at `n = 42`.
 
-   The rat-level matrix identity is stated at the bottom of this
-   file as a single axiom `M1_correct` / `M2_correct`, each
-   explicitly reduced to the already-Qed bool fact above:
-   the axiom is NOT a new trust dependency, it is a restatement
-   modulo the MathComp layer.  A reviewer who trusts rational
-   cross-multiplication (`a/b = c/d  <==>  a*d = c*b` for b,d > 0)
-   does not need these axioms.  The headline theorem
-   `maynard_eigenvalue_S1` does not depend on them either — this
-   file is a leaf in the dependency DAG and is not imported by
-   Cert.v.
+   We deliberately stop at the bool level: cross-multiplication
+   (`a/b = c/d  <==>  a*d = c*b` for b,d > 0) is the standard
+   rational-equality reduction, and `Print Assumptions` on
+   `all_match_M1Z_true` / `all_match_M2Z_true` reports
+   "Closed under the global context" — no new axioms, no admits.
+   `Cert.v` imports this file so the umbrella theorem
+   `maynard_M105_certified` conjoins the closed-form match with
+   the eigenvalue claim; the spectral-only sibling
+   `maynard_eigenvalue_S1` does not depend on it.
    ================================================================ *)
 
 From Stdlib Require Import ZArith List Lia.
