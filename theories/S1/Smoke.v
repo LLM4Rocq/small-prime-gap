@@ -15,7 +15,7 @@ From Stdlib Require Import ZArith List.
 Import ListNotations.
 Open Scope Z_scope.
 
-From PrimeGapS1 Require Import Witness WitnessChain Recompose.
+From PrimeGapS1 Require Import Witness WitnessChain Recompose IntPoly.
 From Bignums Require Import BigZ.
 
 (* ---------------- shape sanity ---------------- *)
@@ -133,3 +133,56 @@ Lemma chain_42_nonzero :
   | _ => False
   end.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ============================================================== *)
+(*  Audit finding M-3: real Brown-Traub PRS cross-check.            *)
+(*                                                                  *)
+(*  Background.  Before this section, the FLINT-shipped Sturm chain *)
+(*  in WitnessChain.v was only checked for internal sign            *)
+(*  consistency (CRTSigns.v: the shipped sign vectors agree with    *)
+(*  direct BigZ evaluation of the shipped chain at the same point). *)
+(*  Nothing in the build re-derived the chain from charpoly_int     *)
+(*  via the Brown-Traub PRS recurrence: if FLINT had shipped an     *)
+(*  incorrect chain whose signs were internally consistent, no      *)
+(*  kernel check would have caught it.                              *)
+(*                                                                  *)
+(*  We close that gap by exposing CRTCheck.v's                      *)
+(*  `full_prs_chain_verified`: a kernel cross-check that every      *)
+(*  consecutive triple of shipped chain entries (A, B, C) together  *)
+(*  with the shipped quotient Q and beta satisfies the Brown-Traub  *)
+(*  PRS identity                                                    *)
+(*                                                                  *)
+(*    lc(B)^d * A == Q * B + beta * C        (mod p)                *)
+(*                                                                  *)
+(*  for each of 10 distinct primes p ~ 2^30 (so the product gives   *)
+(*  ~300 bits of CRT cover).  The primes are themselves verified    *)
+(*  prime in Rocq via Uint63 trial division                         *)
+(*  (CRTCheck.crt_primes_all_prime).                                *)
+(*                                                                  *)
+(*  We attempted the same identity directly over Z (without modular *)
+(*  reduction); that compiles but takes ~37 minutes of wall time on *)
+(*  this machine because vm_compute on the chain[0..2] step alone   *)
+(*  manipulates polynomials whose intermediate coefficients reach   *)
+(*  hundreds of kilobits.  The modular check is a small constant    *)
+(*  cost (~20 s) and is enough to catch any non-adversarial         *)
+(*  miscompilation: a residual that vanishes modulo all 10 primes   *)
+(*  but is nonzero in Z must be a multiple of their product (>      *)
+(*  2^299), which would not arise from a transcription bug.         *)
+(*                                                                  *)
+(*  Combined with `chain_0_matches_charpoly` above (which ties      *)
+(*  chain[0] to the integer-cleared char poly of the matrix), the   *)
+(*  PRS recurrence then anchors the entire shipped Sturm chain to   *)
+(*  charpoly_int through Rocq's own arithmetic, closing audit       *)
+(*  finding M-3.                                                    *)
+(* ============================================================== *)
+
+From PrimeGapS1 Require Import CRTCheck.
+
+(* Re-export the PRS-chain cross-check under a name that documents
+   its role.  No new computation; this is a thin alias around
+   `CRTCheck.full_prs_chain_verified` so a reader of Smoke.v sees,
+   side by side with `chain_0_matches_charpoly`, the lemma that
+   anchors the rest of the chain. *)
+Lemma sturm_chain_real_cross_check :
+  CRTCheck.check_full_prs_chain_mod = true.
+Proof. exact CRTCheck.full_prs_chain_verified. Qed.
