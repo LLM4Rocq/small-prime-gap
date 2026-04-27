@@ -17,3 +17,9 @@ Makefile.conf
 # Rocq cache files
 .lia.cache
 .nia.cache
+
+# Audit / feasibility working artefacts (not project deliverables)
+AUDIT.md
+audit_*.md
+PATH_A_FEASIBILITY.md
+survey_*.md
