@@ -20,6 +20,7 @@ From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
+From PrimeGapS1 Require Import MaynardVerify.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
@@ -48,6 +49,16 @@ Lemma sturm_count_correct :
 Proof. exact maynard_L1_concrete. Qed.
 
 (* charpoly_int_Dq_scaled: imported from CertL2.v (Qed). *)
+
+(* ------------------------------------------------------------------
+   D_q is strictly positive (kernel-checked). This pins sign hygiene:
+   `charpoly_root_transfer` below only needs `D_q != 0`, but a
+   negative `D_q` would also satisfy that, opening a sign-flip
+   consistency attack on the FLINT-shipped denominator.
+   `D_q_pos` rules that out by `vm_compute`.
+   ------------------------------------------------------------------ *)
+Lemma D_q_pos : Z.lt 0 D_q.
+Proof. vm_compute. reflexivity. Qed.
 
 (* ------------------------------------------------------------------
    L2 — root transfer (Qed): a root of the shipped polynomial is also
@@ -117,4 +128,27 @@ Proof.
   (* L2: transfer root from shipped polynomial to char_poly A_rat. *)
   apply eigenvalue_of_root_realalg.
   exact (charpoly_root_transfer lambda Hroot).
+Qed.
+
+(* ------------------------------------------------------------------
+   The full M_{105} > 4 trust contract in a single Qed.
+
+   `maynard_eigenvalue_S1` above gives the eigenvalue bound on the
+   matrix `A_rat = M1^{-1} M2`, but it does not, on its own, surface
+   the closed-form match between the FLINT-shipped integer matrices
+   `M1_int / M2_int` and Maynard's specification (Lemma 7.1/7.2 in
+   arXiv:1311.4600, transcribed in MaynardSpec.v). MaynardVerify.v
+   discharges that match by Z-level cross-multiplication on a
+   42x42 grid; this theorem ties the two ends together so that one
+   `Print Assumptions` covers the entire pipeline.
+   ------------------------------------------------------------------ *)
+Theorem maynard_M105_certified :
+  MaynardVerify.all_match_M1Z = true /\
+  MaynardVerify.all_match_M2Z = true /\
+  exists lambda : realalg,
+    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
+    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
+Proof.
+  split; [exact MaynardVerify.all_match_M1Z_true |
+   split; [exact MaynardVerify.all_match_M2Z_true | exact maynard_eigenvalue_S1]].
 Qed.
