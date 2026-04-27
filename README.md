@@ -47,6 +47,20 @@ Theorem maynard_eigenvalue_S1 :
 Proof. (* L1 + L2 + L3 + L4 *) Qed.
 ```
 
+## Relation to Maynard's notebook
+
+Maynard's `Computations.nb` certifies `M_{105} > 4` via the *eigenvector
+route*: Mathematica numerically computes the top eigenvector of
+`M₁⁻¹M₂`, snaps it to a small-denominator rational vector, and
+evaluates the Rayleigh quotient `k · vᵀM₂v / vᵀM₁v` in exact rational
+arithmetic — a true rigorous lower bound on `λ_max(M₁⁻¹M₂)` regardless
+of how *v* was obtained. This project takes the *characteristic
+polynomial route* instead: the Brown–Traub Sturm chain on
+`char_poly(M₁⁻¹M₂)` certifies the existence of an eigenvalue strictly
+above `4/105`, without ever constructing an eigenvector. Both routes
+fit Maynard's §8 framework (Lemma 8.2 + Lemma 8.3); see `REPORT.md`
+§1.4 for the detailed comparison.
+
 ## Repository layout
 
 ```

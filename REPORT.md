@@ -124,6 +124,43 @@ The FLINT layer's role is threefold:
 **No error was found** in Maynard's computation. The contribution is the
 assurance level.
 
+### 1.4 Two distinct certificates for the same fact
+
+Maynard's notebook and our Rocq layer prove the same inequality
+`λ_max(M₁⁻¹M₂) > 4/k` (which gives `M_k > 4` via Lemmas 8.2 + 8.3 in
+the paper) by **different routes**, neither of which requires the
+other.
+
+- **Maynard's notebook** uses the eigenvector route: Mathematica
+  numerically computes the top eigenvector *v* of `M₁⁻¹M₂` at
+  150-decimal precision, snaps each entry to a small-denominator
+  rational `RatVec` ≈ *v*, and then evaluates the *Rayleigh quotient*
+  ```
+  k · RatVecᵀ M₂ RatVec  /  RatVecᵀ M₁ RatVec
+  ```
+  in **exact rational arithmetic**. For *any* nonzero *a*,
+  `aᵀM₂a / aᵀM₁a ≤ λ_max(M₁⁻¹M₂)`, so this is a true rigorous lower
+  bound on `λ_max`. Mathematica's eigenvector routine is treated as
+  a black box: it only has to be close enough to the true eigenvector
+  for the rational Rayleigh quotient to clear `4/k`. The notebook
+  prints `≈ 4.0021`.
+
+- **Our Rocq proof** uses the characteristic-polynomial route: the
+  Brown–Traub Sturm chain on `char_poly(M₁⁻¹M₂)` certifies the
+  *existence* of a real root (= eigenvalue) strictly above `4/105`,
+  via 1-D root counting. No eigenvector is ever constructed. The
+  argument bypasses the Rayleigh quotient entirely and works
+  purely on the polynomial side.
+
+Both strategies fit Maynard's §8 framework. Lemma 8.2 (the closed
+form for the matrix entries) is verified inside Rocq
+(`MaynardVerify`); Lemma 8.3 (the generalised Rayleigh-quotient
+identity that gives `M_k = k · λ_max`) is *not* formalised here —
+its Maynard-style use in the notebook (eigenvector → Rayleigh
+quotient) and our Sturm-chain alternative both invoke its
+*conclusion* "max ratio = largest eigenvalue", which is needed in
+either strategy to bridge `λ > 4/k` to `M_k > 4`.
+
 ## 2. Architecture: two layers, one certificate
 
 ### 2.1 The FLINT layer
