@@ -783,6 +783,25 @@ chain shipped by FLINT would fail this check with overwhelming
 probability.
 \end{proof}
 
+\begin{remark}[Off the critical path]
+This Theorem is \emph{not} consumed by
+\rocq{PrimeGapS1.Cert.maynard_eigenvalue_S1} or
+\rocq{PrimeGapS1.Cert.maynard_M105_certified}. The L1 IVT proof reads
+only $\texttt{signs\_at\_x0}[0]$ and $\texttt{signs\_at\_inf}[0]$,
+both of which reduce to direct evaluation of $\texttt{charpoly\_int}$
+via Lemma~\ref{lem:chain_0_matches} plus \texttt{fl\_eq\_flint}. The
+PRS cross-check is \emph{independent} FLINT-data assurance: it makes
+the shipped chain a real cross-check rather than just internally
+sign-consistent, but its absence would not weaken the headline trust
+contract. It is also the \emph{one place} in the project where a
+kernel-level identity is replaced by a probabilistic (modular)
+substitute; every other FLINT-shipped artefact is verified by a
+true $\Z$-level identity (matrix entries via
+\rocq{PrimeGapS1.MaynardVerify.all_match_M1Z_true} and
+\rocq{PrimeGapS1.MaynardVerify.all_match_M2Z_true}, char poly via
+\rocq{PrimeGapS1.CRTLift.fl_eq_flint}, etc.).
+\end{remark}
+
 \section{Sign vectors agree with the chain}
 
 \begin{lemma}[Shipped signs at $4/105$ are correct]\label{lem:signs_at_x0}

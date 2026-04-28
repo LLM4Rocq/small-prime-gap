@@ -230,7 +230,13 @@ It verifies, in this order:
    a wrong chain shipped by FLINT would fail this modular PRS
    identity with overwhelming probability (false positive requires
    a residual divisible by all 10 primes, i.e. a multiple of a
-   ~2³⁰⁰-bit number).
+   ~2³⁰⁰-bit number). Note that this Qed is **not** consumed by
+   `maynard_eigenvalue_S1` or `maynard_M105_certified`: the L1 IVT
+   proof reads only `signs_at_x0[0]` and `signs_at_inf[0]`, both
+   of which reduce to direct evaluation of `charpoly_int` via
+   `chain_0_matches_charpoly` plus `fl_eq_flint`. The PRS
+   cross-check is *independent* FLINT-data assurance, not part of
+   the headline trust contract.
 2. `V(4/105) - V(+∞) = 1`; hence, by an IVT step, there is a real
    algebraic root of `charpoly_int` above `4/105`.
 3. `char_poly_int A_int = charpoly_of_A_int` as lists of `Z` (proved via
@@ -1113,15 +1119,23 @@ build would stop:
   `CRTCheck.full_prs_chain_verified`) — every consecutive triple
   of shipped chain entries satisfies the Brown–Traub PRS identity
   `lc(B)^d·A ≡ Q·B + beta·C` mod each of 10 distinct ~2³⁰ primes
-  (themselves verified prime via Uint63 trial division). A wrong
-  chain shipped by FLINT would fail this with overwhelming
-  probability — the false-positive event requires a residual
-  divisible by all 10 primes simultaneously, i.e. by a number
-  exceeding 2³⁰⁰. This is the *real* cross-check that anchors the
-  shipped Sturm chain to `charpoly_int` through Rocq's own
-  arithmetic; without it, a chain that was internally
-  sign-consistent but did not actually arise from the PRS recurrence
-  could in principle slip through.
+  (themselves verified prime via Uint63 trial division). **Unlike
+  the four entries above, this is a probabilistic check, not a
+  Z-level identity.** A wrong chain shipped by FLINT would fail this
+  with overwhelming probability — the false-positive event requires
+  a residual divisible by all 10 primes simultaneously, i.e. by a
+  number exceeding 2³⁰⁰ — but a sufficiently determined adversary
+  who reads the source could in principle craft a chain whose
+  residuals are all such multiples and slip past the check.
+  Note: this Qed is **not** on the critical path of the headline
+  theorem `maynard_M105_certified`. The L1 IVT proof reads only
+  `signs_at_x0[0]` and `signs_at_inf[0]`, both of which reduce to
+  direct evaluation of `charpoly_int` via `chain_0_matches_charpoly`
+  plus `fl_eq_flint` — those are the load-bearing chain facts. The
+  PRS cross-check is *independent* FLINT-data assurance: it makes
+  the shipped chain a real cross-check rather than just internally
+  sign-consistent, but its absence would not weaken the headline
+  trust contract.
 
 **Additional sanity Qeds.**
 
