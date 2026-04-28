@@ -393,7 +393,7 @@ After viewing $A : \texttt{mat}$ as the $\Q$-matrix
 $\texttt{mat\_int\_to\_rat}(A, 1, n) : 'M[\Q]_n$, the integer FL
 recurrence reproduces the rational FL recurrence step by step. The
 auxiliary invariants \texttt{fl\_invariant\_L2} (the
-relationship between $M_k$, $c_k$ and the rational $M_k^\Q$) and
+relationship between $M_k$, $c_k$ and the rational $M_k^{\Q}$) and
 \texttt{fl\_divisibility\_L2} (the classical Newton-identity fact that
 $\trace(A \cdot M_k)$ is divisible by~$k$ at every step) are both
 proved by induction on the FL step count.
@@ -906,7 +906,7 @@ witnesses $\det \ne 0$ over $\Z$, hence over $\Q$). MathComp's
       PrimeGapS1.CertL2.abstract_mat_scale}
 \rocqok
 \uses{def:A_rat, lem:M1_unit, thm:matrix_identity_Z}
-$\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_\Q \cdot \Arat$
+$\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$
 in $'M[\Q]_{42}$.
 \end{lemma}
 \begin{proof}\rocqok
@@ -937,7 +937,7 @@ discharged at the call site by Theorem~\ref{thm:matrix_identity_Z}
       lem:mat_A_scale_eq_Arat, lem:char_poly_scale}
 \[
 \texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   \;=\; (\Dq)_\Q \cdot \charpolysym(\Arat)
+   \;=\; (\Dq)_{\Q} \cdot \charpolysym(\Arat)
    \quad\text{in } \Q[X].
 \]
 \end{theorem}
@@ -951,14 +951,14 @@ We chain four facts:
   $\texttt{pol\_to\_polyrat}(\texttt{char\_poly\_int}(\Aint))
    = \charpolysym(\texttt{mat\_int\_to\_rat}(\Aint, 1, 42))$.
 \item Lemma~\ref{lem:mat_A_scale_eq_Arat}:
-  $\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_\Q \cdot \Arat$.
+  $\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$.
 \item Lemma~\ref{lem:char_poly_scale}:
   $(\charpolysym(c \cdot M))_k = c^{n - k} \cdot (\charpolysym(M))_k$.
 \end{enumerate}
 A direct combination at the polynomial level gives
 \[
 \texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   = (\Dq)_\Q \cdot \charpolysym(\Arat),
+   = (\Dq)_{\Q} \cdot \charpolysym(\Arat),
 \]
 where $\Dq$ absorbs the per-coefficient scaling factors $\DA^{42 - k}$
 through the per-coefficient identity \texttt{scaling\_Z\_from\_check}
