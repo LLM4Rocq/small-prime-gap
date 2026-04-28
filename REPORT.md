@@ -87,10 +87,13 @@ But the computation is non-trivial:
 
 In Maynard's original proof these computations are done inside a
 Mathematica notebook (`Computations.nb`), shipped with the arXiv
-submission as supplementary material. Mathematica is not a formal system;
-its kernel is closed source. For a proof that a Maynard-style argument
-produces a bounded gap at the claimed level, trust in the Mathematica
-notebook is the last remaining black box. This project replaces it.
+submission as supplementary material. The notebook source is fully
+readable, but its evaluation depends on Mathematica's closed-source
+kernel — which is not a formal proof system, so a successful evaluation
+is not a kernel-level proof. For a proof that a Maynard-style argument
+produces a bounded gap at the claimed level, the Mathematica computation
+is the last remaining informal step in the trust chain. This project
+replaces it.
 
 ### 1.3 What this project provides
 
@@ -165,8 +168,7 @@ quotient) and our Sturm-chain alternative both invoke its
 *conclusion* "max ratio = largest eigenvalue", which is needed in
 either strategy to bridge `λ > 4/k` to `M_k > 4`. The analytic content
 of Lemma 8.3 remains paper-side, by design of this project's scope
-(replace the closed-source *computational* black box of the
-Mathematica notebook, not Maynard's paper).
+(replace the Mathematica computation, not Maynard's paper).
 
 ## 2. Architecture: two layers, one certificate
 
