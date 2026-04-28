@@ -22,9 +22,15 @@ The headline is formula~(8.15) of James Maynard,
 \emph{Small gaps between primes} (arXiv:1311.4600;
 Annals of Mathematics \textbf{181} (2015), 383--413).
 In the published proof, this inequality is checked by a Mathematica
-notebook supplied as supplementary material: an unrefereed computational
-black box. The present project replaces that black box with a Rocq
-proof that re-derives every algebraic claim inside the kernel.
+notebook (\texttt{Computations.nb}) supplied as supplementary material
+with the arXiv preprint. Mathematica is closed-source software and is
+not a formal proof system: its kernel offers no kernel-level guarantee
+that a successful evaluation implements a sound mathematical reasoning
+step. So even though Maynard's \emph{paper} was peer-reviewed at the
+\emph{Annals} (one of the most rigorous venues in mathematics), the
+computational artifact itself remains a trust black box. The present
+project replaces that black box with a Rocq proof that re-derives every
+algebraic claim inside the kernel.
 
 The end-to-end statement is
 \begin{verbatim}
@@ -50,8 +56,8 @@ What this Rocq layer proves, kernel-checked, is the left-hand side of
 The right arrow is Maynard's Lemma~8.3 (a generalised Rayleigh-quotient
 identity proved in the Annals paper, refereed there); the project does
 not re-formalise this analytic step. The project's scope is exactly to
-replace the unrefereed \emph{computational} black box, not to
-re-formalise Maynard's paper.
+replace the closed-source \emph{computational} black box of the
+Mathematica notebook, not to re-formalise Maynard's paper.
 
 \paragraph{Two distinct certificates for the same fact.}
 Maynard's notebook proves $\lammax > 4/k$ via the \emph{eigenvector

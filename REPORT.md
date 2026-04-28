@@ -165,8 +165,8 @@ quotient) and our Sturm-chain alternative both invoke its
 *conclusion* "max ratio = largest eigenvalue", which is needed in
 either strategy to bridge `λ > 4/k` to `M_k > 4`. The analytic content
 of Lemma 8.3 remains paper-side, by design of this project's scope
-(replace the unrefereed *computational* black box, not Maynard's
-paper).
+(replace the closed-source *computational* black box of the
+Mathematica notebook, not Maynard's paper).
 
 ## 2. Architecture: two layers, one certificate
 
