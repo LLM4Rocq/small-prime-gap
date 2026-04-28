@@ -1,4 +1,4 @@
-# Maynard `M_{105} > 4` — independent FLINT + Rocq audit
+# Maynard `M_{105} > 4` — a Rocq replacement for the Mathematica notebook
 
 [![Blueprint](https://img.shields.io/badge/blueprint-online-blue)](https://gbaudart.github.io/prime_gap/blueprint/)
 [![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
@@ -14,17 +14,22 @@ Mathematics **181** (2015), 383--413):
 The original proof carries out this numerical step in a Mathematica
 notebook (`Computations.nb`, distributed as supplementary material with
 the arXiv preprint). This repository replaces that Mathematica-based
-computation with two independent verification layers:
+computation with two stages:
 
-1. **A FLINT layer** (Python + `python-flint`): rebuilds the 42x42
-   matrices from closed-form Beta integrals (100% of 3528 entries
-   verified), computes the characteristic polynomial and Brown-Traub
-   Sturm chain, and emits a JSON certificate.
+1. **A FLINT layer** (Python + `python-flint`) — the **candidate
+   generator**: rebuilds the 42x42 matrices from closed-form Beta
+   integrals (100% of 3528 entries internally verified), computes the
+   characteristic polynomial and Brown-Traub Sturm chain, and emits a
+   JSON certificate.
 
-2. **A Rocq layer** (Rocq 9.0/9.1 + MathComp 2.5 + `mathcomp-real-closed`):
-   consumes the certificate, machine-verifies every computational fact
-   via CRT over 710 Uint63 native primes and BigZ evaluation, and proves
-   the headline eigenvalue theorem.
+2. **A Rocq layer** (Rocq 9.0/9.1 + MathComp 2.5 + `mathcomp-real-closed`)
+   — the **verification**: consumes the certificate, kernel-checks every
+   entry against an independent Rocq-side derivation via CRT over 710
+   Uint63 native primes and BigZ evaluation, and proves the headline
+   eigenvalue theorem.
+
+Only the Rocq layer is in the trust base; the FLINT outputs are inputs
+that the Rocq build cross-checks before accepting.
 
 **The headline proof is complete.**
 
