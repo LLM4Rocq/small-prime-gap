@@ -20,9 +20,10 @@ from pathlib import Path
 # Big integer literals require Python's int_max_str_digits to be raised.
 sys.set_int_max_str_digits(1_000_000)
 
-ROOT = Path(__file__).resolve().parent.parent
-CERT      = ROOT / "certificate.json"
-CERT_HEAVY = ROOT / "certificate_chain.json"
+ROOT = Path(__file__).resolve().parent.parent  # project root (for theories/S1/ output)
+HERE = Path(__file__).resolve().parent          # python/ dir (for certificate JSON inputs)
+CERT      = HERE / "certificate.json"
+CERT_HEAVY = HERE / "certificate_chain.json"
 OUT_DIR   = ROOT / "theories" / "S1"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

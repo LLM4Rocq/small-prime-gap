@@ -163,7 +163,9 @@ def prime_gram():
     return G
 
 import pickle, os
-CACHE = "/home/rocq/prime_gap/m1m2.pkl"
+from pathlib import Path
+HERE = Path(__file__).resolve().parent
+CACHE = str(HERE / "m1m2.pkl")
 if os.path.exists(CACHE):
     with open(CACHE, "rb") as f:
         M1_rat, M2_rat = pickle.load(f)
@@ -373,6 +375,7 @@ try:
     print(f"Q.resultant(Q'): bits = {int(r).bit_length()}", flush=True)
 except Exception as e:
     print(f"resultant failed: {e}", flush=True)
-with open("/home/rocq/prime_gap/flint_probe.json", "w") as f:
+PROBE_OUT = str(HERE / "flint_probe.json")
+with open(PROBE_OUT, "w") as f:
     json.dump(out, f, indent=2)
-print("wrote /home/rocq/prime_gap/flint_probe.json", flush=True)
+print(f"wrote {PROBE_OUT}", flush=True)
