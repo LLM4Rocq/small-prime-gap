@@ -11,8 +11,15 @@ Mathematics **181** (2015), 383--413):
 
 > **`M_{105} = 105 * lambda_max((M2, M1)) > 4`**
 
-The original proof relies on an unrefereed Mathematica notebook. This
-repository replaces it with two independent verification layers:
+The original proof carries out this numerical step in a closed-source
+Mathematica notebook (`Computations.nb`, distributed as supplementary
+material with the arXiv preprint). Mathematica is not a formal proof
+system — its kernel is closed source and offers no kernel-level guarantee
+that a successful evaluation implements a sound mathematical reasoning
+step. So even though the *paper* was refereed at the *Annals* (one of
+the most rigorous venues in mathematics), the computational artifact
+itself is a trust black box. This repository replaces that black box
+with two independent verification layers:
 
 1. **A FLINT layer** (Python + `python-flint`): rebuilds the 42x42
    matrices from closed-form Beta integrals (100% of 3528 entries
@@ -87,8 +94,8 @@ witness on `char_poly(M₁⁻¹M₂)`). The right arrow is Maynard's Lemma 8.3
 (`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`), proved in the Annals
 paper and refereed there; it is **not** formalised in this repository,
 and the Mathematica notebook didn't formalise it either. The project's
-scope is to replace the unrefereed *computational* black box, not to
-re-formalise Maynard's paper.
+scope is to replace the closed-source *computational* black box (the
+Mathematica notebook), not to re-formalise Maynard's paper.
 
 Concretely:
 
