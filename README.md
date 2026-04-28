@@ -138,15 +138,15 @@ prime_gap/
 +-- SPEC_TO_PAPER.md                line-level mapping MaynardSpec -> arXiv §8
 +-- _CoqProject                     26 .v files in dependency order
 |
-+-- flint_probe.py                  M1, M2 builder
-+-- m1m2.pkl                        cached exact-rational M1, M2
-+-- certificate.json                small certificate (~510 KB)
-+-- certificate_chain.json          heavy Sturm chain (~14 MB)
 +-- notebook_reconstructed.md       reconstructed Mathematica notebook
 |
-+-- python/
++-- python/                         FLINT layer (candidate generator)
+|   +-- flint_probe.py              M1, M2 builder
 |   +-- build_certificate.py        FLINT pipeline (3528/3528 entries verified)
 |   +-- json_to_v.py                JSON -> Rocq emitter
+|   +-- m1m2.pkl                    cached exact-rational M1, M2
+|   +-- certificate.json            small certificate (~510 KB)
+|   +-- certificate_chain.json      heavy Sturm chain (~14 MB)
 |
 +-- theories/S1/                    26 Rocq files
     +-- Recompose.v                 bigZ <-> Z helpers

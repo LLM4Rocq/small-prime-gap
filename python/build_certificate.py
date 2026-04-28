@@ -34,13 +34,14 @@ from pathlib import Path
 # Brown-Traub PRS coefficients hit ~100 kbit ⇒ ~30 000 decimal digits.
 sys.set_int_max_str_digits(1_000_000)
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parent.parent  # project root (for theories/S1/ output)
+HERE = Path(__file__).resolve().parent          # python/ dir (for sibling .py and data)
+sys.path.insert(0, str(HERE))
 
 # We import the matrix builders from the existing flint_probe.py.  Doing so
 # triggers its module-level code, which is fine the first time but slow on
 # re-runs (90 s for prime_gram).  We use the cached pickle when present.
-CACHE = ROOT / "m1m2.pkl"
+CACHE = HERE / "m1m2.pkl"
 
 if not CACHE.exists():
     print("[1/10] Building M1, M2 (no cache, ~90 s)…", flush=True)
@@ -611,8 +612,8 @@ out_chain = {
     ],  # Q_i for step i = 1..chain_len-2; lc(chain[i])^d * chain[i-1] = Q_i * chain[i] + prem
 }
 
-CERT = ROOT / "certificate.json"
-CERT_CHAIN = ROOT / "certificate_chain.json"
+CERT = HERE / "certificate.json"
+CERT_CHAIN = HERE / "certificate_chain.json"
 with open(CERT, "w") as f:
     json.dump(out_meta, f, indent=2, sort_keys=False)
 with open(CERT_CHAIN, "w") as f:
