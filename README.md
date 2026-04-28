@@ -13,13 +13,8 @@ Mathematics **181** (2015), 383--413):
 
 The original proof carries out this numerical step in a closed-source
 Mathematica notebook (`Computations.nb`, distributed as supplementary
-material with the arXiv preprint). Mathematica is not a formal proof
-system — its kernel is closed source and offers no kernel-level guarantee
-that a successful evaluation implements a sound mathematical reasoning
-step. So even though the *paper* was refereed at the *Annals* (one of
-the most rigorous venues in mathematics), the computational artifact
-itself is a trust black box. This repository replaces that black box
-with two independent verification layers:
+material with the arXiv preprint). This repository replaces that black
+box with two independent verification layers:
 
 1. **A FLINT layer** (Python + `python-flint`): rebuilds the 42x42
    matrices from closed-form Beta integrals (100% of 3528 entries
@@ -46,8 +41,8 @@ with two independent verification layers:
   with `Print Assumptions: Closed under the global context`.
   The FLINT layer is no longer a trust dependency anywhere.
 
-**No error was found in Maynard's computation.** The contribution is
-the assurance level.
+This project does not change Maynard's computation; the contribution
+is the assurance level.
 
 ## The headline theorem
 

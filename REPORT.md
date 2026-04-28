@@ -125,8 +125,8 @@ The FLINT layer's role is threefold:
   ≈ 0.038114950113695686, so 105·λ ≈ 4.002069761938047. This matches
   Mathematica's value to >12 decimal digits.
 
-**No error was found** in Maynard's computation. The contribution is the
-assurance level.
+This project does not change Maynard's computation; the contribution is
+the assurance level.
 
 ### 1.4 Two distinct certificates for the same fact
 
