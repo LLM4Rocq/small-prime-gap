@@ -44,7 +44,9 @@ that the Rocq build cross-checks before accepting.
   kernel-checked against Maynard's closed-form specification
   (Lemma 7.1 / eq. 7.8) — `MaynardVerify.all_match_M*Z_true` are Qed
   with `Print Assumptions: Closed under the global context`.
-  The FLINT layer is no longer a trust dependency anywhere.
+  The FLINT layer is not in the trust base; it is the candidate
+  generator (see below), and every artefact it ships is cross-checked
+  inside Rocq.
 
 This project does not change Maynard's computation; the contribution
 is the assurance level.
