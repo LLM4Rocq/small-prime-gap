@@ -18,6 +18,10 @@ Makefile.conf
 .lia.cache
 .nia.cache
 
+# Python build / runtime artefacts
+__pycache__/
+python/flint_probe.json
+
 # Audit / feasibility working artefacts (not project deliverables)
 AUDIT.md
 audit_*.md
