@@ -2,7 +2,7 @@
    MaynardBasis.v — the 42-element basis matching Witness.basis.
 
    Order is the Mathematica xExponents[5]/yExponents[5] enumeration
-   (see flint_probe.py:xExponents_mma / yExponents_mma).  The bridge
+   (see python/flint_probe.py:xExponents_mma / yExponents_mma).  The bridge
    lemma `maynard_basis_eq_witness` pins it to the shipped `basis`
    list in `Witness.v` by `vm_compute`.
    ================================================================== *)

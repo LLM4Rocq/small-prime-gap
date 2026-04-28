@@ -100,7 +100,7 @@ replaces it.
 Two *independent* verification layers:
 
 1. A **Python + FLINT layer** (`python/build_certificate.py`,
-   `flint_probe.py`) that rebuilds *M1, M2* from the closed-form
+   `python/flint_probe.py`) that rebuilds *M1, M2* from the closed-form
    integrals, computes *A*, its characteristic polynomial and Sturm
    chain over exact rationals (via `python-flint`, i.e. GMP/MPFR), and
    emits a JSON certificate.
@@ -187,7 +187,7 @@ are in the trust base; the FLINT layer is auxiliary.
 Run with `python python/build_certificate.py`. The script performs:
 
 1. Build *M1, M2 ∈ ℚ^{42×42}* from the Mathematica formulas, cached in
-   `m1m2.pkl`. Sanity-check a dozen entries against closed-form Beta
+   `python/m1m2.pkl`. Sanity-check a dozen entries against closed-form Beta
    integrals. Full audit: all 3 528 entries agree with closed-form values.
 2. Clear denominators: produce `M1_int, M2_int : list[list[int]]` and
    scalars `D_M1, D_M2` such that `(M_l)[i][j] = M_l_int[i][j] / D_M_l`.
@@ -203,8 +203,8 @@ Run with `python python/build_certificate.py`. The script performs:
    `V(4/105) - V(+inf) ≥ 1`.
 7. Cross-check *lambda_max* against an `arb_mat` computation at 256-bit
    precision.
-8. Write `certificate.json` (~510 KB metadata) and
-   `certificate_chain.json` (~14 MB heavy Sturm-chain data).
+8. Write `python/certificate.json` (~510 KB metadata) and
+   `python/certificate_chain.json` (~14 MB heavy Sturm-chain data).
 
 The translator `python/json_to_v.py` converts the JSON into Rocq sources:
 `Witness.v` (matrix entries, char poly, sign vectors as `list Z` or `list
