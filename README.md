@@ -241,7 +241,15 @@ every consecutive triple in the chain across 10 distinct ~2^30 primes
 The FLINT layer is **not** in the trust base of the Rocq proof. It
 serves only as (a) the candidate generator for the certificate data
 and (b) an independent cross-check. If the FLINT layer shipped wrong
-data, the Rocq build would fail at one of the `vm_compute` checks.
+data on any of the *load-bearing* artefacts (the M1/M2 matrix entries,
+the cleared characteristic polynomial, the sign-vector entries actually
+read by the L1 IVT proof, or chain entry 0), the build would fail at
+one of the `vm_compute` checks. The shipped Sturm chain entries beyond
+index 0 are *additionally* cross-checked via a 10-prime modular PRS
+identity (`Smoke.sturm_chain_real_cross_check`) — strong against
+accidental error but a probabilistic check, not a strict Z-level
+identity. That Qed is not on the critical path of the headline
+theorem.
 
 See `SPEC_TO_PAPER.md` for a line-level mapping from the
 `MaynardSpec.{bnd, cff, G_2, alpha, M1_entry, M2_entry}` definitions
