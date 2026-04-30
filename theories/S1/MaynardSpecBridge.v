@@ -298,6 +298,10 @@ Qed.
 Definition qfrac (p : Z * Z) : rat :=
   (Z_to_int p.1)%:~R / (Z_to_int p.2)%:~R.
 
+Lemma qfrac_pair (a b : Z) :
+  qfrac (a, b) = (Z_to_int a)%:~R / (Z_to_int b)%:~R.
+Proof. by []. Qed.
+
 Lemma qfrac_qmul (p q : Z * Z) :
   qfrac (qmul p q) = qfrac p * qfrac q.
 Proof.
@@ -345,4 +349,78 @@ Lemma M1_spec_rat_eq (i j : nat) :
 Proof.
   rewrite /M1_spec_ij /m1_num_den_at.
   by rewrite m1_num_den_to_rat.
+Qed.
+
+(* ============================================================== *)
+(*  Layer 8: M2 spec bridge                                         *)
+(* ============================================================== *)
+
+Lemma Z_to_int_factZ_nz (n : nat) : Z_to_int (factZ n) != 0.
+Proof. apply: Z_to_int_pos_nz. exact: factZ_pos. Qed.
+
+Lemma Z_to_int_qplus_den_nz (a b : Z * Z) :
+  Z_to_int a.2 != 0 -> Z_to_int b.2 != 0 ->
+  Z_to_int (qplus a b).2 != 0.
+Proof.
+  case: a => [n d]; case: b => [n' d'] /= Hd Hd'.
+  by rewrite Z_to_int_mul mulf_neq0.
+Qed.
+
+Lemma Z_to_int_qmul_den_nz (a b : Z * Z) :
+  Z_to_int a.2 != 0 -> Z_to_int b.2 != 0 ->
+  Z_to_int (qmul a b).2 != 0.
+Proof.
+  case: a => [n d]; case: b => [n' d'] /= Hd Hd'.
+  by rewrite Z_to_int_mul mulf_neq0.
+Qed.
+
+Lemma Z_to_int_alphaZ_den_nz (b c cp : nat) :
+  Z_to_int (alphaZ b c cp).2 != 0.
+Proof. by rewrite /alphaZ /=; exact: Z_to_int_factZ_nz. Qed.
+
+Lemma Z_to_int_m2_term_den_nz bi ci bj cj cp1 cp2 :
+  Z_to_int (m2_term_num_den bi ci bj cj cp1 cp2).2 != 0.
+Proof.
+  rewrite /m2_term_num_den.
+  apply: Z_to_int_qmul_den_nz.
+  - apply: Z_to_int_qmul_den_nz; exact: Z_to_int_alphaZ_den_nz.
+  - exact: Z_to_int_factZ_nz.
+Qed.
+
+(* Bridge for one m2 term. *)
+Lemma m2_term_to_rat (bi ci bj cj cp1 cp2 : nat) :
+  qfrac (m2_term_num_den bi ci bj cj cp1 cp2) =
+  let bp1 := (bi + 2 * ci - 2 * cp1 + 1)%N in
+  let bp2 := (bj + 2 * cj - 2 * cp2 + 1)%N in
+  let bsum := (bp1 + bp2)%N in
+  let csum := (cp1 + cp2)%N in
+  alpha bi ci cp1 * alpha bj cj cp2
+    * factQ bsum / factQ (K2 + bsum + 2 * csum)%N
+    * G_2 csum K2.
+Proof.
+  cbv zeta.
+  rewrite /m2_term_num_den.
+  cbv zeta.
+  rewrite !qfrac_qmul !alphaZ_to_rat.
+  rewrite qfrac_pair.
+  rewrite Z_to_int_mul intrM factZ_to_rat factZ_to_rat G2Z_to_rat.
+  rewrite -(_ : K2n = K2) //.
+  by rewrite !mulrA mulrAC.
+Qed.
+
+(* Generic fold_left qplus -> sum bridge. *)
+Lemma fold_left_qplus_qfrac (l : list (Z * Z)) (acc : Z * Z) :
+  Z_to_int acc.2 != 0 ->
+  (forall t, List.In t l -> Z_to_int t.2 != 0) ->
+  qfrac (List.fold_left qplus l acc) =
+  qfrac acc + \sum_(t <- l) qfrac t.
+Proof.
+  elim: l acc => [|t l IH] acc Hacc Hl /=.
+  - by rewrite big_nil addr0.
+  - have Ht : Z_to_int t.2 != 0 by apply: Hl; left.
+    rewrite IH.
+    + rewrite qfrac_qplus //.
+      by rewrite big_cons addrA.
+    + by apply: Z_to_int_qplus_den_nz.
+    + move=> t' Ht'. apply: Hl. by right.
 Qed.
