@@ -197,14 +197,52 @@ Proof.
 Qed.
 
 Lemma binZ_to_rat (n k : nat) :
-  (k <= n)%nat ->
   ((Z_to_int (binZ n k))%:~R : rat) = binQ n k.
 Proof.
-  move=> Hkn.
   rewrite /binZ.
-  have -> : Nat.leb k n = true by apply/Nat.leb_le; apply/leP.
-  rewrite Z_to_int_div_exact;
-    [|exact: factZ_factZ_pos|exact: factZ_factZ_dvd].
-  rewrite Z_to_int_mul intrM !factZ_to_rat.
-  by rewrite -binQ_factQ.
+  case Hkn: (Nat.leb k n).
+  - move/Nat.leb_le/leP: Hkn => Hkn.
+    rewrite Z_to_int_div_exact;
+      [|exact: factZ_factZ_pos|exact: factZ_factZ_dvd Hkn].
+    rewrite Z_to_int_mul intrM !factZ_to_rat.
+    by rewrite -binQ_factQ.
+  - rewrite Z_to_int_0 /=.
+    move/Nat.leb_nle/leP: Hkn; rewrite -ltnNge => Hkn.
+    rewrite /binQ (bin_small Hkn) /=.
+    by rewrite mulr0n.
 Qed.
+
+(* ============================================================== *)
+(*  Layer 3: compositionsZ <-> compositions                         *)
+(* ============================================================== *)
+
+Lemma iota_seq_eq (m n : nat) : iota m n = List.seq m n.
+Proof. by elim: n m => [|n IH] m //=; rewrite IH. Qed.
+
+Lemma flatten_concat T (s : seq (seq T)) :
+  flatten s = List.concat s.
+Proof. by elim: s => [|x s IH] //=; rewrite IH. Qed.
+
+Lemma seq_map_eq T1 T2 (f : T1 -> T2) (l : seq T1) :
+  [seq f x | x <- l] = List.map f l.
+Proof. by elim: l => [|x l IH] //=; rewrite IH. Qed.
+
+Lemma flat_map_concat_map T1 T2 (f : T1 -> list T2) (l : list T1) :
+  List.flat_map f l = List.concat (List.map f l).
+Proof. by elim: l => [|x l IH] //=; rewrite IH. Qed.
+
+Lemma compositions_auxZ_eq (r remaining : nat) :
+  compositions_auxZ r remaining = compositions_aux r remaining.
+Proof.
+  elim: r remaining => [|r IH] remaining /=.
+  - case: (Nat.eqb_spec remaining 0) => [-> //|H].
+    by have -> : (remaining == 0)%N = false by apply/eqP.
+  - rewrite flat_map_concat_map -flatten_concat.
+    rewrite -seq_map_eq -iota_seq_eq.
+    congr (flatten _). apply: eq_map => a /=.
+    by rewrite IH seq_map_eq.
+Qed.
+
+Lemma compositionsZ_eq_compositions (r n : nat) :
+  compositionsZ r n = compositions r n.
+Proof. exact: compositions_auxZ_eq. Qed.
