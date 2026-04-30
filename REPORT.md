@@ -534,12 +534,12 @@ The proof pattern is the same for both:
 
 ### 3.8 Maynard input verification (M1, M2)
 
-The four files `MaynardFactQ.v`, `MaynardBasis.v`, `MaynardSpec.v`,
-`MaynardVerify.v` close the trust loop on the 42x42 input matrices.
-They sit downstream of `Witness.v` and `CharPoly.v`. `Cert.v` imports
-`MaynardVerify` (for the `all_match_*` bool facts inside
-`maynard_M105_certified`); the others are leaves in the dependency
-DAG and are pulled in only transitively.
+The five files `MaynardFactQ.v`, `MaynardBasis.v`, `MaynardSpec.v`,
+`MaynardVerify.v`, `MaynardSpecBridge.v` close the trust loop on the
+42x42 input matrices. They sit downstream of `Witness.v` and
+`CharPoly.v`. `Cert.v` imports `MaynardVerify` (for the `all_match_*`
+bool facts inside `maynard_M105_certified`); the others are leaves in
+the dependency DAG and are pulled in only transitively.
 
 A companion document `SPEC_TO_PAPER.md` at the repo root maps every
 definition in `MaynardSpec.v` (`compositions`, `cff`, `G_2`, `alpha`,
@@ -614,6 +614,36 @@ for `M1` (one term per entry) and ~35 minutes for `M2` (~36 terms
 per entry, accumulator denominators reach ~10^7000 digits). This is
 a single-threaded `vm_compute` and dominates the project's total
 build time when `make -j` cannot find anything else to do near the end.
+
+**`MaynardSpecBridge.v`** (~520 lines). Kernel-Qed bridge between Part
+A (rat-level, paper-shaped) and Part B (Z-level, `vm_compute`-shaped)
+of `MaynardSpec.v`:
+
+```rocq
+Theorem M1_spec_rat_eq (i j : nat) :
+  M1_spec_ij i j = qfrac (m1_num_den_at i j).
+
+Theorem M2_spec_rat_eq (i j : nat) :
+  M2_spec_ij i j = qfrac (m2_num_den_at i j).
+```
+
+where `qfrac (n, d) := (Z_to_int n)%:~R / (Z_to_int d)%:~R : rat` reads
+a (numerator, denominator) ℤ-pair as a rational. Both theorems are `Qed`
+and `Print Assumptions` reports *Closed under the global context* — no
+axioms, no `Uint63` primitives, just structural induction over the
+parallel definitions. The bridge is layered through `factZ_to_rat`,
+`dblratZ_to_rat`, `binZ_to_rat`, `compositionsZ_eq_compositions`,
+`G2Z_to_rat`, `qfrac_qmul`, `qfrac_qplus`, and `alphaZ_to_rat`.
+
+The bridge is a leaf in the dependency DAG: `Cert.v` does not import it,
+and it is independent of `MaynardVerify.v`'s load-bearing Z-level
+cross-check. Its purpose is to certify in the kernel that the rat-level
+paper-form spec — the readable definition a reviewer reads against
+arXiv:1311.4600 §8 — and the Z-level computational spec — the form
+`vm_compute` consumes inside `MaynardVerify` — encode the same closed
+forms. Together with `MaynardVerify.all_match_M{1,2}Z_true`, this gives
+a two-step kernel chain: `M1_int` agrees with `m1_num_den` (Z), and
+`m1_num_den` agrees with `M1_entry` (rat-level, paper-shaped).
 
 ### 3.9 The L2 / L3 / L4 assembly
 
@@ -1216,6 +1246,10 @@ L0 (input matrices match Maynard's closed form)
     + MaynardSpec.v  G_2, M1_entry, M2_entry (closed forms)
     + MaynardBasis.v  maynard_basis_eq_witness
     + Witness.v provides M1_int, M2_int, D_M1, D_M2
+
+L0' (rat-level paper-form spec matches Z-level computational spec)
+  MaynardSpecBridge.v   M1_spec_rat_eq, M2_spec_rat_eq (Qed, no axioms)
+    + MaynardSpec.v  PART A (rat) and PART B (Z) definitions
 
 L1 (IVT root existence)
   CertL1.v   maynard_L1_concrete
