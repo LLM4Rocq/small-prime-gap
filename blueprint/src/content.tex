@@ -82,12 +82,14 @@ shown in the web version of the blueprint.
 This chapter sets up the input data that the rest of the proof consumes:
 the 42-element basis, the closed-form entries of $\Mone$ and $\Mtwo$,
 the $\Z$-level cross-multiplication checks that anchor the
-FLINT-shipped integer matrices to those closed forms, and the bridge
-into MathComp's $\Q$-level matrices. All material here lives inside
-the files \texttt{MaynardSpec.v}, \texttt{MaynardBasis.v},
-\texttt{MaynardFactQ.v} and \texttt{MaynardVerify.v}. Throughout this
-chapter we follow the v3/Annals numbering of Maynard's paper:
-Lemma~8.1 / 8.2 / 8.3 (= Lemma~7.1 / 7.2 / 7.3 in v1).
+FLINT-shipped integer matrices to those closed forms, the kernel-Qed
+bridge between the rat-level paper-form spec and the Z-level
+computational spec, and the bridge into MathComp's $\Q$-level matrices.
+All material here lives inside the files \texttt{MaynardSpec.v},
+\texttt{MaynardBasis.v}, \texttt{MaynardFactQ.v}, \texttt{MaynardVerify.v},
+and \texttt{MaynardSpecBridge.v}. Throughout this chapter we follow the
+v3/Annals numbering of Maynard's paper: Lemma~8.1 / 8.2 / 8.3 (=
+Lemma~7.1 / 7.2 / 7.3 in v1).
 
 \section{Conventions}
 
@@ -327,6 +329,82 @@ matrices that the rest of the proof consumes is kernel-verified to
 agree with Maynard's closed-form specification (Lemma~8.2). The FLINT
 generator is therefore not part of the trust base for the input data
 either.
+\end{remark}
+
+\section{Paper-form $\leftrightarrow$ computational-form spec bridge}
+
+The cross-checks above operate on the $\Z$-level twins
+(\texttt{m1\_num\_den}, \texttt{m2\_num\_den}) because \vmcompute{} on
+$\rat$-level matrices stalls on canonical-structure elaboration
+(see~\S\ref{ch:hb}). The rat-level spec
+(\texttt{M1\_entry}, \texttt{M2\_entry}) is the
+documentation-shaped form a reviewer reads side by side with
+arXiv:1311.4600~\S8. The bridge below certifies in the kernel that the
+two forms encode the same closed forms: a single \Qed{} per matrix,
+with no axioms.
+
+\begin{definition}[Reading a $\Z$-pair as a rational]\label{def:qfrac}
+\rocq{PrimeGapS1.MaynardSpecBridge.qfrac}
+\rocqok
+For $(n, d) \in \Z \times \Z$, set
+$\texttt{qfrac}(n, d) := \frac{n}{d} \in \rat$
+(MathComp's int--to--rat morphism applied component-wise, then divided).
+This reads a $(\text{numerator}, \text{denominator})$ pair as the
+rational it represents.
+\end{definition}
+
+\begin{theorem}[$\Mone$ paper-form spec equals $\Z$-level spec]\label{thm:M1_spec_rat_eq}
+\rocq{PrimeGapS1.MaynardSpecBridge.M1_spec_rat_eq}
+\rocqok
+\uses{def:M1_entry, def:qfrac}
+For every $(i, j) \in \{0, \ldots, 41\}^2$,
+\[
+  \texttt{M1\_spec\_ij}(i, j) \;=\; \texttt{qfrac}\bigl(\texttt{m1\_num\_den\_at}(i, j)\bigr).
+\]
+\end{theorem}
+\begin{proof}\rocqok
+Layered structural induction in
+\texttt{theories/S1/MaynardSpecBridge.v}: \texttt{factZ\_to\_rat},
+\texttt{dblratZ\_to\_rat}, \texttt{binZ\_to\_rat},
+\texttt{compositionsZ\_eq\_compositions}, \texttt{G2Z\_to\_rat}, and
+\texttt{m1\_num\_den\_to\_rat} compose into a single rewrite chain.
+\texttt{Print Assumptions} reports \emph{Closed under the global
+context}: no axioms, not even \Uintsf\ primitives.
+\end{proof}
+
+\begin{theorem}[$\Mtwo$ paper-form spec equals $\Z$-level spec]\label{thm:M2_spec_rat_eq}
+\rocq{PrimeGapS1.MaynardSpecBridge.M2_spec_rat_eq}
+\rocqok
+\uses{def:M2_entry, def:qfrac}
+For every $(i, j) \in \{0, \ldots, 41\}^2$,
+\[
+  \texttt{M2\_spec\_ij}(i, j) \;=\; \texttt{qfrac}\bigl(\texttt{m2\_num\_den\_at}(i, j)\bigr).
+\]
+\end{theorem}
+\begin{proof}\rocqok
+Same layered induction, with two extra steps for the running
+$\texttt{qplus}$ accumulator: \texttt{qfrac\_qmul} and
+\texttt{qfrac\_qplus} bridge \texttt{qmul} / \texttt{qplus} on
+$\Z \times \Z$ pairs to $*$ / $+$ on $\rat$, and a generic
+$\texttt{fold\_left qplus} \to \sum$ lemma collects the double sum
+over $(c'_1, c'_2)$. \texttt{Print Assumptions}: \emph{Closed under
+the global context}.
+\end{proof}
+
+\begin{remark}
+Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} live
+in \texttt{MaynardSpecBridge.v}, a leaf in the dependency DAG:
+\texttt{Cert.v} does not import them, and the headline theorem does
+not depend on them. Their job is purely to certify that the
+documentation-shaped $\rat$-level definitions
+(Definitions~\ref{def:M1_entry} and~\ref{def:M2_entry}, written to
+match Maynard's paper character for character) and the
+$\vmcompute$-shaped $\Z$-level definitions
+(\texttt{m1\_num\_den}, \texttt{m2\_num\_den}, consumed by
+Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}) compute the same
+rational. Combined with those theorems, this gives a two-step
+kernel-verified path from each shipped integer matrix entry back to
+Maynard's exact closed form.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -92,13 +92,30 @@ outer integration dimension; in our formalisation this is `k_param = 105`.
   canonical-structure elaborator and stalls (REPORT.md §4d).
 
 Part A and Part B are structurally isomorphic: every operation in Part A
-has a directly corresponding operation in Part B. They are not formally
-bridged by a Qed lemma in `MaynardSpec.v` — `MaynardVerify.v` cross-checks
-the Z-level form against the shipped matrices, and the rat-level form is
-the documentation-shaped spec a reviewer reads against the paper. A
-kernel-checked bridge `M{1,2}_spec_rat_eq` would be straightforward to
-add (each layer of Part A maps 1-1 to a layer of Part B) and is left as
-a follow-up.
+has a directly corresponding operation in Part B. The kernel-Qed bridge
+between them lives in `theories/S1/MaynardSpecBridge.v`:
+
+```rocq
+Theorem M1_spec_rat_eq (i j : nat) :
+  M1_spec_ij i j = qfrac (m1_num_den_at i j).
+
+Theorem M2_spec_rat_eq (i j : nat) :
+  M2_spec_ij i j = qfrac (m2_num_den_at i j).
+```
+
+where `qfrac (n, d) := (Z_to_int n)%:~R / (Z_to_int d)%:~R : rat`. Both
+theorems are `Qed` and `Print Assumptions` reports *Closed under the
+global context* — no axioms, no `Uint63` primitives. The bridge is layered
+through `factZ_to_rat`, `dblratZ_to_rat`, `binZ_to_rat`,
+`compositionsZ_eq_compositions`, `G2Z_to_rat`, `qfrac_qmul`, `qfrac_qplus`,
+and `alphaZ_to_rat`, each one a small structural induction.
+
+`MaynardSpecBridge.v` is a leaf in the dependency DAG (`Cert.v` does not
+import it) and is independent of `MaynardVerify.v`'s load-bearing Z-level
+cross-check. Its purpose is to certify in the kernel that the rat-level
+paper-form spec (the documentation-shaped Part A a reviewer reads against
+the paper) and the Z-level computational spec (the Part B `vm_compute`
+consumes) encode the same closed forms.
 
 ### The `K = 105` vs `K2 = 104` distinction
 
