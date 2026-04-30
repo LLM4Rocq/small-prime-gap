@@ -246,3 +246,44 @@ Qed.
 Lemma compositionsZ_eq_compositions (r n : nat) :
   compositionsZ r n = compositions r n.
 Proof. exact: compositions_auxZ_eq. Qed.
+
+(* ============================================================== *)
+(*  Layer 4: G2Z <-> G_2                                            *)
+(* ============================================================== *)
+
+Lemma fold_left_Zadd_acc (xs : list Z) (acc : Z) :
+  List.fold_left Z.add xs acc = Z.add acc (List.fold_left Z.add xs Z0).
+Proof.
+  elim: xs acc => [|x xs IH] acc /=.
+  - by rewrite Z.add_0_r.
+  - rewrite IH (IH (Z.add Z0 x)).
+    by rewrite Z.add_0_l Z.add_assoc.
+Qed.
+
+Lemma fold_left_Zadd_sum (xs : list Z) :
+  ((Z_to_int (List.fold_left Z.add xs Z0))%:~R : rat) =
+  \sum_(z <- xs) ((Z_to_int z)%:~R).
+Proof.
+  elim: xs => [|x xs IH] /=.
+  - rewrite big_nil. by [].
+  - rewrite fold_left_Zadd_acc /=.
+    rewrite Z_to_int_add intrD IH big_cons.
+    by rewrite addrC.
+Qed.
+
+Lemma G2Z_to_rat (n k : nat) :
+  ((Z_to_int (G2Z n k))%:~R : rat) = G_2 n k.
+Proof.
+  rewrite /G2Z /G_2.
+  case: n => [|n].
+  - by rewrite Z_to_int_1_rat.
+  - rewrite Z_to_int_mul intrM factZ_to_rat.
+    congr (_ * _).
+    rewrite fold_left_Zadd_sum -seq_map_eq -iota_seq_eq big_map.
+    apply: eq_big_seq => r Hr.
+    rewrite Z_to_int_mul intrM binZ_to_rat.
+    congr (_ * _).
+    rewrite fold_left_Zadd_sum -seq_map_eq -compositionsZ_eq_compositions big_map.
+    apply: eq_big_seq => a Ha.
+    by rewrite cffZ_to_rat.
+Qed.
