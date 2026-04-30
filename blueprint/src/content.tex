@@ -149,6 +149,51 @@ integer matrices in \texttt{Witness.v}.
 \vmcompute{} on a list of 42 pairs.
 \end{proof}
 
+\begin{lemma}[Basis is the canonical set]\label{lem:basis_spec}
+\rocq{PrimeGapS1.MaynardBasis.maynard_basis_spec}
+\rocqok
+\uses{def:maynard_basis}
+For every $p \in \N \times \N$,
+\[
+  p \in \texttt{maynard\_basis} \quad\iff\quad p.1 + 2 \cdot p.2 \le 11.
+\]
+\end{lemma}
+\begin{proof}\rocqok
+The basis is permutation-equal to the canonical filter
+\[
+  \texttt{canonical\_basis} \;:=\; \bigl[\, p \,\big|\, p \in
+    \texttt{iota}\,0\,12 \times \texttt{iota}\,0\,6,\; p.1 + 2\,p.2 \le 11
+  \bigr]
+\]
+by a \vmcompute{} \texttt{perm\_eq} lemma, and \texttt{canonical\_basis}
+satisfies the spec by construction (\texttt{mem\_filter} +
+\texttt{allpairs\_f}; the residual $2c \le 11 \Rightarrow c < 6$ step
+closes by \texttt{lia}).
+\end{proof}
+
+\begin{lemma}[Basis has no duplicates]\label{lem:basis_uniq}
+\rocq{PrimeGapS1.MaynardBasis.maynard_basis_uniq}
+\rocqok
+\uses{def:maynard_basis}
+$\texttt{uniq}\;\texttt{maynard\_basis}$.
+\end{lemma}
+\begin{proof}\rocqok
+\vmcompute{} on the 42-pair list.
+\end{proof}
+
+\begin{remark}
+Lemmas~\ref{lem:basis_size}, \ref{lem:basis_spec},
+and~\ref{lem:basis_uniq} together pin \texttt{maynard\_basis} to
+exactly the multiset $\{(b, c) \in \N^2 : b + 2c \le 11\}$. A reviewer
+never has to inspect the literal 42-pair list — the basis is fully
+characterised by the predicate $b + 2c \le 11$, the size $42$, and the
+absence of duplicates. Order matters only because the matrix rows and
+columns must align with the indexing of $M_{1,2}^{\mathrm{int}}$;
+eigenvalues of $M_1^{-1} M_2$ are invariant under simultaneous
+row/column permutation, so any ordering of the same set yields the
+same $\lammax$.
+\end{remark}
+
 \begin{remark}
 This is a lower-bound subspace argument. Maynard's full optimisation is
 over all symmetric $F$ of degree $\le 11$ in $k = 105$ variables;

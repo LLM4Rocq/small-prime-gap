@@ -550,18 +550,26 @@ giving the line-level reference from the Rocq spec back to the paper.
 := n`!%:R : rat`, `binQ n k := 'C(n, k)%:R : rat`, and a couple of
 helper lemmas (`factQ_nz`, `factQ_succ`).
 
-**`MaynardBasis.v`** (~35 lines). Rebuilds the 42-element basis
+**`MaynardBasis.v`** (~75 lines). Rebuilds the 42-element basis
 `{(b, c) ∈ ℕ × ℕ : b + 2c ≤ 11}` in the Mathematica enumeration order
-used in `Witness.v`. Includes the bridge
+used in `Witness.v`, and pins it to the canonical predicate via three
+Qed lemmas:
 
 ```rocq
+Lemma maynard_basis_size : length maynard_basis = 42.
+Lemma maynard_basis_uniq : uniq maynard_basis.
+Lemma maynard_basis_spec : forall p,
+  (p \in maynard_basis) = (p.1 + 2 * p.2 <= 11)%N.
 Lemma maynard_basis_eq_witness :
   maynard_basis = Witness.basis.
-Proof. vm_compute. reflexivity. Qed.
 ```
 
-so a reviewer can verify the basis enumeration without reading either
-file's encoding.
+`maynard_basis_spec` + `maynard_basis_uniq` + `maynard_basis_size`
+together certify that `maynard_basis` is *exactly* the multiset
+`{(b, c) ∈ ℕ² : b + 2c ≤ 11}` — a reviewer never has to read the 42-pair
+literal. The proof goes via a canonical `[seq p <- allpairs ... | p.1 +
+2*p.2 ≤ 11]` and a `vm_compute`-Qed `perm_eq` lemma; the residual
+`2c ≤ 11 ⇒ c < 6` step is closed by `lia` (mczify).
 
 **`MaynardSpec.v`** (~250 lines). Transcribes Maynard's closed forms:
 

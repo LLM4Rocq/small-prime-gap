@@ -238,11 +238,15 @@ and `M2_int` are kernel-checked against Maynard's closed-form
 specification in `theories/S1/MaynardVerify.v` (Z-level, `vm_compute`
 shape) and that Z-level form is in turn kernel-Qed-bridged to the
 rat-level paper-form spec in `theories/S1/MaynardSpecBridge.v`
-(`M{1,2}_spec_rat_eq`, *Closed under the global context*). The
-denominator `D_q` shipped alongside the integer-cleared characteristic
-polynomial is also kernel-checked to be strictly positive
-(`Cert.D_q_pos`, `vm_compute`-Qed), pinning sign hygiene of the
-FLINT-shipped data against an otherwise-permissible sign-flip on `D_q`.
+(`M{1,2}_spec_rat_eq`, *Closed under the global context*). The basis
+itself is also kernel-pinned: `MaynardBasis.maynard_basis_spec` certifies
+that the 42-element list is exactly the multiset
+`{(b, c) ∈ ℕ² : b + 2c ≤ 11}`, so a reviewer never has to inspect the
+literal pair list. The denominator `D_q` shipped alongside the
+integer-cleared characteristic polynomial is also kernel-checked to be
+strictly positive (`Cert.D_q_pos`, `vm_compute`-Qed), pinning sign
+hygiene of the FLINT-shipped data against an otherwise-permissible
+sign-flip on `D_q`.
 
 The shipped Sturm chain is now cross-validated against an independent
 Rocq computation, not just self-consistent. `Smoke.sturm_chain_real_cross_check`
