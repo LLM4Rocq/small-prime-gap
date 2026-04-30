@@ -49,56 +49,43 @@ Import GRing.Theory.
 
 Local Open Scope ring_scope.
 
-Fixpoint enum_bnd_aux (slots_left remaining : nat) : seq (seq nat) :=
-  match slots_left with
-  | 0 => [:: [::] ]
-  | S m =>
-      if (remaining <= m)%N then [::]
-      else
-        let upper := (remaining - m)%N in
-        flatten
-          [seq [seq (ai :: tl) | tl <- enum_bnd_aux m (remaining - ai)%N]
-             | ai <- iota 1 upper]
+(* `compositions r n` is the set of length-`r` compositions of `n` with
+   parts >= 1: every (b_1, ..., b_r) : seq nat with b_i >= 1 and
+   \sum b_i = n.  This is the index set of the inner sum in Maynard's
+   G_{n,2}(k) (Lemma 8.1 / v1 Lemma 7.1).  The recursion is:
+     - r = 0: the only length-0 composition is the empty one, and it
+              is a composition of 0 (and only 0).
+     - r > 0: for each first part a in [1, remaining], recursively
+              enumerate length-(r-1) compositions of remaining-a. *)
+Fixpoint compositions_aux (r remaining : nat) : seq (seq nat) :=
+  match r with
+  | 0 => if (remaining == 0)%N then [:: [::] ] else [::]
+  | S r' =>
+      flatten
+        [seq [seq (a :: tl) | tl <- compositions_aux r' (remaining - a)%N]
+           | a <- iota 1 remaining]
   end.
 
-(* `bnd i n` enumerates the first `i` parts of length-(i+1) compositions
-   of `n` with parts >= 1.  Concretely it returns every
-     a = (a_1, ..., a_i),   a_j >= 1,   sum a <= n - 1,
-   and the implicit (i+1)-th part is b_{i+1} := n - sumn a >= 1.
-   Maynard's paper writes the inner sum over compositions of length
-   r = i+1 explicitly; we keep the (i+1)-th part implicit so that a
-   single `cff a n` value covers it.
+Definition compositions (r n : nat) : seq (seq nat) := compositions_aux r n.
 
-   Note: the explicit-recursion style here mirrors `flint_probe.py`'s
-   `enumerate_bounds` and `bndZ` below for line-by-line auditability;
-   a MathComp-bigops alternative (`\sum_(a in compositions i n)`) would
-   be more idiomatic but harder to compare against the Python reference. *)
-Definition bnd (i n : nat) : seq (seq nat) :=
-  if (n == 0)%N then [::] else enum_bnd_aux i (n - 1)%N.
+(* `cff a` is Maynard's per-composition coefficient:
+     cff(a) = (sumn a)! * \prod_(x <- a) (2x)! / x!.
+   When `a` is a length-r composition of `n` (i.e. sumn a = n), this
+   evaluates to  n! * \prod_i (2 b_i)! / b_i!  --- precisely the inner
+   factor of Lemma 8.1. *)
+Definition cff (a : seq nat) : rat :=
+  factQ (sumn a) * \prod_(x <- a) (factQ (2 * x) / factQ x).
 
-(* `cff a n` is the term of Maynard's inner sum corresponding to the
-   length-(i+1) composition (a_1, ..., a_i, b_{i+1}) of `n`, with
-   b_{i+1} := n - sumn a (>= 1, by construction of `bnd`).  The three
-   factors are:
-
-     factQ n                              -- the n! prefactor;
-     prod_(x <- a) (2x)! / x!             -- the first i parts;
-     (2 (n - sumn a))! / (n - sumn a)!    -- the implicit (i+1)-th part.
-
-   The third factor is *not* trivially 1: since sumn a <= n - 1, we
-   always have n - sumn a >= 1, and that final factor contributes the
-   (2 b_{i+1})! / b_{i+1}! piece for the implicit part. *)
-Definition cff (a : seq nat) (n : nat) : rat :=
-  factQ n
-  * \prod_(x <- a) (factQ (2 * x) / factQ x)
-  * (factQ (2 * (n - sumn a)) / factQ (n - sumn a)).
-
+(* G_{n,2}(k) per Maynard Lemma 8.1 (= Lemma 7.1 in v1):
+     G_{n,2}(k) = \sum_{r=1}^{n} C(k, r) \sum_{a \in compositions(r, n)} cff(a).
+   The r = 1 term, where the only composition is [:: n], contributes
+   C(k, 1) * n! * (2n)!/n! = k * (2n)!, recovering the leading
+   k*(2n)! piece of the formula as written in some prose
+   presentations.  For n = 0 the convention is G_{0,2}(k) = 1. *)
 Definition G_2 (n k : nat) : rat :=
   if (n == 0)%N then 1
   else
-    k%:R * factQ (2 * n)
-      + \sum_(i <- iota 1 (n - 1)%N)
-          binQ k i.+1 * \sum_(a <- bnd i n) cff a n.
+    \sum_(r <- iota 1 n) binQ k r * \sum_(a <- compositions r n) cff a.
 
 Definition K1 : nat := 105.
 Definition K2 : nat := 104.
