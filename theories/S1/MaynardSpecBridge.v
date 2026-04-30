@@ -154,63 +154,57 @@ Proof.
 Qed.
 
 (* ============================================================== *)
-(*  Remaining bridges -- TODO                                       *)
-(*                                                                  *)
-(*  The substrate above (factZ_to_rat, fact_dvd_fact, factZ_dvd_    *)
-(*  double) is the foundation.  The remaining bridges are in       *)
-(*  dependency order:                                               *)
-(*                                                                  *)
-(*    Lemma dblratZ_to_rat (x : nat) :                              *)
-(*      ((Z_to_int (dblratZ x))%:~R : rat)                          *)
-(*      = factQ (2 * x) / factQ x.                                  *)
-(*    -- uses factZ_dvd_double to discharge the integer-division-   *)
-(*       is-exact side condition.                                   *)
-(*                                                                  *)
-(*    Lemma prod_dblratZ_to_rat (a : list nat) :                    *)
-(*      ((Z_to_int (prod_dblratZ a))%:~R : rat)                     *)
-(*      = \prod_(x <- a) (factQ (2 * x) / factQ x).                 *)
-(*    -- induction on a, using dblratZ_to_rat.                      *)
-(*                                                                  *)
-(*    Lemma cffZ_to_rat (a : list nat) :                            *)
-(*      ((Z_to_int (cffZ a))%:~R : rat) = cff a.                    *)
-(*    -- corollary: cffZ a = prod_dblratZ a definitionally,         *)
-(*       cff a is the same product over rat.                        *)
-(*                                                                  *)
-(*    Lemma binZ_to_rat (n k : nat) : (k <= n)%nat ->               *)
-(*      ((Z_to_int (binZ n k))%:~R : rat) = binQ n k.               *)
-(*    -- needs (factZ k * factZ (n - k)) | factZ n; standard        *)
-(*       binomial-divisibility.                                     *)
-(*                                                                  *)
-(*    Lemma compositionsZ_eq_compositions (r n : nat) :             *)
-(*      compositionsZ r n = compositions r n.                       *)
-(*    -- structural induction modulo iota = List.seq and            *)
-(*       flatten = List.concat o List.map.                          *)
-(*                                                                  *)
-(*    Lemma G2Z_to_rat (n k : nat) :                                *)
-(*      ((Z_to_int (G2Z n k))%:~R : rat) = G_2 n k.                 *)
-(*    -- structural induction over r in [1, n] and a in             *)
-(*       compositions r n.                                          *)
-(*                                                                  *)
-(*    Definition qfrac (p : Z * Z) : rat :=                         *)
-(*      (Z_to_int p.1)%:~R / (Z_to_int p.2)%:~R.                    *)
-(*                                                                  *)
-(*    Lemma qfrac_qmul / qfrac_qplus  -- the rat-fraction calculus  *)
-(*      requires denominators nonzero, threaded as side conditions. *)
-(*                                                                  *)
-(*    Lemma alphaZ_to_rat (b c cp : nat) : (cp <= c)%nat ->         *)
-(*      qfrac (alphaZ b c cp) = alpha b c cp.                       *)
-(*                                                                  *)
-(*    Theorem M1_spec_rat_eq i j :                                  *)
-(*      M1_spec_ij i j = qfrac (m1_num_den_at i j).                 *)
-(*    -- corollary: M1_entry definitionally factors as              *)
-(*       (factQ b * G_2 c K1) / factQ (...).                        *)
-(*                                                                  *)
-(*    Theorem M2_spec_rat_eq i j :                                  *)
-(*      M2_spec_ij i j = qfrac (m2_num_den_at i j).                 *)
-(*    -- the hardest: induction over the outer/inner fold of        *)
-(*       qplus, using qfrac_qmul / qfrac_qplus to peel each term.   *)
-(*                                                                  *)
-(*  Estimated: 250-400 additional lines of structural induction,    *)
-(*  no deep mathematics, no vm_compute on heavy data.  Each layer   *)
-(*  is mechanical given the foundation above.                       *)
+(*  Layer 2: binZ                                                   *)
 (* ============================================================== *)
+
+(* nat-level: k! * (n-k)! divides n! when k <= n.  Standard via
+   bin_fact: 'C(n,k) * (k! * (n-k)!) = n!. *)
+Lemma bin_dvd_fact (n k : nat) :
+  (k <= n)%nat -> (k`! * (n - k)`! %| n`!)%nat.
+Proof.
+  move=> Hkn. apply/dvdnP. exists 'C(n,k).
+  by rewrite -(bin_fact Hkn).
+Qed.
+
+(* Z-level lift: factZ k * factZ (n-k) divides factZ n. *)
+Lemma factZ_factZ_dvd (n k : nat) :
+  (k <= n)%nat ->
+  (factZ k * factZ (n - k)%nat | factZ n)%Z.
+Proof.
+  move=> Hkn.
+  rewrite !factZ_eq_Z_of_nat -Nat2Z.inj_mul.
+  apply: Z_of_nat_dvd. exact: bin_dvd_fact.
+Qed.
+
+Lemma factZ_factZ_pos (n k : nat) :
+  Z.lt 0 (factZ k * factZ (n - k)%nat).
+Proof.
+  apply: Z.mul_pos_pos; exact: factZ_pos.
+Qed.
+
+(* binQ n k = factQ n / (factQ k * factQ (n-k)) when k <= n. *)
+Lemma binQ_factQ (n k : nat) :
+  (k <= n)%nat ->
+  binQ n k = factQ n / (factQ k * factQ (n - k)%nat).
+Proof.
+  move=> Hkn.
+  have Hnz : factQ k * factQ (n - k)%nat != 0
+    by rewrite mulf_neq0 ?factQ_nz.
+  apply: (canRL (mulfK Hnz)).
+  rewrite /binQ /factQ -natrM -natrM.
+  apply/eqP. rewrite Num.Theory.eqr_nat. apply/eqP.
+  exact: bin_fact.
+Qed.
+
+Lemma binZ_to_rat (n k : nat) :
+  (k <= n)%nat ->
+  ((Z_to_int (binZ n k))%:~R : rat) = binQ n k.
+Proof.
+  move=> Hkn.
+  rewrite /binZ.
+  have -> : Nat.leb k n = true by apply/Nat.leb_le; apply/leP.
+  rewrite Z_to_int_div_exact;
+    [|exact: factZ_factZ_pos|exact: factZ_factZ_dvd].
+  rewrite Z_to_int_mul intrM !factZ_to_rat.
+  by rewrite -binQ_factQ.
+Qed.
