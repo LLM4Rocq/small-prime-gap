@@ -316,3 +316,33 @@ Proof.
   rewrite Z_to_int_add !Z_to_int_mul !intrD !intrM.
   by rewrite addf_div ?intr_eq0.
 Qed.
+
+(* ============================================================== *)
+(*  Layer 6: alphaZ <-> alpha                                       *)
+(* ============================================================== *)
+
+Lemma alphaZ_to_rat (b c cp : nat) :
+  qfrac (alphaZ b c cp) = alpha b c cp.
+Proof.
+  rewrite /qfrac /alphaZ /alpha /=.
+  by rewrite !Z_to_int_mul !intrM !factZ_to_rat binZ_to_rat.
+Qed.
+
+(* ============================================================== *)
+(*  Layer 7: M1 spec bridge                                         *)
+(* ============================================================== *)
+
+Lemma m1_num_den_to_rat (bi ci bj cj : nat) :
+  qfrac (m1_num_den bi ci bj cj) = M1_entry bi ci bj cj.
+Proof.
+  rewrite /qfrac /m1_num_den /M1_entry.
+  rewrite Z_to_int_mul intrM !factZ_to_rat G2Z_to_rat.
+  by rewrite mulrAC.
+Qed.
+
+Lemma M1_spec_rat_eq (i j : nat) :
+  M1_spec_ij i j = qfrac (m1_num_den_at i j).
+Proof.
+  rewrite /M1_spec_ij /m1_num_den_at.
+  by rewrite m1_num_den_to_rat.
+Qed.
