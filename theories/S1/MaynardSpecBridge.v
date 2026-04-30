@@ -17,7 +17,7 @@
 (*  spec encode the same closed forms.                              *)
 (* ============================================================== *)
 
-From Stdlib Require Import ZArith List Lia.
+From Stdlib Require Import ZArith List Lia Znumtheory.
 Import ListNotations.
 
 From mathcomp Require Import all_ssreflect all_algebra.
@@ -85,8 +85,76 @@ Proof.
   by rewrite leq_pmull.
 Qed.
 
+(* `factZ n` is strictly positive. *)
+Lemma factZ_pos (n : nat) : Z.lt 0 (factZ n).
+Proof.
+  rewrite factZ_eq_Z_of_nat.
+  have /ltP H := fact_gt0 n.
+  lia.
+Qed.
+
+(* `Z_to_int` of a strictly-positive Z is nonzero in int. *)
+Lemma Z_to_int_pos_nz (z : Z) : Z.lt 0 z -> Z_to_int z != 0.
+Proof.
+  case: z => [|p _|p H] //.
+  rewrite Z_to_int_pos_pos eqz_nat -lt0n.
+  apply/ltP; exact: Pos2Nat.is_pos.
+Qed.
+
+(* Lifted to rat: ((Z_to_int z)%:~R : rat) is nonzero when z > 0. *)
+Lemma Z_to_int_pos_rat_nz (z : Z) :
+  Z.lt 0 z -> ((Z_to_int z)%:~R : rat) != 0.
+Proof.
+  by move=> /Z_to_int_pos_nz; rewrite intr_eq0.
+Qed.
+
+(* Generic integer-division-is-exact bridge: when `b | a` and `b > 0`,
+   the integer division `a / b` lifts to the rat division
+   `(a : rat) / (b : rat)`. *)
+Lemma Z_to_int_div_exact (a b : Z) :
+  Z.lt 0 b -> (b | a)%Z ->
+  ((Z_to_int (a / b))%:~R : rat)
+  = (Z_to_int a)%:~R / (Z_to_int b)%:~R.
+Proof.
+  move=> Hbpos Hdvd.
+  have Hnz : ((Z_to_int b)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_nz.
+  apply: (canRL (mulfK Hnz)).
+  rewrite -intrM -Z_to_int_mul Z.mul_comm.
+  by rewrite -Zdivide_Zdiv_eq.
+Qed.
+
 (* ============================================================== *)
-(*  Layer 1+: remaining bridges -- TODO                             *)
+(*  Layer 1: dblratZ, prod_dblratZ, cffZ                            *)
+(* ============================================================== *)
+
+Lemma dblratZ_to_rat (x : nat) :
+  ((Z_to_int (dblratZ x))%:~R : rat)
+  = factQ (2 * x) / factQ x.
+Proof.
+  rewrite /dblratZ Z_to_int_div_exact ?factZ_to_rat //.
+  - exact: factZ_pos.
+  - exact: factZ_dvd_double.
+Qed.
+
+Lemma prod_dblratZ_to_rat (a : list nat) :
+  ((Z_to_int (prod_dblratZ a))%:~R : rat)
+  = \prod_(x <- a) (factQ (2 * x) / factQ x).
+Proof.
+  elim: a => [|x a IH] /=.
+  - by rewrite Z_to_int_1_rat big_nil.
+  - rewrite Z_to_int_mul intrM dblratZ_to_rat IH.
+    by rewrite big_cons.
+Qed.
+
+(* `cffZ a = prod_dblratZ a` definitionally; bridge is direct. *)
+Lemma cffZ_to_rat (a : list nat) :
+  ((Z_to_int (cffZ a))%:~R : rat) = cff a.
+Proof.
+  by rewrite /cffZ /cff prod_dblratZ_to_rat.
+Qed.
+
+(* ============================================================== *)
+(*  Remaining bridges -- TODO                                       *)
 (*                                                                  *)
 (*  The substrate above (factZ_to_rat, fact_dvd_fact, factZ_dvd_    *)
 (*  double) is the foundation.  The remaining bridges are in       *)
