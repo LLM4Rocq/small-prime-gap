@@ -542,10 +542,9 @@ They sit downstream of `Witness.v` and `CharPoly.v`. `Cert.v` imports
 DAG and are pulled in only transitively.
 
 A companion document `SPEC_TO_PAPER.md` at the repo root maps every
-definition in `MaynardSpec.v` (`bnd`, `cff`, `G_2`, `alpha`,
+definition in `MaynardSpec.v` (`compositions`, `cff`, `G_2`, `alpha`,
 `M1_entry`, `M2_entry`) to specific lines of arXiv:1311.4600 v3 §8,
-closing audit finding M-4 (the previously informal reference from
-the Rocq spec back to the paper).
+giving the line-level reference from the Rocq spec back to the paper.
 
 **`MaynardFactQ.v`** (~30 lines). Tiny rat-level wrappers `factQ n
 := n`!%:R : rat`, `binQ n k := 'C(n, k)%:R : rat`, and a couple of
@@ -566,10 +565,12 @@ file's encoding.
 
 **`MaynardSpec.v`** (~250 lines). Transcribes Maynard's closed forms:
 
-- `G_2 n k : rat`: the polynomial `G_{n,2}(k) = k·(2n)! + Σ_{i=1}^{n-1}
-  C(k, i+1)·Σ_{a ∈ Bnd(i, n)} Cff(a, n)` from Lemma 7.1, with the
-  enumeration `bnd i n` of integer compositions of length `i` with
-  parts ≥ 1 summing to ≤ `n - 1`.
+- `G_2 n k : rat`: the polynomial
+  `G_{n,2}(k) = n! · Σ_{r=1}^{n} C(k, r) · Σ_{a ∈ compositions(r, n)} cff(a)`
+  from Lemma 8.1 (= v1 Lemma 7.1), where `compositions r n` enumerates
+  the length-r compositions of n with parts ≥ 1, and `cff a := Π (2 b_i)!/b_i!`
+  is the per-composition inner factor. Both the n! prefactor and the
+  inner product appear at the same positions as in Maynard's paper.
 - `M1_entry bi ci bj cj : rat = b!/(105+b+2c)! · G_2 c 105` where
   `b = bi+bj`, `c = ci+cj`. Single term per matrix entry.
 - `alpha b c cp : rat`, the eq. 7.8 expansion coefficient.
