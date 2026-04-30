@@ -18,10 +18,14 @@
        shipped integer matrices — purely in Z, so vm_compute does
        not hit `rat`'s canonical-form normalisation at scale.
 
-   The two are connected by `M1_spec_rat_eq` / `M2_spec_rat_eq`
-   below, which rewrite the rat spec in terms of the (num, den)
-   pair.  Those bridge lemmas are used only as sanity checks; they
-   are *not* on the critical path of MaynardVerify.
+   The two representations are independent transcriptions of the
+   same closed-form formula and are not formally bridged by a
+   Qed lemma here: `MaynardVerify.v` uses the (num, den) pair
+   directly, and the rat spec is documentation-shaped (it is what
+   matches the paper text).  Adding a `M*_spec_rat_eq` bridge
+   would be straightforward but unnecessary for the headline
+   theorem; see audit finding M-4 / SPEC_TO_PAPER.md for the
+   paper-side mapping.
    ================================================================== *)
 
 From Stdlib Require Import ZArith List.
