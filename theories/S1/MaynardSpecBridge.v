@@ -287,3 +287,32 @@ Proof.
     apply: eq_big_seq => a Ha.
     by rewrite cffZ_to_rat.
 Qed.
+
+(* ============================================================== *)
+(*  Layer 5: qfrac calculus                                         *)
+(*                                                                  *)
+(*  Reads (n, d) : Z * Z as the rational n / d.  qmul / qplus on    *)
+(*  the (Z * Z) side correspond to * / + on rat.                    *)
+(* ============================================================== *)
+
+Definition qfrac (p : Z * Z) : rat :=
+  (Z_to_int p.1)%:~R / (Z_to_int p.2)%:~R.
+
+Lemma qfrac_qmul (p q : Z * Z) :
+  qfrac (qmul p q) = qfrac p * qfrac q.
+Proof.
+  case: p => [a b]; case: q => [c d].
+  rewrite /qfrac /qmul /=.
+  rewrite !Z_to_int_mul !intrM.
+  by rewrite mulf_div.
+Qed.
+
+Lemma qfrac_qplus (p q : Z * Z) :
+  Z_to_int p.2 != 0 -> Z_to_int q.2 != 0 ->
+  qfrac (qplus p q) = qfrac p + qfrac q.
+Proof.
+  case: p => [a b]; case: q => [c d] /= Hb Hd.
+  rewrite /qfrac /qplus /=.
+  rewrite Z_to_int_add !Z_to_int_mul !intrD !intrM.
+  by rewrite addf_div ?intr_eq0.
+Qed.
