@@ -61,9 +61,33 @@ Fixpoint enum_bnd_aux (slots_left remaining : nat) : seq (seq nat) :=
              | ai <- iota 1 upper]
   end.
 
+(* `bnd i n` enumerates the first `i` parts of length-(i+1) compositions
+   of `n` with parts >= 1.  Concretely it returns every
+     a = (a_1, ..., a_i),   a_j >= 1,   sum a <= n - 1,
+   and the implicit (i+1)-th part is b_{i+1} := n - sumn a >= 1.
+   Maynard's paper writes the inner sum over compositions of length
+   r = i+1 explicitly; we keep the (i+1)-th part implicit so that a
+   single `cff a n` value covers it.
+
+   Note: the explicit-recursion style here mirrors `flint_probe.py`'s
+   `enumerate_bounds` and `bndZ` below for line-by-line auditability;
+   a MathComp-bigops alternative (`\sum_(a in compositions i n)`) would
+   be more idiomatic but harder to compare against the Python reference. *)
 Definition bnd (i n : nat) : seq (seq nat) :=
   if (n == 0)%N then [::] else enum_bnd_aux i (n - 1)%N.
 
+(* `cff a n` is the term of Maynard's inner sum corresponding to the
+   length-(i+1) composition (a_1, ..., a_i, b_{i+1}) of `n`, with
+   b_{i+1} := n - sumn a (>= 1, by construction of `bnd`).  The three
+   factors are:
+
+     factQ n                              -- the n! prefactor;
+     prod_(x <- a) (2x)! / x!             -- the first i parts;
+     (2 (n - sumn a))! / (n - sumn a)!    -- the implicit (i+1)-th part.
+
+   The third factor is *not* trivially 1: since sumn a <= n - 1, we
+   always have n - sumn a >= 1, and that final factor contributes the
+   (2 b_{i+1})! / b_{i+1}! piece for the implicit part. *)
 Definition cff (a : seq nat) (n : nat) : rat :=
   factQ n
   * \prod_(x <- a) (factQ (2 * x) / factQ x)
@@ -136,11 +160,12 @@ Fixpoint prod_dblratZ (xs : list nat) : Z :=
   | x :: r => dblratZ x * prod_dblratZ r
   end.
 
-Fixpoint sumn_nat (xs : list nat) : nat :=
-  match xs with
-  | nil => 0%nat
-  | x :: r => (x + sumn_nat r)%nat
-  end.
+(* Sum of a `list nat` (PART B uses stdlib lists, so MathComp's
+   `sumn` -- which targets `seq nat` -- is not directly available;
+   this is just `fold_right Nat.add 0` under a name that signals
+   intent at the use sites). *)
+Definition sumn_nat (xs : list nat) : nat :=
+  List.fold_right Nat.add 0%nat xs.
 
 Definition cffZ (a : list nat) (n : nat) : Z :=
   factZ n * prod_dblratZ a * dblratZ (n - sumn_nat a)%nat.

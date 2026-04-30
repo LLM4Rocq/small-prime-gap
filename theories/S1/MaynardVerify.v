@@ -37,8 +37,13 @@
      - `all_match_M2Z_true` : ~35 min (42x42 entries each a sum of
                                        up to 36 terms over G_{n,2}(104))
 
-   Both are Qed.  `Print Assumptions` on each shows only the standard
-   Uint63 / PrimInt63 kernel primitives.
+   Both are Qed.  `Print Assumptions` on each reports
+   "Closed under the global context" -- this file does NOT use
+   primitive integers (Uint63 / PrimInt63).  The cross-check is pure
+   stdlib `Z` arithmetic; `vm_compute` reduces it without ever
+   reaching the Uint63 layer.  This is stronger than the typical
+   vm_compute Qed elsewhere in the project (which does pull in the
+   PrimInt63 axioms via Bignums).
 
    == Why no `M1_rat = M1_spec : 'M[rat]_42` Qed ===================
 
