@@ -424,3 +424,107 @@ Proof.
     + by apply: Z_to_int_qplus_den_nz.
     + move=> t' Ht'. apply: Hl. by right.
 Qed.
+
+Lemma fold_left_qplus_den_nz (l : list (Z * Z)) (acc : Z * Z) :
+  Z_to_int acc.2 != 0 ->
+  (forall t, List.In t l -> Z_to_int t.2 != 0) ->
+  Z_to_int (List.fold_left qplus l acc).2 != 0.
+Proof.
+  elim: l acc => [|x l IH] acc Hacc Hl //=.
+  apply: IH.
+  - apply: Z_to_int_qplus_den_nz => //. apply: Hl. by left.
+  - move=> t Ht. apply: Hl. by right.
+Qed.
+
+Lemma fold_left_inner_to_map (T : Type) (l : list T) (g : T -> Z * Z) (acc : Z * Z) :
+  List.fold_left (fun acc' x => qplus acc' (g x)) l acc =
+  List.fold_left qplus (List.map g l) acc.
+Proof. by elim: l acc => [|x l IH] acc //=; rewrite IH. Qed.
+
+Lemma fold_left_pointwise_eq (T1 T2 : Type)
+  (f g : T1 -> T2 -> T1) (l : list T2) (acc : T1) :
+  (forall a x, f a x = g a x) ->
+  List.fold_left f l acc = List.fold_left g l acc.
+Proof.
+  move=> Hfg. elim: l acc => [|x l IH] acc //=.
+  by rewrite Hfg IH.
+Qed.
+
+Lemma qfrac_init : qfrac (Z0, Zpos xH) = (0 : rat).
+Proof.
+  rewrite /qfrac /=.
+  by rewrite mul0r.
+Qed.
+
+(* Sum bridge for the inner row. *)
+Lemma inner_row_sum (l : list nat) bi ci bj cj cp1 :
+  \sum_(t <- List.map (m2_term_num_den bi ci bj cj cp1) l) qfrac t =
+  \sum_(cp2 <- l) qfrac (m2_term_num_den bi ci bj cj cp1 cp2).
+Proof. by rewrite -seq_map_eq big_map. Qed.
+
+(* M2 outer fold bridge.  The outer accumulator is fed through the
+   inner fold each iteration.  Total fold equals qfrac(acc) plus
+   the double sum over (cp1, cp2). *)
+Lemma m2_outer_qfrac (outer : list nat) (acc : Z * Z) bi ci bj cj :
+  Z_to_int acc.2 != 0 ->
+  qfrac (List.fold_left
+    (fun acc' cp1 => List.fold_left qplus
+      (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj)))
+      acc')
+    outer acc) =
+  qfrac acc +
+  \sum_(cp1 <- outer)
+    \sum_(cp2 <- List.seq 0 (S cj))
+      qfrac (m2_term_num_den bi ci bj cj cp1 cp2).
+Proof.
+  elim: outer acc => [|cp1 outer IH] acc Hacc /=.
+  - by rewrite big_nil addr0.
+  - have Hin : forall t,
+      List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) ->
+      Z_to_int t.2 != 0.
+      move=> t /List.in_map_iff[cp2 [<- _]]. exact: Z_to_int_m2_term_den_nz.
+    have Hnext : Z_to_int (List.fold_left qplus
+      (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) acc).2 != 0
+      by apply: fold_left_qplus_den_nz.
+    have Hterm0 : Z_to_int (m2_term_num_den bi ci bj cj cp1 0).2 != 0
+      by exact: Z_to_int_m2_term_den_nz.
+    have Hacc' : Z_to_int (qplus acc (m2_term_num_den bi ci bj cj cp1 0)).2 != 0
+      by apply: Z_to_int_qplus_den_nz.
+    have Hrest : forall t : Z * Z,
+        List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 1 cj)) ->
+        Z_to_int t.2 != 0.
+      move=> t Ht. apply: Hin. by right.
+    rewrite IH //.
+    rewrite fold_left_qplus_qfrac //.
+    rewrite qfrac_qplus //.
+    rewrite -!addrA.
+    congr (qfrac acc + _).
+    rewrite [in RHS]big_cons.
+    rewrite [\sum_(cp2 <- (0%N :: _)) _]big_cons.
+    rewrite !addrA.
+    by rewrite inner_row_sum.
+Qed.
+
+Lemma m2_num_den_to_rat bi ci bj cj :
+  qfrac (m2_num_den bi ci bj cj) = M2_entry bi ci bj cj.
+Proof.
+  rewrite /m2_num_den /M2_entry.
+  rewrite (fold_left_pointwise_eq
+    (g := fun acc' cp1 => List.fold_left qplus
+      (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj)))
+      acc'));
+  last by move=> a x; rewrite fold_left_inner_to_map.
+  rewrite m2_outer_qfrac; last by [].
+  rewrite qfrac_init add0r -iota_seq_eq.
+  apply: eq_big_seq => cp1 _.
+  rewrite -iota_seq_eq.
+  apply: eq_big_seq => cp2 _.
+  by rewrite m2_term_to_rat.
+Qed.
+
+Lemma M2_spec_rat_eq (i j : nat) :
+  M2_spec_ij i j = qfrac (m2_num_den_at i j).
+Proof.
+  rewrite /M2_spec_ij /m2_num_den_at.
+  by rewrite m2_num_den_to_rat.
+Qed.
