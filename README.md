@@ -259,7 +259,7 @@ identity. That Qed is not on the critical path of the headline
 theorem.
 
 See `SPEC_TO_PAPER.md` for a line-level mapping from the
-`MaynardSpec.{bnd, cff, G_2, alpha, M1_entry, M2_entry}` definitions
+`MaynardSpec.{compositions, cff, G_2, alpha, M1_entry, M2_entry}` definitions
 back to arXiv:1311.4600 v3 §8.
 
 ## License

@@ -68,24 +68,24 @@ Fixpoint compositions_aux (r remaining : nat) : seq (seq nat) :=
 
 Definition compositions (r n : nat) : seq (seq nat) := compositions_aux r n.
 
-(* `cff a` is Maynard's per-composition coefficient:
-     cff(a) = (sumn a)! * \prod_(x <- a) (2x)! / x!.
-   When `a` is a length-r composition of `n` (i.e. sumn a = n), this
-   evaluates to  n! * \prod_i (2 b_i)! / b_i!  --- precisely the inner
-   factor of Lemma 8.1. *)
+(* `cff a` is the per-composition inner factor of Lemma 8.1,
+   character-for-character:
+     cff(a) = \prod_(x <- a) (2x)! / x!.
+   This is exactly Maynard's `\prod_i (2 b_i)! / b_i!` for the
+   composition a = (b_1, ..., b_r). *)
 Definition cff (a : seq nat) : rat :=
-  factQ (sumn a) * \prod_(x <- a) (factQ (2 * x) / factQ x).
+  \prod_(x <- a) (factQ (2 * x) / factQ x).
 
 (* G_{n,2}(k) per Maynard Lemma 8.1 (= Lemma 7.1 in v1):
-     G_{n,2}(k) = \sum_{r=1}^{n} C(k, r) \sum_{a \in compositions(r, n)} cff(a).
-   The r = 1 term, where the only composition is [:: n], contributes
-   C(k, 1) * n! * (2n)!/n! = k * (2n)!, recovering the leading
-   k*(2n)! piece of the formula as written in some prose
-   presentations.  For n = 0 the convention is G_{0,2}(k) = 1. *)
+     G_{n,2}(k) = n! * \sum_{r=1}^{n} C(k, r) * \sum_{a in compositions(r, n)} cff(a).
+   The factQ n prefactor is exactly the paper's global  n!  factor in
+   front of the double sum.  For n = 0 the convention is
+   G_{0,2}(k) = 1 (the empty product). *)
 Definition G_2 (n k : nat) : rat :=
   if (n == 0)%N then 1
   else
-    \sum_(r <- iota 1 n) binQ k r * \sum_(a <- compositions r n) cff a.
+    factQ n
+    * \sum_(r <- iota 1 n) binQ k r * \sum_(a <- compositions r n) cff a.
 
 Definition K1 : nat := 105.
 Definition K2 : nat := 104.
@@ -147,49 +147,43 @@ Fixpoint prod_dblratZ (xs : list nat) : Z :=
   | x :: r => dblratZ x * prod_dblratZ r
   end.
 
-(* Sum of a `list nat` (PART B uses stdlib lists, so MathComp's
-   `sumn` -- which targets `seq nat` -- is not directly available;
-   this is just `fold_right Nat.add 0` under a name that signals
-   intent at the use sites). *)
-Definition sumn_nat (xs : list nat) : nat :=
-  List.fold_right Nat.add 0%nat xs.
-
-Definition cffZ (a : list nat) (n : nat) : Z :=
-  factZ n * prod_dblratZ a * dblratZ (n - sumn_nat a)%nat.
-
-Fixpoint enum_bnd_auxZ (slots_left remaining : nat) : list (list nat) :=
-  match slots_left with
-  | O => [nil]
-  | S m =>
-      if Nat.leb remaining m then nil
-      else
-        let upper := (remaining - m)%nat in
-        List.flat_map
-          (fun ai =>
-             List.map (fun tl => ai :: tl)
-                      (enum_bnd_auxZ m (remaining - ai)%nat))
-          (List.seq 1 upper)
+(* Z-level mirror of PART A's `compositions_aux` / `compositions`.
+   Enumerates length-r compositions of n with parts >= 1. *)
+Fixpoint compositions_auxZ (r remaining : nat) : list (list nat) :=
+  match r with
+  | O => if Nat.eqb remaining 0 then [nil] else nil
+  | S r' =>
+      List.flat_map
+        (fun a =>
+           List.map (fun tl => a :: tl)
+                    (compositions_auxZ r' (remaining - a)%nat))
+        (List.seq 1 remaining)
   end.
 
-Definition bndZ (i n : nat) : list (list nat) :=
-  if Nat.eqb n O then nil else enum_bnd_auxZ i (n - 1)%nat.
+Definition compositionsZ (r n : nat) : list (list nat) :=
+  compositions_auxZ r n.
+
+(* Z-level mirror of PART A's `cff`: just the product of (2x)!/x!. *)
+Definition cffZ (a : list nat) : Z := prod_dblratZ a.
 
 (* C(n, k) as Z, integer-valued. *)
 Definition binZ (n k : nat) : Z :=
   if Nat.leb k n then factZ n / (factZ k * factZ (n - k)%nat) else 0.
 
-(* G_{n,2}(k) as Z — integer when k is an integer. *)
+(* G_{n,2}(k) as Z, mirroring PART A's `G_2`:
+     G_{n,2}(k) = n! * sum_{r=1..n} C(k, r) * sum_{a in compositionsZ(r, n)} cffZ(a).
+   The factZ n prefactor is the paper's global  n!  factor. *)
 Definition G2Z (n k : nat) : Z :=
   if Nat.eqb n O then 1
   else
-    Z.of_nat k * factZ (2 * n)%nat
-    + List.fold_left Z.add
+    factZ n
+    * List.fold_left Z.add
         (List.map
-           (fun i =>
-              binZ k (i+1)%nat
+           (fun r =>
+              binZ k r
               * List.fold_left Z.add
-                  (List.map (fun a => cffZ a n) (bndZ i n)) 0)
-           (List.seq 1 (n - 1)%nat)) 0.
+                  (List.map cffZ (compositionsZ r n)) 0)
+           (List.seq 1 n)) 0.
 
 (* M1 as (num, den) in lowest common form built from factorials.
    num / den = b! / (K1 + b + 2c)! * G_{c,2}(K1).

@@ -159,45 +159,42 @@ $\Mk[105] > 4$.
 
 \section{The polynomial \texorpdfstring{$G_{n,2}(k)$}{G\_n,2(k)} (Lemma 8.1)}
 
-\begin{definition}[Composition enumerator $\Bnd$]\label{def:bnd}
-\rocq{PrimeGapS1.MaynardSpec.bnd}
+\begin{definition}[Compositions of $n$]\label{def:compositions}
+\rocq{PrimeGapS1.MaynardSpec.compositions}
 \rocqok
-For $i, n \in \N$ with $n \ge 1$,
-$\Bnd(i, n) := \{(b_1, \ldots, b_i) \in \N_{\ge 1}^i : \sum_s b_s \le n - 1\}$,
-returned as a list of compositions in lexicographic order.
-For $i = 0$ this is the singleton $\{[\,]\}$; for $n = 0$ it is empty.
-The $\le n - 1$ bound (rather than $\le n$) reflects the implicit
-final part $b_{i+1} = n - \sum_{s \le i} b_s$ which must also be
-$\ge 1$.
+For $r, n \in \N$,
+$\Comp(r, n) := \{(b_1, \ldots, b_r) \in \N_{\ge 1}^r : \sum_s b_s = n\}$,
+returned as a list in lexicographic order.  For $r = 0$ this is the
+singleton $\{[\,]\}$ if $n = 0$ and empty otherwise; for $r = n + 1$
+or larger it is empty.
 \end{definition}
 
-\begin{definition}[Coefficient $\Cff(a, n)$]\label{def:cff}
+\begin{definition}[Inner factor $\Cff(a)$]\label{def:cff}
 \rocq{PrimeGapS1.MaynardSpec.cff}
 \rocqok
-\uses{def:bnd}
-For a composition $a = (b_1, \ldots, b_i) \in \Bnd(i, n)$ with
-implicit last part $b_{i+1} = n - \sum_s b_s$,
+\uses{def:compositions}
+For a composition $a = (b_1, \ldots, b_r)$,
 \[
-\Cff(a, n) \;:=\; n! \cdot \frac{(2(n - \sum a))!}{(n - \sum a)!}
-                       \prod_{s=1}^{i} \frac{(2 b_s)!}{b_s!}
-\;=\; n! \cdot \prod_{s=1}^{i+1} \frac{(2 b_s)!}{b_s!}.
+\Cff(a) \;:=\; \prod_{s=1}^{r} \frac{(2 b_s)!}{b_s!}.
 \]
+This is exactly the per-composition inner product appearing in
+Maynard's Lemma~8.1 (with $j = 2$, so $j b_s = 2 b_s$).
 \end{definition}
 
 \begin{definition}[Maynard's $G_{n,2}(k)$]\label{def:G_2}
 \rocq{PrimeGapS1.MaynardSpec.G_2}
 \rocqok
-\uses{def:bnd, def:cff}
+\uses{def:compositions, def:cff}
 For $n, k \in \N$:
 $\Gnk{0}{k} = 1$, and for $n \ge 1$,
 \[
-\Gnk{n}{k} \;=\; k \cdot (2n)!
-   \;+\; \sum_{i = 1}^{n - 1} \binom{k}{i+1}
-         \sum_{a \in \Bnd(i, n)} \Cff(a, n).
+\Gnk{n}{k} \;=\; n! \cdot \sum_{r = 1}^{n} \binom{k}{r}
+                          \sum_{a \in \Comp(r, n)} \Cff(a).
 \]
-This is exactly Lemma~8.1 of arXiv:1311.4600~v3 after the standard
-re-indexing $r = i + 1$ that separates the $r = 1$ term (which
-collapses to $k \cdot (2n)!$).
+This is Lemma~8.1 of arXiv:1311.4600~v3 character-for-character: the
+$n!$ prefactor, the outer $r$-sum, the binomial coefficient, the
+inner sum over length-$r$ compositions of $n$, and the inner product
+$\prod_s (j b_s)!/b_s!$ with $j = 2$ all appear at the same positions.
 \end{definition}
 
 \begin{lemma}[Sanity values of $G_{n,2}$]\label{lem:G_2_small}
@@ -206,10 +203,12 @@ collapses to $k \cdot (2n)!$).
 $\Gnk{0}{k} = 1$, $\Gnk{1}{k} = 2k$, $\Gnk{2}{k} = 4 k^2 + 20 k$.
 \end{lemma}
 \begin{proof}\rocqok
-$\Gnk{1}{k}$: the empty $i$-range sum is $0$; only the $r = 1$ term
-$k \cdot 2! = 2k$ remains. $\Gnk{2}{k}$: $r = 1$ gives $k \cdot 4! = 24k$,
-and $i = 1$ gives $\binom{k}{2} \cdot \Cff([1], 2) = \binom{k}{2}\cdot 8
-= 4k(k-1)$, summing to $4k^2 + 20k$. Both reduce by \vmcompute{}.
+$\Gnk{1}{k}$: the only length-1 composition of $1$ is $[1]$, with
+$\Cff([1]) = 2!/1! = 2$, so the sum is $1! \cdot \binom{k}{1} \cdot 2 = 2k$.
+$\Gnk{2}{k}$: length-1 contributes $\binom{k}{1} \cdot \Cff([2]) = k \cdot 4!/2! = 12k$;
+length-2 contributes $\binom{k}{2} \cdot \Cff([1,1]) = \binom{k}{2} \cdot (2 \cdot 2) = 2k(k-1)$;
+total $= 2! \cdot (12k + 2k(k-1)) = 2(12k + 2k^2 - 2k) = 4k^2 + 20k$.
+Both also reduce by \vmcompute{}.
 \end{proof}
 
 \section{Closed forms for \texorpdfstring{$M_1$ and $M_2$}{M\_1 and M\_2} (Lemma 8.2)}
