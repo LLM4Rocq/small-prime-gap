@@ -23,5 +23,6 @@ theories/S1/MaynardFactQ.v
 theories/S1/MaynardBasis.v
 theories/S1/MaynardSpec.v
 theories/S1/MaynardVerify.v
+theories/S1/MaynardSpecBridge.v
 theories/S1/Cert.v
 theories/S1/CertL2.v
