@@ -20,7 +20,7 @@ From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
-From PrimeGapS1 Require Import MaynardVerify MaynardSpec MaynardSpecBridge.
+From PrimeGapS1 Require Import MaynardVerify MaynardSpec MaynardSpecBridge MaynardSymmetric.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
@@ -158,6 +158,8 @@ Theorem maynard_M105_certified :
   (forall i j : nat,
      MaynardSpec.M2_spec_ij i j
      = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
+  MaynardSymmetric.M1_is_symmetric_b = true /\
+  MaynardSymmetric.M2_is_symmetric_b = true /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
@@ -165,5 +167,8 @@ Proof.
   split; [exact MaynardVerify.all_match_M1Z_true |
    split; [exact MaynardVerify.all_match_M2Z_true |
     split; [exact MaynardSpecBridge.M1_spec_rat_eq |
-     split; [exact MaynardSpecBridge.M2_spec_rat_eq | exact maynard_eigenvalue_S1]]]].
+     split; [exact MaynardSpecBridge.M2_spec_rat_eq |
+      split; [exact MaynardSymmetric.M1_int_symmetric |
+       split; [exact MaynardSymmetric.M2_int_symmetric |
+                exact maynard_eigenvalue_S1]]]]]].
 Qed.
