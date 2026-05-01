@@ -162,29 +162,17 @@ other.
 Both strategies fit Maynard's §8 framework. Lemma 8.2 (the closed
 form for the matrix entries) is verified inside Rocq
 (`MaynardVerify`); Lemma 8.3 (the generalised Rayleigh-quotient
-identity that gives `M_k = k · λ_max`) is *not* formalised here —
+identity that gives `M_k = k · λ_max`, plus its hypotheses
+`M_1 ≻ 0` and `M_2 = M_2ᵀ`) is *not* formalised here —
 its Maynard-style use in the notebook (eigenvector → Rayleigh
 quotient) and our Sturm-chain alternative both invoke its
 *conclusion* "max ratio = largest eigenvalue", which is needed in
 either strategy to bridge `λ > 4/k` to `M_k > 4`. The analytic content
 of Lemma 8.3 remains paper-side, by design of this project's scope
-(replace the Mathematica computation, not Maynard's paper).
-
-**Lemma 8.3's two implicit hypotheses** are addressed at different
-levels by Rocq:
-- *`M_2` symmetric*: kernel-verified by `MaynardSymmetric.M2_int_symmetric`
-  (1764 entry-equality checks, *Closed under the global context*).
-- *`M_1` symmetric*: kernel-verified by `MaynardSymmetric.M1_int_symmetric`
-  (same shape, *Closed under the global context*).
-- *`M_1` positive definite*: **not** verified inside Rocq. The
-  paper-side argument is `aᵀ M_1 a = I_k(F²) > 0` for any nonzero `F`,
-  which is positive by construction of the inner product `I_k`. A full
-  Rocq formalization would require either (a) defining `posdef` over
-  ordered fields and proving Sylvester's criterion (MathComp does not
-  ship `posdef` and Sylvester is non-trivial), or (b) building the
-  Cholesky decomposition. Both are substantial. We do verify
-  `det(M_1) ≠ 0` (`CertL2.M1_1_unit`, single-prime modular evidence),
-  which is necessary but not sufficient for positive definiteness.
+(replace the Mathematica computation, not Maynard's paper). The
+notebook's Rayleigh-quotient lower bound *also* relies on `M_1 ≻ 0`
+implicitly, so the Rocq layer's trust contract on this point is
+exactly the same as the notebook's.
 
 ## 2. Architecture: candidate generation + kernel verification
 
@@ -1274,10 +1262,6 @@ L0 (input matrices match Maynard's closed form)
 L0' (rat-level paper-form spec matches Z-level computational spec)
   MaynardSpecBridge.v   M1_spec_rat_eq, M2_spec_rat_eq (Qed, no axioms)
     + MaynardSpec.v  PART A (rat) and PART B (Z) definitions
-
-L0'' (input matrices are symmetric — closes one of Lemma 8.3's hypotheses)
-  MaynardSymmetric.v   M1_int_symmetric, M2_int_symmetric
-                       (vm_compute, "Closed under the global context")
 
 L1 (IVT root existence)
   CertL1.v   maynard_L1_concrete
