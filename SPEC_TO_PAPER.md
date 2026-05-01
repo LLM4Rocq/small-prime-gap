@@ -464,29 +464,14 @@ The remaining integral is exactly Lemma 8.1 / eq. 8.4 evaluated at degree
 
 since `(k − 1) + 1 = k = 105` and our `K2 = k − 1 = 104` on the RHS.
 
-**Caveat on eq. 8.4 (paper p. 409).** Maynard's eq. 8.4 — the
-closed-form Beta–Dirichlet integral
-`∫_{Δ_n} (1 − Σ t_j)^b (Σ t_j²)^c dt = b! · G_{c,2}(n) / (n + b + 2c + 1)!`
-— is stated under the implicit hypothesis `b ≠ 0`. The `b = 0` case
-has a different closed form (the volume term `1/n!` vs the formal
-substitution `1/(n+1)!`). For our M2 application this is harmless:
-the M2 integrand is invoked with `b_sum = b'_1 + b'_2 = b_i + b_j +
-2(c_i + c_j) − 2(c'_1 + c'_2) + 2`, and since `c'_1 ≤ c_i`,
-`c'_2 ≤ c_j`, we have `b_sum ≥ 2 > 0` for every term in the M2
-double sum. So eq. 8.4 is always applied in the `b ≠ 0` regime
-in our derivation.
-
-For the M1 integrand the corresponding `b = b_i + b_j` *can* be
-zero (when `b_i = b_j = 0`, e.g. the `(0, 0)` × `(0, 0)` basis
-entry). The M1 formula in our `M1_entry` treats this case using
-the same closed-form expression as for `b ≠ 0`; this is consistent
-with Maynard's Lemma 8.2 first part as written, which gives the
-M1 entries directly as `b! · G_{c, 2}(k) / (k + b + 2c)!` for all
-`b ≥ 0`. In particular Maynard's M1 closed form does not invoke
-eq. 8.4's `b = 0` corner case — it is derived independently for
-M1, before eq. 8.8's substitution introduces the `+1` in `b'_i`.
-So the corner case of eq. 8.4 is not silently assumed in either
-M1 or M2.
+**On the `b = 0` regime of the Beta–Dirichlet integral.** Maynard's
+closed form `b! · G_{c,2}(n) / (n + b + 2c)!` (eq. 8.4 / Lemma 8.2)
+is correct for all `b ≥ 0` with the standard `0! = 1` convention. The
+formula does not require a separate `b = 0` case. Both `M1_entry`
+(where `b = b_i + b_j ≥ 0` may be zero, e.g. for the `(0,0) × (0,0)`
+entry) and `M2_entry` (where `b_sum = b_i + b_j + 2(c_i + c_j) −
+2(c'_1 + c'_2) + 2 ≥ 2 > 0` always) apply it as written. No corner
+case is silently assumed.
 
 ### Mapping
 

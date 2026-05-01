@@ -125,9 +125,14 @@ route*: Mathematica numerically computes the top eigenvector of
 evaluates the Rayleigh quotient `k · vᵀM₂v / vᵀM₁v` in exact rational
 arithmetic — a true rigorous lower bound on `λ_max(M₁⁻¹M₂)` regardless
 of how *v* was obtained. This project takes the *characteristic
-polynomial route* instead: the Brown–Traub Sturm chain on
-`char_poly(M₁⁻¹M₂)` certifies the existence of an eigenvalue strictly
-above `4/105`, without ever constructing an eigenvector. Both routes
+polynomial route* instead: IVT on `char_poly(M₁⁻¹M₂)` (using
+mathcomp-real-closed's `poly_ivtoo`) certifies a real-algebraic root
+strictly above `4/105`, without ever constructing an eigenvector. The
+Brown–Traub Sturm chain ships as a richer-than-needed certificate —
+`chain[0] = char_poly_int` is exact (`vm_compute`-Qed,
+`chain_0_matches_charpoly`) and chain entries 1–41 are cross-checked
+modulo 10 ~2³⁰ primes (`Smoke.sturm_chain_real_cross_check`,
+probabilistic, not on the headline's critical path). Both routes
 fit Maynard's §8 framework (Lemma 8.2 + Lemma 8.3); see `REPORT.md`
 §1.4 for the detailed comparison.
 
@@ -216,37 +221,58 @@ make -j
 
 # 4. Verify the end-to-end theorem has no project-specific axioms.
 #    `maynard_M105_certified` is the recommended target: it conjoins
-#    `all_match_M{1,2}Z = true` (the closed-form input-matrix check)
-#    with the eigenvalue bound, so a single Print Assumptions covers
-#    the full pipeline.  The spectral-only sibling
-#    `maynard_eigenvalue_S1` reports the same assumption set.
+#    `all_match_M{1,2}Z = true` (the Z-level closed-form input-matrix
+#    check), `M{1,2}_spec_rat_eq` (the Z-level <-> rat-level paper-form
+#    bridge from MaynardSpecBridge), and the eigenvalue bound, so a
+#    single Print Assumptions covers the full pipeline. The
+#    spectral-only sibling `maynard_eigenvalue_S1` reports the same
+#    assumption set minus the matrix-pinning bool facts.
 coqtop -Q theories/S1 PrimeGapS1 \
   -l theories/S1/Cert.v -batch \
   -e 'Print Assumptions maynard_M105_certified.'
-# Expected: only Uint63Axioms.* entries (standard Rocq primitive integers).
+# Expected: only Rocq's standard PrimInt63 / Uint63Axioms primitive-integer
+# interface (the footprint inherited by every vm_compute-driven proof).
+# No project-specific axioms, no Admitted.
+
+# Or: a single canonical "clean rebuild + Print Assumptions" script:
+./verify.sh
 ```
 
 ## Trust base
 
 The Rocq verification trusts only:
-- Rocq's kernel (including Uint63 primitive axioms for native int
-  arithmetic, which are listed by `Print Assumptions`).
+- Rocq's kernel, including its standard `PrimInt63` / `Uint63Axioms`
+  primitive-integer interface. This footprint is the unavoidable cost
+  of any `vm_compute`-driven proof in modern Rocq and is listed by
+  `Print Assumptions` on every `vm_compute`-using lemma in this
+  project. **No project-specific axioms are introduced.**
 
-There are zero project-specific `Axiom` or `Admitted` lemmas anywhere
-in the repository. This includes the 42x42 input matrices: `M1_int`
-and `M2_int` are kernel-checked against Maynard's closed-form
-specification in `theories/S1/MaynardVerify.v` (Z-level, `vm_compute`
-shape) and that Z-level form is in turn kernel-Qed-bridged to the
-rat-level paper-form spec in `theories/S1/MaynardSpecBridge.v`
-(`M{1,2}_spec_rat_eq`, *Closed under the global context*). The basis
-itself is also kernel-pinned: `MaynardBasis.maynard_basis_spec` certifies
-that the 42-element list is exactly the multiset
-`{(b, c) ∈ ℕ² : b + 2c ≤ 11}`, so a reviewer never has to inspect the
-literal pair list. The denominator `D_q` shipped alongside the
-integer-cleared characteristic polynomial is also kernel-checked to be
-strictly positive (`Cert.D_q_pos`, `vm_compute`-Qed), pinning sign
-hygiene of the FLINT-shipped data against an otherwise-permissible
-sign-flip on `D_q`.
+There are zero `Axiom` or `Admitted` lemmas anywhere in the repository.
+This includes the 42x42 input matrices: the headline
+`maynard_M105_certified` conjoins (i) the Z-level cross-multiplication
+match `all_match_M{1,2}Z = true` (`MaynardVerify.v`, vm_compute), (ii)
+the rat-level paper-form bridge `M{1,2}_spec_rat_eq` from
+`MaynardSpecBridge.v` (Qed, *Closed under the global context* — no
+axioms at all, not even `Uint63`), and (iii) the eigenvalue bound. So a
+single `Print Assumptions maynard_M105_certified` certifies that the
+FLINT-shipped integer matrices `M1_int`, `M2_int` agree with the
+rat-level paper-form `MaynardSpec.M{1,2}_entry` (which transcribes
+Maynard's Lemma 8.2 character-for-character) and that the resulting
+rational pencil has a real-algebraic eigenvalue strictly above `4/105`.
+
+The basis itself is also kernel-pinned: `MaynardBasis.maynard_basis_spec`
+certifies that the 42-element list contains exactly the multiset
+`{(b, c) ∈ ℕ² : b + 2c ≤ 11}` (a reviewer reads only the predicate
+`b + 2c ≤ 11`, not the literal list), and `maynard_basis_eq_witness`
+pins the *ordering* to the FLINT-shipped indexing (a vm_compute-Qed,
+needed because matrix rows/columns are read by integer index).
+
+The denominator `D_q` shipped alongside the integer-cleared
+characteristic polynomial is kernel-checked to be strictly positive
+(`Cert.D_q_pos`, `vm_compute`-Qed). This is a defense-in-depth sanity
+Qed and is not on the headline's load-bearing path: a sign-flipped `D_q`
+would be caught by the leading-coefficient sign check
+(`signs_at_inf[0] = +1`) before reaching `D_q_pos`.
 
 The shipped Sturm chain is now cross-validated against an independent
 Rocq computation, not just self-consistent. `Smoke.sturm_chain_real_cross_check`
