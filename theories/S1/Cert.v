@@ -20,7 +20,7 @@ From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
-From PrimeGapS1 Require Import MaynardVerify.
+From PrimeGapS1 Require Import MaynardVerify MaynardSpec MaynardSpecBridge.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
    statement in this file lives in MathComp's ring_scope. *)
@@ -134,21 +134,36 @@ Qed.
    The full M_{105} > 4 trust contract in a single Qed.
 
    `maynard_eigenvalue_S1` above gives the eigenvalue bound on the
-   matrix `A_rat = M1^{-1} M2`, but it does not, on its own, surface
-   the closed-form match between the FLINT-shipped integer matrices
-   `M1_int / M2_int` and Maynard's specification (Lemma 7.1/7.2 in
-   arXiv:1311.4600, transcribed in MaynardSpec.v). MaynardVerify.v
-   discharges that match by Z-level cross-multiplication on a
-   42x42 grid; this theorem ties the two ends together so that one
-   `Print Assumptions` covers the entire pipeline.
+   matrix `A_rat = M1^{-1} M2`. MaynardVerify discharges the Z-level
+   match between the FLINT-shipped integer matrices `M1_int / M2_int`
+   and the Z-level closed form `m{1,2}_num_den` (cross-multiplied in
+   Z, vm_compute).  MaynardSpecBridge then certifies that the Z-level
+   closed form equals the rat-level paper-form spec
+   `MaynardSpec.M{1,2}_entry`, the readable definition that
+   transcribes Maynard's Lemma 8.2 character-for-character (see
+   SPEC_TO_PAPER.md).
+
+   Conjoining all four facts means a single `Print Assumptions
+   maynard_M105_certified` certifies the full chain
+       FLINT integer matrices  =  Z-level closed form
+                                =  rat-level paper-form spec
+                                ⇒  eigenvalue > 4/105.
    ------------------------------------------------------------------ *)
 Theorem maynard_M105_certified :
   MaynardVerify.all_match_M1Z = true /\
   MaynardVerify.all_match_M2Z = true /\
+  (forall i j : nat,
+     MaynardSpec.M1_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
+  (forall i j : nat,
+     MaynardSpec.M2_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof.
   split; [exact MaynardVerify.all_match_M1Z_true |
-   split; [exact MaynardVerify.all_match_M2Z_true | exact maynard_eigenvalue_S1]].
+   split; [exact MaynardVerify.all_match_M2Z_true |
+    split; [exact MaynardSpecBridge.M1_spec_rat_eq |
+     split; [exact MaynardSpecBridge.M2_spec_rat_eq | exact maynard_eigenvalue_S1]]]].
 Qed.

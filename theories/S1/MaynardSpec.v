@@ -18,14 +18,15 @@
        shipped integer matrices — purely in Z, so vm_compute does
        not hit `rat`'s canonical-form normalisation at scale.
 
-   The two representations are independent transcriptions of the
-   same closed-form formula and are not formally bridged by a
-   Qed lemma here: `MaynardVerify.v` uses the (num, den) pair
-   directly, and the rat spec is documentation-shaped (it is what
-   matches the paper text).  Adding a `M*_spec_rat_eq` bridge
-   would be straightforward but unnecessary for the headline
-   theorem; see audit finding M-4 / SPEC_TO_PAPER.md for the
-   paper-side mapping.
+   The two representations are bridged by Qed lemmas
+   `M{1,2}_spec_rat_eq` in `MaynardSpecBridge.v` (no axioms,
+   "Closed under the global context").  `MaynardVerify.v`
+   consumes the (num, den) pair directly for the Z-level
+   cross-multiplication check, and `Cert.maynard_M105_certified`
+   conjoins both the Z-level bool match and the rat-level paper-form
+   bridge so a single `Print Assumptions` covers the full
+   FLINT-matrix → Z-spec → rat-paper-form → eigenvalue chain.
+   See SPEC_TO_PAPER.md for the line-level paper mapping.
    ================================================================== *)
 
 From Stdlib Require Import ZArith List.
@@ -191,6 +192,23 @@ Definition G2Z (n k : nat) : Z :=
 
 Definition K1n : nat := 105.
 Definition K2n : nat := 104.
+
+(* The Z-level constants are syntactically separate from PART A's K1/K2
+   to keep the two parts independent, but they are forced to agree by
+   these reflexive lemmas — a future PR that changes one without the
+   other would fail to compile MaynardSpecBridge.v.  These also
+   document the invariant K1 = K2 + 1 (the constant of integration
+   after the eq.~8.8 substitution that integrates out t_1). *)
+Lemma K1n_eq_K1 : K1n = K1.
+Proof. by []. Qed.
+
+Lemma K2n_eq_K2 : K2n = K2.
+Proof. by []. Qed.
+
+Local Open Scope nat_scope.
+Lemma K1_eq_K2_succ : K1 = K2 + 1.
+Proof. by []. Qed.
+Local Close Scope nat_scope.
 
 Definition m1_num_den (bi ci bj cj : nat) : Z * Z :=
   let b := (bi + bj)%nat in

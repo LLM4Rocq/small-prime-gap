@@ -37,13 +37,10 @@
      - `all_match_M2Z_true` : ~35 min (42x42 entries each a sum of
                                        up to 36 terms over G_{n,2}(104))
 
-   Both are Qed.  `Print Assumptions` on each reports
-   "Closed under the global context" -- this file does NOT use
-   primitive integers (Uint63 / PrimInt63).  The cross-check is pure
-   stdlib `Z` arithmetic; `vm_compute` reduces it without ever
-   reaching the Uint63 layer.  This is stronger than the typical
-   vm_compute Qed elsewhere in the project (which does pull in the
-   PrimInt63 axioms via Bignums).
+   Both are Qed.  `Print Assumptions` on each lists Rocq's standard
+   `PrimInt63` / `Uint63Axioms` primitive-integer interface — the
+   footprint inherited by every `vm_compute` proof in modern Rocq.
+   No project-specific axioms are introduced.
 
    == Why no `M1_rat = M1_spec : 'M[rat]_42` Qed ===================
 
@@ -56,8 +53,9 @@
    We deliberately stop at the bool level: cross-multiplication
    (`a/b = c/d  <==>  a*d = c*b` for b,d > 0) is the standard
    rational-equality reduction, and `Print Assumptions` on
-   `all_match_M1Z_true` / `all_match_M2Z_true` reports
-   "Closed under the global context" — no new axioms, no admits.
+   `all_match_M1Z_true` / `all_match_M2Z_true` lists only the
+   standard `PrimInt63` / `Uint63Axioms` primitive-integer interface
+   (no project-specific axioms, no admits).
    `Cert.v` imports this file so the umbrella theorem
    `maynard_M105_certified` conjoins the closed-form match with
    the eigenvalue claim; the spectral-only sibling
