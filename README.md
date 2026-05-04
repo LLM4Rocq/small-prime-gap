@@ -34,7 +34,7 @@ Theorem maynard_eigenvalue_S1 :
 Proof. (* L1 + L2 + L3 *) Qed.
 ```
 
-The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). For each of the two 42x42 matrices, this match is now stated as a single composed identity: the paper-form spec entry equals the FLINT-shipped integer entry rationalised over a common denominator.
+The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). This last step consists in checking that the computation-friendly version of each matrix agrees with its deduction-friendly version, which in turn essentially consists in changing the datastructure respectively used for integers and for matrices.
 
 Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as definitions for the coefficients of matrices `M1` and `M2` :
 
@@ -50,11 +50,7 @@ Theorem maynard_M105_certified :
 Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1 *) Qed.
 ```
 
-Here `Z2rat (z : Z) : rat := (Z_to_int z)%:~R` is a thin helper defined in `Cert.v` that injects a `Z` integer into `rat`. The Z-level boolean checks `all_match_M{1,2}Z = true` and the rat<->Z bridges `M{1,2}_spec_rat_eq` are now implementation details of the proof rather than part of the audit-surface contract; they remain available as standalone Qeds in `MaynardVerify.v` and `MaynardSpecBridge.v` for anyone who wants to re-verify the chain step-by-step.
-
-The audit pipeline this exposes is straightforward: a reader reads `MaynardSpec.M{1,2}_spec_ij` against Maynard's Lemma 8.2 (paper), then trusts the headline that says it matches the FLINT-shipped `M{1,2}_int` rationalised over `D_M{1,2}`.
-
-A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound. It reports 51 axioms, all `PrimInt63 / Uint63Axioms` standard primitives; no project-specific axioms have been added or removed.
+A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
 
 ## Relation to Maynard's notebook
 
