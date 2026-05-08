@@ -150,8 +150,8 @@ Qed.
                                 ⇒  eigenvalue > 4/105.
    ------------------------------------------------------------------ *)
 Theorem maynard_M105_certified :
-  MaynardVerify.all_match_M1Z = true /\
-  MaynardVerify.all_match_M2Z = true /\
+  all_match_M1Z = true /\
+  all_match_M2Z = true /\
   (forall i j : nat,
      MaynardSpec.M1_spec_ij i j
      = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
@@ -162,8 +162,8 @@ Theorem maynard_M105_certified :
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof.
-  split; [exact MaynardVerify.all_match_M1Z_true |
-   split; [exact MaynardVerify.all_match_M2Z_true |
+  split; [exact all_match_M1Z_true |
+   split; [exact all_match_M2Z_true |
     split; [exact MaynardSpecBridge.M1_spec_rat_eq |
      split; [exact MaynardSpecBridge.M2_spec_rat_eq | exact maynard_eigenvalue_S1]]]].
 Qed.

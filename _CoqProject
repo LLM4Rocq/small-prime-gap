@@ -9,6 +9,13 @@ theories/S1/BrownTraub.v
 theories/S1/SignChain.v
 theories/S1/CharPoly.v
 theories/S1/ModularArith.v
+theories/S1/CharPolyAgreeDef.v
+theories/S1/CharPolyAgreeChunk_0.v
+theories/S1/CharPolyAgreeChunk_1.v
+theories/S1/CharPolyAgreeChunk_2.v
+theories/S1/CharPolyAgreeChunk_3.v
+theories/S1/CharPolyAgreeChunk_4.v
+theories/S1/CharPolyAgreeChunk_5.v
 theories/S1/CharPolyAgree.v
 theories/S1/Bridge.v
 theories/S1/CRTSigns.v
