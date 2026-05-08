@@ -3,13 +3,13 @@
    plus the post-CRT bridge infrastructure.
 
    The 710-prime char-poly and matrix-identity checks are split across
-   six chunks (CharPolyAgreeChunk_0..5.v) so `make -j` can run them in
-   parallel.  This file imports those chunks and assembles the two
+   six chunks (CharPolyAgree/Chunk_0..5.v) so `make -j` can run them
+   in parallel.  This file imports those chunks and assembles the two
    headline Qeds via `crt_primes_all_split` + `forallb_app`.
 
    Definitions (modular polynomial primitives, the 710 prime list,
    `check_charpoly_one_prime_710`, `check_mat_identity_one_prime`,
-   the chunk decomposition) live in CharPolyAgreeDef.v.
+   the chunk decomposition) live in CharPolyAgree/Def.v.
    =================================================================== *)
 
 From Stdlib Require Import ZArith List Bool Uint63.
@@ -18,10 +18,9 @@ Open Scope Z_scope.
 
 From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness Recompose ModularArith.
 From Bignums Require Import BigZ.
-From PrimeGapS1 Require Export CharPolyAgreeDef.
-From PrimeGapS1 Require Import
-  CharPolyAgreeChunk_0 CharPolyAgreeChunk_1 CharPolyAgreeChunk_2
-  CharPolyAgreeChunk_3 CharPolyAgreeChunk_4 CharPolyAgreeChunk_5.
+From PrimeGapS1.CharPolyAgree Require Export Def.
+From PrimeGapS1.CharPolyAgree Require Import
+  Chunk_0 Chunk_1 Chunk_2 Chunk_3 Chunk_4 Chunk_5.
 
 (* ==================================================================
    Assembly: six chunks compose to the full 710-prime check.

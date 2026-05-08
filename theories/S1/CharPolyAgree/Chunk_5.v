@@ -1,6 +1,6 @@
-(* CharPolyAgreeChunk_5.v -- 710-prime CRT, primes 595..709. *)
+(* CharPolyAgree/Chunk_5.v -- 710-prime CRT, primes 595..709. *)
 
-From PrimeGapS1 Require Import CharPolyAgreeDef.
+From PrimeGapS1.CharPolyAgree Require Import Def.
 
 Lemma char_poly_chunk_5 :
   List.forallb check_charpoly_one_prime_710 crt_chunk_5 = true.

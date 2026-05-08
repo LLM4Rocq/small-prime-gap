@@ -1,5 +1,5 @@
 (* ===================================================================
-   CharPolyAgree.v -- cross-validate our Faddeev-LeVerrier
+   CharPolyAgree/Def.v -- cross-validate our Faddeev-LeVerrier
    `char_poly_int` against the FLINT-shipped `charpoly_of_A_int`
    via modular (CRT) arithmetic over 10 Uint63 primes.
 

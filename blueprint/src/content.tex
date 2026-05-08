@@ -86,7 +86,9 @@ FLINT-shipped integer matrices to those closed forms, the kernel-Qed
 bridge between the rat-level paper-form spec and the Z-level
 computational spec, and the bridge into MathComp's $\Q$-level matrices.
 All material here lives inside the files \texttt{MaynardSpec.v},
-\texttt{MaynardBasis.v}, \texttt{MaynardFactQ.v}, \texttt{MaynardVerify.v},
+\texttt{MaynardBasis.v}, \texttt{MaynardFactQ.v}, the
+\texttt{MaynardVerify/} directory (\texttt{Def.v}, six parallel
+\texttt{M2\_0..5.v} chunks, and the assembly \texttt{MaynardVerify.v}),
 and \texttt{MaynardSpecBridge.v}. Throughout this chapter we follow the
 v3/Annals numbering of Maynard's paper: Lemma~8.1 / 8.2 / 8.3 (=
 Lemma~7.1 / 7.2 / 7.3 in v1).
@@ -325,7 +327,7 @@ canonical \texttt{gcd}-normalisation cost during \vmcompute.
 \section{Kernel cross-check: matrices match the spec}
 
 \begin{theorem}[$M_1$ entries match Maynard's closed form]\label{thm:M1_match}
-\rocq{PrimeGapS1.MaynardVerify.all_match_M1Z_true}
+\rocq{PrimeGapS1.MaynardVerify.Def.all_match_M1Z_true}
 \rocqok
 \uses{def:M1_entry}
 For every $(i, j) \in \{0, \ldots, 41\}^2$,
@@ -343,10 +345,8 @@ The $1764$ Boolean cross-multiplication checks
 \texttt{M1\_entry\_matchZ}~$i\,j$ are aggregated into
 \texttt{all\_match\_M1Z}~$=$~\texttt{forallb}~over $42 \times 42$, and
 the Lemma is closed by a single \vmcompute{}. The check costs
-${\sim}90$~s wall-clock. \texttt{Print Assumptions} on this Lemma
-reports \emph{Closed under the global context}: the proof lives entirely
-in stdlib $\Z$ arithmetic and does not depend on the \Uintsf\ kernel
-primitives.
+${\sim}90$~s wall-clock. \texttt{Print Assumptions} reports only the
+standard \Uintsf{} primitives.
 \end{proof}
 
 \begin{theorem}[$M_2$ entries match Maynard's closed form]\label{thm:M2_match}
@@ -360,11 +360,13 @@ for all $(i, j) \in \{0, \ldots, 41\}^2$.
 \end{theorem}
 \begin{proof}\rocqok
 Same shape as Theorem~\ref{thm:M1_match}, but the entries are double
-sums of up to 36 rational terms, so the \vmcompute{} cost is
-${\sim}35$ minutes. This is the dominant single-\Qed{} cost in the
-project after \texttt{fl\_crt\_bound} (Chapter~\ref{ch:crt}).
-\texttt{Print Assumptions}: \emph{Closed under the global context},
-no \Uintsf\ axioms.
+sums of up to 36 rational terms, so the per-row \vmcompute{} cost is
+significant. The check is split into six 7-row chunks
+(\texttt{MaynardVerify/M2\_0..5.v}) that \texttt{make -j} runs
+concurrently, and the assembly stitches them via \texttt{seq\_split\_42}
+plus \texttt{forallb\_app} — no per-entry recomputation in the
+\Qed{} of \texttt{all\_match\_M2Z\_true} itself.
+\texttt{Print Assumptions}: only the standard \Uintsf{} primitives.
 \end{proof}
 
 \begin{remark}
@@ -596,8 +598,10 @@ $|a - b| = 0$ from $(\prod p_i) \mid (a - b)$ via a verified bound. The
 same pattern handles the matrix identity $\Mtwo \cdot \Mone \cdot \Aint
 = \DMone \cdot \DA \cdot \Mtwo$ that links the cleared denominators.
 This chapter follows files \texttt{ModularArith.v}, \texttt{CRTBridge.v},
-\texttt{CharPolyAgree.v}, \texttt{CRTCheck.v}, \texttt{Fermat.v},
-\texttt{PrimeCheck.v} and \texttt{CRTLift.v}.
+the \texttt{CharPolyAgree/} directory (\texttt{Def.v} + six parallel
+\texttt{Chunk\_0..5.v} + the assembly \texttt{CharPolyAgree.v}),
+\texttt{CRTCheck.v}, \texttt{Fermat.v}, \texttt{PrimeCheck.v} and
+\texttt{CRTLift.v}.
 
 \section{Modular arithmetic in Uint63}
 
