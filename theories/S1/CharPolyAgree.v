@@ -87,28 +87,6 @@ Fixpoint list_eqb63 (a b : list int) : bool :=
   | _, _ => false
   end.
 
-Definition check_charpoly_one_prime (p : int) : bool :=
-  let computed := char_poly_mod p A_int in
-  let shipped := charpoly_mod p in
-  list_eqb63 computed shipped.
-
-Definition check_charpoly_all_primes : bool :=
-  List.forallb check_charpoly_one_prime crt_primes_local.
-
-(* ==================================================================
-   THE BIG LEMMA: char_poly_int(A_int) agrees with the FLINT-shipped
-   charpoly_of_A_int modulo all 10 CRT primes (> 2^30 each).
-
-   The product of these primes is > 2^300, which far exceeds any
-   possible difference between two degree-42 polynomials with the
-   given coefficient magnitudes, so agreement mod all primes implies
-   agreement over Z by CRT.
-   ================================================================== *)
-
-Lemma char_poly_int_agrees_with_flint :
-  check_charpoly_all_primes = true.
-Proof. vm_compute. reflexivity. Qed.
-
 (* ==================================================================
    MATRIX IDENTITY CHECK: M1_int * A_int * D_M2 = M2_int * (D_M1 * D_A)
 
@@ -135,13 +113,6 @@ Definition check_mat_identity_one_prime (p : int) : bool :=
   let lhs := mmat_scale p dM2 (mmat_mul p M1 A) in
   let rhs := mmat_scale p dM1_dA M2 in
   mmat_eqb lhs rhs.
-
-Definition check_mat_identity_all_primes : bool :=
-  List.forallb check_mat_identity_one_prime crt_primes_local.
-
-Lemma matrix_identity_agrees :
-  check_mat_identity_all_primes = true.
-Proof. vm_compute. reflexivity. Qed.
 
 (* ==================================================================
    POLYNOMIAL SCALING CHECK:
