@@ -681,9 +681,8 @@ Via MathComp's \texttt{expf\_card} on the multiplicative group $\Fp^\ast$.
       PrimeGapS1.CharPolyAgree.crt_primes_extra}
 \rocqok
 A concatenated list \texttt{crt\_primes\_all} of $710$ distinct
-$\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The first $10$ are reused
-later for the Sturm-chain PRS cross-check; the remaining $700$ are CRT
-filler. The product $\prod_{i=1}^{710} p_i$ exceeds $2^{21300}$.
+$\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The product
+$\prod_{i=1}^{710} p_i$ exceeds $2^{21300}$.
 \end{definition}
 
 \begin{lemma}[All 710 candidates are prime]\label{lem:crt_primes_all_prime}
@@ -821,11 +820,9 @@ $\texttt{charpoly\_int}$ above $4/105$. The strategy is the
 \emph{intermediate value theorem} on a real-closed field: we show
 $P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from the
 shipped sign vectors, and let MathComp's \texttt{poly\_ivtoo} produce
-a root in the interval. The full Sturm count $V(4/105) - V(+\infty) = 1$
-is also verified for additional confidence but is not load-bearing
-for the headline. The material lives in \texttt{BrownTraub.v},
-\texttt{SignChain.v}, \texttt{CRTSigns.v}, \texttt{CRTCheck.v},
-\texttt{Smoke.v}, \texttt{Bridge.v} and \texttt{CertL1.v}.
+a root in the interval. The material lives in \texttt{BrownTraub.v},
+\texttt{SignChain.v}, \texttt{CRTSigns.v}, \texttt{Smoke.v},
+\texttt{Bridge.v} and \texttt{CertL1.v}.
 
 \section{The Brown--Traub Sturm chain}
 
@@ -853,14 +850,7 @@ returns $V(a) - V(+\infty)$, the standard Sturm-theorem count for the
 number of real roots of $p$ in $(a, +\infty)$.
 \end{definition}
 
-\section{Independent cross-check of the shipped chain}
-
-The $43$-polynomial Sturm chain shipped in \texttt{WitnessChain.v} is
-${\sim}14$~MB of data. Re-running Brown--Traub end-to-end on
-$\texttt{charpoly\_int}$ inside \vmcompute{} would be infeasible at
-the $\BigZ$ scale (intermediate coefficients reach ${\sim}200{,}000$
-bits). Instead, we verify the shipped chain via the per-step PRS
-identity modulo $10$ Uint63 primes.
+\section{Anchoring \texttt{chain[0]} to \texttt{charpoly\_int}}
 
 \begin{lemma}[Chain anchors to \texttt{charpoly\_int}]
 \label{lem:chain_0_matches}
@@ -875,53 +865,12 @@ characteristic polynomial.
 \vmcompute{} on a list of $43$ \BigZ\ coefficients.
 \end{proof}
 
-\begin{theorem}[PRS identity holds for every consecutive triple]
-\label{thm:full_prs}
-\rocq{PrimeGapS1.CRTCheck.full_prs_chain_verified,
-      PrimeGapS1.Smoke.sturm_chain_real_cross_check}
-\rocqok
-\uses{def:sturm_chain, def:char_poly_mod, lem:fermat_mod}
-For every consecutive triple $(A, B, C)$ in the shipped Sturm chain,
-together with the shipped quotient $Q$ and pseudo-remainder leading
-factor $\beta$,
-\[
-\lcoeff(B)^{d} \cdot A
-   \;\equiv\; Q \cdot B + \beta \cdot C \pmod{p}
-\]
-holds for each of $10$ distinct primes $p \in [2^{30}, 2^{31})$
-(themselves verified prime via $\Uintsf$ trial division), where
-$d = \deg A - \deg B + 1$.
-\end{theorem}
-\begin{proof}\rocqok
-For each $(\text{triple}, p)$ pair, both sides are reduced to
-modular polynomials over $\Fp$, where $\Fp$-arithmetic is supplied by
-\texttt{ModularArith.v}. The aggregated $\texttt{forallb}$ over
-(triples) $\times$ ($10$ primes) is a single \vmcompute. False positive
-requires a residual divisible by all $10$ primes simultaneously,
-i.e.\ by a number exceeding $2^{300}$. Together with
-Lemma~\ref{lem:chain_0_matches} this anchors the entire shipped chain
-to $\texttt{charpoly\_int}$ through Rocq's own arithmetic; a wrong
-chain shipped by FLINT would fail this check with overwhelming
-probability.
-\end{proof}
-
-\begin{remark}[Off the critical path]
-This Theorem is \emph{not} consumed by
-\rocq{PrimeGapS1.Cert.maynard_eigenvalue_S1} or
-\rocq{PrimeGapS1.Cert.maynard_M105_certified}. The L1 IVT proof reads
-only $\texttt{signs\_at\_x0}[0]$ and $\texttt{signs\_at\_inf}[0]$,
-both of which reduce to direct evaluation of $\texttt{charpoly\_int}$
-via Lemma~\ref{lem:chain_0_matches} plus \texttt{fl\_eq\_flint}. The
-PRS cross-check is \emph{independent} FLINT-data assurance: it makes
-the shipped chain a real cross-check rather than just internally
-sign-consistent, but its absence would not weaken the headline trust
-contract. It is also the \emph{one place} in the project where a
-kernel-level identity is replaced by a probabilistic (modular)
-substitute; every other FLINT-shipped artefact is verified by a
-true $\Z$-level identity (matrix entries via
-\rocq{PrimeGapS1.MaynardVerify.all_match_M1Z_true} and
-\rocq{PrimeGapS1.MaynardVerify.all_match_M2Z_true}, char poly via
-\rocq{PrimeGapS1.CRTLift.fl_eq_flint}, etc.).
+\begin{remark}[Chain entries 1--42 are pipeline artefacts]
+The IVT proof reads only $\texttt{signs\_at\_x0}[0]$ and
+$\texttt{signs\_at\_inf}[0]$, both anchored to $\texttt{charpoly\_int}$
+via Lemma~\ref{lem:chain_0_matches} plus the $\texttt{signs\_at\_*\_shipped}$
+agreements. Chain entries $1..42$ are FLINT-shipped data that the
+headline does not consume, and are not separately validated.
 \end{remark}
 
 \section{Sign vectors agree with the chain}
@@ -958,7 +907,7 @@ $\sgn(\lcoeff(P_i))$, the sign of the leading coefficient.
 \rocq{PrimeGapS1.CertL1.maynard_L1_concrete}
 \rocqok
 \uses{def:sturm_chain, lem:signs_at_x0, lem:signs_at_inf,
-      thm:full_prs, lem:chain_0_matches}
+      lem:chain_0_matches}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda
@@ -1307,9 +1256,8 @@ would fail:
 \item Lemmas~\ref{lem:signs_at_x0} and~\ref{lem:signs_at_inf}: the
   shipped sign vectors agree with direct \BigZ\ evaluation on the
   shipped Sturm chain.
-\item Theorem~\ref{thm:full_prs}: every consecutive triple of the
-  shipped chain satisfies the Brown--Traub PRS identity modulo $10$
-  primes (false-positive event $< 2^{-300}$).
+\item Lemma~\ref{lem:chain_0_matches}: $\texttt{chain}[0] =
+  \texttt{charpoly\_int}$ (the only chain entry the IVT proof reads).
 \item Lemma~\ref{lem:Dq_pos}: $\Dq$ shipped strictly positive.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.

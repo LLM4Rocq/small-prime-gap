@@ -128,13 +128,13 @@ of how *v* was obtained. This project takes the *characteristic
 polynomial route* instead: IVT on `char_poly(M₁⁻¹M₂)` (using
 mathcomp-real-closed's `poly_ivtoo`) certifies a real-algebraic root
 strictly above `4/105`, without ever constructing an eigenvector. The
-Brown–Traub Sturm chain ships as a richer-than-needed certificate —
-`chain[0] = char_poly_int` is exact (`vm_compute`-Qed,
-`chain_0_matches_charpoly`) and chain entries 1–41 are cross-checked
-modulo 10 ~2³⁰ primes (`Smoke.sturm_chain_real_cross_check`,
-probabilistic, not on the headline's critical path). Both routes
-fit Maynard's §8 framework (Lemma 8.2 + Lemma 8.3); see `REPORT.md`
-§1.4 for the detailed comparison.
+IVT proof reads only `signs_at_x0[0]` and `signs_at_inf[0]`, both of
+which are anchored to `charpoly_int` by `chain_0_matches_charpoly`
+(`vm_compute`-Qed) plus the `signs_at_*_shipped` per-entry
+agreements; chain entries 1–41 are shipped as a pipeline artefact
+but are not consumed by the headline. Both routes fit Maynard's §8
+framework (Lemma 8.2 + Lemma 8.3); see `REPORT.md` §1.4 for the
+detailed comparison.
 
 ## Repository layout
 
@@ -274,27 +274,15 @@ Qed and is not on the headline's load-bearing path: a sign-flipped `D_q`
 would be caught by the leading-coefficient sign check
 (`signs_at_inf[0] = +1`) before reaching `D_q_pos`.
 
-The shipped Sturm chain is now cross-validated against an independent
-Rocq computation, not just self-consistent. `Smoke.sturm_chain_real_cross_check`
-re-exports `CRTCheck.full_prs_chain_verified`, which checks the
-Brown-Traub PRS identity `lc(B)^d * A == Q*B + beta*C (mod p)` for
-every consecutive triple in the chain across 10 distinct ~2^30 primes
-(themselves verified prime in Rocq via Uint63 trial division), giving
-~300 bits of CRT cover on top of the chain-anchoring lemma
-`chain_0_matches_charpoly`.
-
 The FLINT layer is **not** in the trust base of the Rocq proof. It
 serves only as (a) the candidate generator for the certificate data
 and (b) an independent cross-check. If the FLINT layer shipped wrong
 data on any of the *load-bearing* artefacts (the M1/M2 matrix entries,
-the cleared characteristic polynomial, the sign-vector entries actually
-read by the L1 IVT proof, or chain entry 0), the build would fail at
-one of the `vm_compute` checks. The shipped Sturm chain entries beyond
-index 0 are *additionally* cross-checked via a 10-prime modular PRS
-identity (`Smoke.sturm_chain_real_cross_check`) — strong against
-accidental error but a probabilistic check, not a strict Z-level
-identity. That Qed is not on the critical path of the headline
-theorem.
+the cleared characteristic polynomial, the sign-vector entries
+actually read by the L1 IVT proof, or chain entry 0), the build would
+fail at one of the `vm_compute` checks. The shipped Sturm chain
+entries beyond index 0 are pipeline artefacts that the headline does
+not consume; they are not separately validated.
 
 See `SPEC_TO_PAPER.md` for a line-level mapping from the
 `MaynardSpec.{compositions, cff, G_2, alpha, M1_entry, M2_entry}` definitions

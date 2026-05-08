@@ -1387,7 +1387,7 @@ Proof. vm_compute. reflexivity. Qed.
 (*                    = map (Z_to_mod63 p) charpoly_of_A_int           *)
 (*                                                                     *)
 (* 4. Combining (1)-(3):                                               *)
-(*      forall p in crt_primes, forall k,                              *)
+(*      forall p in crt_primes_all, forall k,                          *)
 (*        (char_poly_int A_int)[k] mod p                               *)
 (*        = charpoly_of_A_int[k] mod p                                 *)
 (*                                                                     *)
