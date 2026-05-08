@@ -438,21 +438,32 @@ Technique (c) in §4.
 
 ### 3.6 CRT cross-validation of the shipped polynomial
 
-**`CharPolyAgree.v`** (~1 000 lines). The computational core of the CRT
-check. Beyond structural lemmas (dimensions, length, monic, etc.), it
-supplies:
+The computational core of the CRT check is split across the
+`CharPolyAgree/` directory:
 
-- `crt_primes_local : list int` (10 primes ≥ 2^30) and
-  `crt_primes_extra` (700 more), `crt_primes_all := local ++ extra`
-  (710 Uint63 primes, all ≥ 2^30).
-- `check_charpoly_one_prime_710 p := list_eqb63 (char_poly_mod p A_int)
-  (List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ)`.
-- `char_poly_int_agrees_710 : check_charpoly_710 = true` by
-  `vm_compute`.
-- `check_mat_identity_one_prime p`: verifies the
-  `D_M2 · (M1 · A) ≡ D_M1 · D_A · M2  (mod p)` identity.
-- `matrix_identity_710 : check_mat_identity_710 = true` by
-  `vm_compute`.
+- **`CharPolyAgree/Def.v`** (~870 lines). Beyond structural lemmas
+  (dimensions, length, monic, etc.):
+    - `crt_primes_local : list int` (10 primes ≥ 2^30) and
+      `crt_primes_extra` (700 more),
+      `crt_primes_all := local ++ extra` (710 Uint63 primes, all ≥ 2^30).
+    - `check_charpoly_one_prime_710 p := list_eqb63 (char_poly_mod p A_int)
+      (List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ)`.
+    - `check_mat_identity_one_prime p`: verifies
+      `D_M2 · (M1 · A) ≡ D_M1 · D_A · M2  (mod p)`.
+    - `crt_chunk_0..5` and `crt_primes_all_split` decompose
+      `crt_primes_all` into six contiguous 119-prime sublists (the last
+      has 115).
+
+- **`CharPolyAgree/Chunk_0.v` … `Chunk_5.v`** (~12 lines each).
+  Each runs the per-prime char-poly and matrix-identity checks on its
+  119-prime chunk via `vm_compute`. Six files compile in parallel
+  under `make -j`.
+
+- **`CharPolyAgree.v`** (~170 lines). The assembly: imports `Def` and
+  the six chunks, and proves
+    - `char_poly_int_agrees_710 : check_charpoly_710 = true`
+    - `matrix_identity_710 : check_mat_identity_710 = true`
+  via `crt_primes_all_split` plus `forallb_app`. No new `vm_compute`.
 - `scaling_Z_from_check (k : nat)`: if *k < 43* then
   *c_k · D_A^(42-k) = D_q · c'_k* where *c_k* is the *k*-th coefficient
   of `charpoly_int` and *c'_k* of `charpoly_of_A_int`. Derived from a
@@ -595,7 +606,8 @@ The file also provides Z-level twins `m1_num_den_at`, `m2_num_den_at
 (numerator, denominator) pair of integers, avoiding `rat`'s canonical
 `gcd`-normalisation cost during `vm_compute`.
 
-**`MaynardVerify.v`** (~140 lines). The kernel cross-check.
+**`MaynardVerify/Def.v`** (~75 lines). Definitions plus the fast M1
+cross-check:
 
 ```rocq
 Definition M1_entry_matchZ (i j : nat) : bool :=
@@ -609,9 +621,13 @@ Lemma all_match_M1Z_true : all_match_M1Z = true.
 Proof. vm_compute. reflexivity. Qed.
 ```
 
-Same shape for M2. `Print Assumptions` on each lemma reports
-`Closed under the global context` — not even Uint63 primitives are
-used (the proof is pure ℤ arithmetic).
+Same shape for M2's `M2_entry_matchZ` / `all_match_M2Z`, but the M2
+check is split into six row-range chunks
+(`MaynardVerify/M2_0.v` … `M2_5.v`, 7 rows each) so `make -j`
+runs them concurrently. **`MaynardVerify.v`** (~95 lines) is the
+assembly: it imports `Def` plus the six chunks and proves
+`all_match_M2Z_true` via `seq_split_42` + `forallb_app` from the
+six chunk Qeds — no new `vm_compute`.
 
 The cross-check is at the Z level (`num · D = M_int · den`) rather
 than the rat level (`M_int / D = num / den` in `'M[rat]_42`)
@@ -621,11 +637,12 @@ deliberately: closing the rat-level matrix equality at concrete dim
 Z cross-check is the load-bearing fact; rational cross-multiplication
 is one well-known identity away from the rat-level statement.
 
-**Timing**: `MaynardVerify.v` compiles in ~36 minutes — about 90 s
-for `M1` (one term per entry) and ~35 minutes for `M2` (~36 terms
-per entry, accumulator denominators reach ~10^7000 digits). This is
-a single-threaded `vm_compute` and dominates the project's total
-build time when `make -j` cannot find anything else to do near the end.
+**Timing**: M1 is a single ~90 s `vm_compute` Qed. M2 is split into
+six 7-row chunks (`MaynardVerify/M2_<k>.v`) so `make -j` runs them
+concurrently; on this machine each chunk finishes in ~6–18 minutes
+of CPU but the chunks overlap with the six 710-prime CRT chunks in
+`CharPolyAgree/`, putting the headline cold-build wall time in the
+~24 minute range.
 
 **`MaynardSpecBridge.v`** (~520 lines). Kernel-Qed bridge between Part
 A (rat-level, paper-shaped) and Part B (Z-level, `vm_compute`-shaped)

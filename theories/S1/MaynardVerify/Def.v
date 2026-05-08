@@ -1,5 +1,5 @@
 (* ==================================================================
-   MaynardVerifyDef.v -- definitions for the Z-level cross-check
+   MaynardVerify/Def.v -- definitions for the Z-level cross-check
    between the FLINT-shipped integer matrices and Maynard's closed
    form, plus the fast M1 check.
 

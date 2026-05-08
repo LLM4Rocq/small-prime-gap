@@ -5,9 +5,9 @@
 
    This file closes the trust gap on the 42x42 input matrices by
    assembling six per-row-range chunks of the M2 check (proved in
-   parallel by `make -j` from MaynardVerifyM2_0..5.v), plus the
+   parallel by `make -j` from MaynardVerify/M2_0..5.v), plus the
    re-export of the M1 check `all_match_M1Z_true` from
-   MaynardVerifyDef.v.
+   MaynardVerify/Def.v.
 
    == Method =======================================================
 
@@ -30,9 +30,9 @@
    == Timing on the cleanup branch =================================
 
    M1: a single ~90 s `vm_compute` Qed (`all_match_M1Z_true`,
-   MaynardVerifyDef.v).
+   MaynardVerify/Def.v).
 
-   M2: split into six 7-row chunks (`MaynardVerifyM2_<k>.v`,
+   M2: split into six 7-row chunks (`MaynardVerify/M2_<k>.v`,
    k = 0..5) so `make -j` runs them concurrently.  The assembly
    `all_match_M2Z_true` below stitches them via `forallb_app` plus
    the trivial `seq_split_42` rewrite — no per-entry recomputation.
@@ -53,10 +53,9 @@
 From Stdlib Require Import ZArith List Lia.
 From mathcomp Require Import all_ssreflect all_algebra.
 
-From PrimeGapS1 Require Export MaynardVerifyDef.
-From PrimeGapS1 Require Import
-  MaynardVerifyM2_0 MaynardVerifyM2_1 MaynardVerifyM2_2
-  MaynardVerifyM2_3 MaynardVerifyM2_4 MaynardVerifyM2_5.
+From PrimeGapS1.MaynardVerify Require Export Def.
+From PrimeGapS1.MaynardVerify Require Import
+  M2_0 M2_1 M2_2 M2_3 M2_4 M2_5.
 
 Import ListNotations.
 
