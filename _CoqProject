@@ -22,6 +22,13 @@ theories/S1/CRTLift.v
 theories/S1/MaynardFactQ.v
 theories/S1/MaynardBasis.v
 theories/S1/MaynardSpec.v
+theories/S1/MaynardVerifyDef.v
+theories/S1/MaynardVerifyM2_0.v
+theories/S1/MaynardVerifyM2_1.v
+theories/S1/MaynardVerifyM2_2.v
+theories/S1/MaynardVerifyM2_3.v
+theories/S1/MaynardVerifyM2_4.v
+theories/S1/MaynardVerifyM2_5.v
 theories/S1/MaynardVerify.v
 theories/S1/MaynardSpecBridge.v
 theories/S1/Cert.v
