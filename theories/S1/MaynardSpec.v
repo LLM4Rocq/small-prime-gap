@@ -220,8 +220,6 @@ Definition qmul (p q : Z * Z) : Z * Z :=
   let '(c, d) := q in
   (a * c, b * d).
 
-Definition qone : Z * Z := (1, 1).
-
 (* alpha as (num, den).  alpha = C(c,cp) * b! * (2c-2cp)! / (b+2c-2cp+1)!.
    C(c,cp) is an integer — so numerator is that integer times b! times
    (2c-2cp)!, and denominator is (b+2c-2cp+1)!. *)

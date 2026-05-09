@@ -148,9 +148,6 @@ Definition vec_in_range (p : int) (v : list int) : Prop :=
   Forall (in_range p) v.
 
 (* A modular matrix is in range *)
-Definition mat_in_range (p : int) (m : mmat) : Prop :=
-  Forall (vec_in_range p) m.
-
 
 (* ================================================================== *)
 (* Section 4: Operation-level correspondence                           *)
