@@ -193,23 +193,6 @@ Definition G2Z (n k : nat) : Z :=
 Definition K1n : nat := 105.
 Definition K2n : nat := 104.
 
-(* The Z-level constants are syntactically separate from PART A's K1/K2
-   to keep the two parts independent, but they are forced to agree by
-   these reflexive lemmas — a future PR that changes one without the
-   other would fail to compile MaynardSpecBridge.v.  These also
-   document the invariant K1 = K2 + 1 (the constant of integration
-   after the eq.~8.8 substitution that integrates out t_1). *)
-Lemma K1n_eq_K1 : K1n = K1.
-Proof. by []. Qed.
-
-Lemma K2n_eq_K2 : K2n = K2.
-Proof. by []. Qed.
-
-Local Open Scope nat_scope.
-Lemma K1_eq_K2_succ : K1 = K2 + 1.
-Proof. by []. Qed.
-Local Close Scope nat_scope.
-
 Definition m1_num_den (bi ci bj cj : nat) : Z * Z :=
   let b := (bi + bj)%nat in
   let c := (ci + cj)%nat in
