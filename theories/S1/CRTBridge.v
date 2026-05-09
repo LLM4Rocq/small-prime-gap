@@ -116,21 +116,6 @@ Proof.
   rewrite (Z.mod_small _ wB Hnf). reflexivity.
 Qed.
 
-(* addmod63 soundness *)
-Lemma addmod63_spec (p a b : int) :
-  valid_prime p ->
-  (0 <= Uint63.to_Z a < Uint63.to_Z p)%Z ->
-  (0 <= Uint63.to_Z b < Uint63.to_Z p)%Z ->
-  Uint63.to_Z (addmod63 p a b) =
-    ((Uint63.to_Z a + Uint63.to_Z b) mod Uint63.to_Z p)%Z.
-Proof.
-  intros [Hp1 Hp2] Ha Hb.
-  unfold addmod63.
-  rewrite mod_spec. rewrite add_spec.
-  assert (Hnf : (0 <= Uint63.to_Z a + Uint63.to_Z b < wB)%Z).
-  { split; [lia|exact (no_overflow_add _ _ _ Ha Hb Hp2)]. }
-  rewrite (Z.mod_small _ wB Hnf). reflexivity.
-Qed.
 
 (* negmod63 soundness *)
 Lemma negmod63_spec (p a : int) :
@@ -175,16 +160,6 @@ Definition vec_in_range (p : int) (v : list int) : Prop :=
 Definition mat_in_range (p : int) (m : mmat) : Prop :=
   Forall (vec_in_range p) m.
 
-(* reduce_mat_Z produces in-range matrices *)
-Lemma reduce_mat_Z_in_range (p : int) (M : list (list Z)) :
-  valid_prime p ->
-  mat_in_range p (reduce_mat_Z p M).
-Proof.
-  intros Hv. unfold reduce_mat_Z, mat_in_range.
-  apply Forall_map. apply Forall_forall. intros row _.
-  unfold vec_in_range. apply Forall_map. apply Forall_forall. intros z _.
-  unfold in_range. exact (Z_to_mod63_bound p z Hv).
-Qed.
 
 (* ================================================================== *)
 (* Section 4: Operation-level correspondence                           *)
@@ -222,27 +197,6 @@ Proof.
     + apply IH. simpl in Hlen. lia.
 Qed.
 
-(* ---- Matrix addition ---- *)
-Lemma madd_mod_sound (p : int) (A B : list (list Z)) :
-  valid_prime p ->
-  List.length A = List.length B ->
-  (forall i, (i < List.length A)%nat ->
-    List.length (List.nth i A []) = List.length (List.nth i B [])) ->
-  List.map (List.map (Z_to_mod63 p)) (madd A B) =
-  mmat_add p (List.map (List.map (Z_to_mod63 p)) A)
-             (List.map (List.map (Z_to_mod63 p)) B).
-Proof.
-  intros Hv. revert B.
-  induction A as [|ra A' IH]; intros B Hlen Hrows.
-  - destruct B; [reflexivity | simpl in Hlen; lia].
-  - destruct B as [|rb B']; [simpl in Hlen; lia|].
-    simpl. f_equal.
-    + apply vadd_mod_sound; [exact Hv|].
-      specialize (Hrows 0%nat). simpl in *. apply Hrows. lia.
-    + apply IH.
-      * simpl in Hlen. lia.
-      * intros i Hi. specialize (Hrows (S i)). simpl in *. apply Hrows. lia.
-Qed.
 
 (* ---- Scalar-vector multiplication ---- *)
 Lemma vscale_mod_sound (p : int) (c : Z) (xs : list Z) :
@@ -466,26 +420,6 @@ Qed.
 
 (* ---- Matrix multiplication ---- *)
 
-(* Helper: one row of mmul vs mmat_mul *)
-Lemma mmul_row_sound (p : int) (row : list Z) (Bt : list (list Z)) :
-  valid_prime p ->
-  (forall j, (j < List.length Bt)%nat ->
-    List.length (List.nth j Bt []) = List.length row) ->
-  List.map (Z_to_mod63 p) (List.map (fun col => dot_int row col) Bt) =
-  List.map (fun col => dot_mod p (List.map (Z_to_mod63 p) row) col)
-           (List.map (List.map (Z_to_mod63 p)) Bt).
-Proof.
-  intros Hv Hlens.
-  rewrite !List.map_map.
-  apply List.map_ext_in.
-  intros col Hin.
-  apply dot_mod_sound; [exact Hv|].
-  (* Need: length row = length col *)
-  (* col is in Bt, so its length = length row by Hlens *)
-  apply List.In_nth with (d := @nil Z) in Hin.
-  destruct Hin as [j [Hj Heq]]. subst col.
-  symmetry. exact (Hlens j Hj).
-Qed.
 
 Lemma mmul_mod_sound (p : int) (A B : list (list Z)) :
   valid_prime p ->
@@ -1396,53 +1330,5 @@ Proof. vm_compute. reflexivity. Qed.
 (*                                                                     *)
 (* Similarly for matrix_identity_Z.                                    *)
 (* ================================================================== *)
-
-(* The coefficient-wise CRT lift principle:
-   If two lists agree mod p for all primes p in a list,
-   and the product of the primes exceeds twice the max absolute
-   value of any difference, then the lists are equal over Z. *)
-
-(* We state the abstract CRT principle. Its proof requires only
-   standard number theory (Z.divide, prime factorization bounds). *)
-(* For our application, all primes are distinct, so their product
-   divides d when each prime divides d. We state this directly as
-   a hypothesis rather than deriving it from NoDup + prime.
-   The proof is standard: induction + Z.gauss (or Z.prime_mult). *)
-Lemma crt_lift_lists (l1 l2 : list Z) (primes : list Z) :
-  List.length l1 = List.length l2 ->
-  (* Agreement mod each prime *)
-  (forall p, In p primes ->
-    forall k, (k < List.length l1)%nat ->
-      ((List.nth k l1 0%Z) mod p = (List.nth k l2 0%Z) mod p)%Z) ->
-  (* Product of primes exceeds twice the max absolute difference *)
-  (forall k, (k < List.length l1)%nat ->
-    (Z.abs (List.nth k l1 0%Z - List.nth k l2 0%Z) <
-     List.fold_right Z.mul 1%Z primes)%Z) ->
-  (* Product of primes divides every difference (derived from above two + primality) *)
-  (forall k, (k < List.length l1)%nat ->
-    (List.fold_right Z.mul 1%Z primes |
-     List.nth k l1 0%Z - List.nth k l2 0%Z)%Z) ->
-  l1 = l2.
-Proof.
-  intros Hlen Hmod Hbound Hprod_dvd.
-  apply (List.nth_ext _ _ 0%Z 0%Z Hlen).
-  intros k Hk.
-  assert (Hdiff : (List.nth k l1 0%Z - List.nth k l2 0%Z = 0)%Z); [|lia].
-  set (d := (List.nth k l1 0%Z - List.nth k l2 0%Z)%Z).
-  destruct (Z.eq_dec d 0) as [e|Hne]; [exact e|].
-  exfalso.
-  assert (Hk' : (k < List.length l1)%nat) by lia.
-  pose proof (Hbound k Hk') as Habs.
-  pose proof (Hprod_dvd k Hk') as Hprod.
-  apply Hne. apply Z.abs_0_iff.
-  assert (Hp : (0 <= fold_right Z.mul 1 primes)%Z) by lia.
-  assert (Ha : (0 <= Z.abs d)%Z) by lia.
-  apply Z.le_antisymm; [|lia].
-  destruct (Z.eq_dec (Z.abs d) 0) as [e2|Hne2]; [lia|].
-  exfalso. apply (Z.lt_irrefl (fold_right Z.mul 1 primes)).
-  apply Z.le_lt_trans with (Z.abs d); [|lia].
-  apply Z.divide_pos_le; [lia|].
-  apply Z.divide_abs_r. exact Hprod.
-Qed.
 
 Close Scope uint63_scope.
