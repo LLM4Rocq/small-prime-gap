@@ -273,13 +273,6 @@ certifies that the 42-element list contains exactly the multiset
 pins the *ordering* to the FLINT-shipped indexing (a vm_compute-Qed,
 needed because matrix rows/columns are read by integer index).
 
-The denominator `D_q` shipped alongside the integer-cleared
-characteristic polynomial is kernel-checked to be strictly positive
-(`Cert.D_q_pos`, `vm_compute`-Qed). This is a defense-in-depth sanity
-Qed and is not on the headline's load-bearing path: a sign-flipped `D_q`
-would be caught by the leading-coefficient sign check
-(`signs_at_inf[0] = +1`) before reaching `D_q_pos`.
-
 The FLINT layer is **not** in the trust base of the Rocq proof. It
 serves only as (a) the candidate generator for the certificate data
 and (b) an independent cross-check. If the FLINT layer shipped wrong

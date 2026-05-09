@@ -1207,14 +1207,6 @@ build would stop:
   sign-consistent, but its absence would not weaken the headline
   trust contract.
 
-**Additional sanity Qeds.**
-
-- `Cert.D_q_pos : Z.lt 0 D_q` (`vm_compute. reflexivity.`) — the
-  FLINT-shipped char-poly denominator is strictly positive. This
-  rules out a sign-flip consistency attack: `charpoly_root_transfer`
-  only needs `D_q != 0`, which a negative `D_q` would also satisfy.
-  Closes audit finding M-5.
-
 Each of these is `Qed` and reduces in pure kernel arithmetic. The
 repository has zero `Axiom` declarations and zero `Admitted` lemmas
 anywhere.
@@ -1310,7 +1302,6 @@ Headline (eigenvalue-only sibling, kept for backward compatibility):
   Cert.v   maynard_eigenvalue_S1
 
 Sanity Qeds (§6):
-  Cert.v       D_q_pos                       (M-5)
   Smoke.v      sturm_chain_real_cross_check  (M-3)
   CRTCheck.v   full_prs_chain_verified       (load-bearing PRS check)
 ```

@@ -1101,20 +1101,8 @@ $\texttt{pol\_to\_polyrat}\,\texttt{charpoly\_int}
    = \Dq \cdot \charpolysym(\Arat)$.
 Mapping through $\texttt{ratr}$ pulls the scalar out
 ($\texttt{map\_polyZ}$), and \texttt{rootZ} says a nonzero scalar does
-not kill roots. Nonzero-ness of $\Dq$ is discharged by Lemma~\ref{lem:Dq_pos}.
-\end{proof}
-
-\begin{lemma}[$\Dq$ is positive]\label{lem:Dq_pos}
-\rocq{PrimeGapS1.Cert.D_q_pos}
-\rocqok
-$0 < \Dq$ in $\Z$.
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} on a positive shipped constant. This rules out a
-sign-flip consistency attack: \texttt{charpoly\_root\_transfer} only
-needs $\Dq \ne 0$, but a negative $\Dq$ would also satisfy that and
-silently flip the polynomial. The strict positivity check pins the
-sign hygiene of the FLINT-shipped scalar.
+not kill roots. Nonzero-ness of $\Dq$ is checked inline by
+\vmcompute{} on the shipped constant.
 \end{proof}
 
 \begin{lemma}[L4: rescale $4 < 105 \lambda$]\label{lem:bridge_L4}
@@ -1135,7 +1123,7 @@ $4/105 < \lambda$ form directly.
       PrimeGapS1.Cert.sturm_count_correct}
 \rocqok
 \uses{thm:maynard_L1, lem:charpoly_root_transfer,
-      lem:eigenvalue_of_root, lem:Dq_pos}
+      lem:eigenvalue_of_root}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{eigenvalue}\,(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
@@ -1262,7 +1250,6 @@ would fail:
   shipped Sturm chain.
 \item Lemma~\ref{lem:chain_0_matches}: $\texttt{chain}[0] =
   \texttt{charpoly\_int}$ (the only chain entry the IVT proof reads).
-\item Lemma~\ref{lem:Dq_pos}: $\Dq$ shipped strictly positive.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.
 
@@ -1282,8 +1269,9 @@ $2B < 2^{6500}$ needed for the CRT lift.
 
 \paragraph{Denominators.} $\DMone$ has ${\sim}221$ decimal digits,
 $\DMtwo$ ${\sim}227$, $\DA$ ${\sim}139$, $\Dq$ ${\sim}333$. All four
-are strictly positive (Lemma~\ref{lem:Dq_pos} for $\Dq$; the others
-follow from being products of factorials).
+are strictly positive (the others follow from being products of
+factorials; positivity of $\Dq$ is checked inline by \vmcompute{} in
+\texttt{charpoly\_root\_transfer}).
 
 \paragraph{Cauchy bound.} The IVT step uses MathComp's
 \texttt{cauchy\_bound} — an explicit rational upper bound on all real

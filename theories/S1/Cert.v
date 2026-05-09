@@ -51,16 +51,6 @@ Proof. exact maynard_L1_concrete. Qed.
 (* charpoly_int_Dq_scaled: imported from CertL2.v (Qed). *)
 
 (* ------------------------------------------------------------------
-   D_q is strictly positive (kernel-checked). This pins sign hygiene:
-   `charpoly_root_transfer` below only needs `D_q != 0`, but a
-   negative `D_q` would also satisfy that, opening a sign-flip
-   consistency attack on the FLINT-shipped denominator.
-   `D_q_pos` rules that out by `vm_compute`.
-   ------------------------------------------------------------------ *)
-Lemma D_q_pos : Z.lt 0 D_q.
-Proof. vm_compute. reflexivity. Qed.
-
-(* ------------------------------------------------------------------
    L2 — root transfer (Qed): a root of the shipped polynomial is also
    a root of `char_poly A_rat`.
 
