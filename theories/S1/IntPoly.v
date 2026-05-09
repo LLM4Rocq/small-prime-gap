@@ -140,10 +140,6 @@ Definition peval_at_rat (p : pol) (num den : Z) : Z :=
 (* Helpers on normalized polys: leading coefficient and degree with
    explicit fuel so reduction stays linear. *)
 
-(* Remove the leading zero coefficients from the *high* end.
-   Assumes input is already in low-to-high form. *)
-Definition ptrim (p : pol) : pol := pnorm p.
-
 (* Length-based degree of a *normalized* polynomial. *)
 Definition len_deg (p : pol) : nat :=
   match List.length p with O => O | S k => k end.
@@ -192,8 +188,6 @@ Definition prem (A B : pol) : pol :=
       if Nat.ltb (len_deg A') (len_deg B') then A'
       else prem_loop A' B' (S (List.length A'))
   end.
-
-Definition pmod (A B : pol) : pol := prem A B.
 
 (* ============================================================== *)
 (*  Sanity tests: every primitive must reduce under vm_compute.     *)
