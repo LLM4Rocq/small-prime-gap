@@ -33,18 +33,6 @@ Lemma charpoly_of_A_int_bigZ_length :
   List.length charpoly_of_A_int_bigZ = 43%nat.
 Proof. vm_compute. reflexivity. Qed.
 
-(* bigZ -> Z lift round-trip for the FLINT-shipped charpoly_of_A_int. *)
-Lemma charpoly_of_A_int_lift_round_trip :
-  lift_bigZ charpoly_of_A_int_bigZ = charpoly_of_A_int.
-Proof. reflexivity. Qed.
-
-(* Monic check on the bigZ representation (avoids forcing all 43
-   BigZ.to_Z conversions that Z-level List.last would trigger). *)
-Lemma charpoly_of_A_int_monic :
-  BigZ.eqb (List.last charpoly_of_A_int_bigZ 0%bigZ) 1%bigZ = true.
-Proof. vm_compute. reflexivity. Qed.
-
-
 (* ==================================================================
    Section: Reduce charpoly_of_A_int_bigZ mod p
    ================================================================== *)

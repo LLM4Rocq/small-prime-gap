@@ -278,12 +278,6 @@ Lemma length_charpoly_of_A_int : List.length charpoly_of_A_int = 43%nat.
 Proof. unfold charpoly_of_A_int. rewrite List.length_map.
   exact charpoly_of_A_int_bigZ_length. Qed.
 
-Lemma size_ship : size (map (fun z : Z => (Z_to_int z)%:~R : rat) charpoly_int) = 43.
-Proof. rewrite size_map. exact length_charpoly_int. Qed.
-
-Lemma size_cpA : size (map (fun z : Z => (Z_to_int z)%:~R : rat) charpoly_of_A_int) = 43.
-Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
-
 (* ================================================================ *)
 (*  charpoly_int_Dq_scaled -- the headline L2 fact                    *)
 (* ================================================================ *)
@@ -349,9 +343,6 @@ Proof. exact: expf_neq0. Qed.
 
 Lemma size_char_poly_42 (M : 'M[rat]_42) : size (char_poly M) = 43.
 Proof. exact: size_char_poly. Qed.
-
-Lemma size_scale_rat (c : rat) (p : {poly rat}) : c != 0 -> size (c *: p) = size p.
-Proof. exact: size_scale. Qed.
 
 Lemma size_pol_to_polyrat_bound (l : list Z) :
   (size (pol_to_polyrat l) <= List.length l)%nat.

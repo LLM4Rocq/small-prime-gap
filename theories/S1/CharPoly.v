@@ -550,12 +550,6 @@ Qed.
 
 (* ------- (6) mmul ------------------------------------------- *)
 
-Lemma nth_Z_oob (xs : list Z) (i : nat) :
-  (List.length xs <= i)%coq_nat -> nth_Z xs i = Z0.
-Proof.
-  intros H. unfold nth_Z. apply List.nth_overflow. exact H.
-Qed.
-
 (* ---------- structural facts about mtrans ---------- *)
 
 Lemma length_tails (m : mat) : List.length (tails m) = List.length m.
@@ -592,24 +586,11 @@ Proof.
   destruct row; simpl; rewrite IH; reflexivity.
 Qed.
 
-Lemma length_mtrans_fuel (f : nat) (m : mat) :
-  (List.length (mtrans_fuel f m) <= f)%coq_nat.
-Proof.
-  revert m. induction f as [|f IH]; intros m; simpl.
-  - apply Nat.le_refl.
-  - destruct (all_empty m); simpl.
-    + apply Nat.le_0_l.
-    + apply le_n_S. apply IH.
-Qed.
-
 Fixpoint all_rows_at_least (k : nat) (m : mat) : Prop :=
   match m with
   | nil => True
   | r :: rest => (k <= List.length r)%coq_nat /\ all_rows_at_least k rest
   end.
-
-Lemma all_rows_at_least_0 (m : mat) : all_rows_at_least 0 m.
-Proof. induction m as [|r rest IH]; simpl; [exact I|]. split; [lia|exact IH]. Qed.
 
 Lemma all_rows_at_least_tails (k : nat) (m : mat) :
   all_rows_at_least (S k) m -> all_rows_at_least k (tails m).
@@ -1562,15 +1543,6 @@ Proof. reflexivity. Qed.
 Lemma fl_c_int_k_base (M : mat) :
   fl_c_int_k M 0 = Zpos xH.
 Proof. reflexivity. Qed.
-
-Lemma fl_state_step (M : mat) (k : nat) :
-  fl_state (S k) M =
-    let '(M_prev, c_prev) := fl_state k M in
-    let I_n := meye (mat_dim M) in
-    let M_k := madd (mmul M M_prev) (mscale c_prev I_n) in
-    let tr := mtrace (mmul M M_k) in
-    (M_k, BinInt.Z.div (BinInt.Z.opp tr) (BinInt.Z.of_nat (S k))).
-Proof. simpl. reflexivity. Qed.
 
 Lemma fl_M_int_k_step (M : mat) (k : nat) :
   fl_M_int_k M (S k) = madd (mmul M (fl_M_int_k M k))

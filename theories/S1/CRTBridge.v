@@ -66,15 +66,6 @@ Proof.
     lia.
 Qed.
 
-(* Corollary: Z_to_mod63 values are bounded by p *)
-Lemma Z_to_mod63_bound (p : int) (z : Z) :
-  valid_prime p ->
-  (0 <= Uint63.to_Z (Z_to_mod63 p z) < Uint63.to_Z p)%Z.
-Proof.
-  intros Hv. rewrite Z_to_mod63_spec; [|exact Hv].
-  apply Z.mod_pos_bound. destruct Hv; lia.
-Qed.
-
 (* ================================================================== *)
 (* Section 2: Modular arithmetic soundness                             *)
 (* ================================================================== *)
@@ -168,35 +159,6 @@ Definition mat_in_range (p : int) (m : mmat) : Prop :=
 (* OP_mod, prove:                                                     *)
 (*   map (Z_to_mod63 p) (OP ...) = OP_mod p (map (Z_to_mod63 p) ...) *)
 (* ================================================================== *)
-
-(* ---- Vector addition ---- *)
-Lemma vadd_mod_sound (p : int) (xs ys : list Z) :
-  valid_prime p ->
-  List.length xs = List.length ys ->
-  List.map (Z_to_mod63 p) (vadd xs ys) =
-  mmat_vadd p (List.map (Z_to_mod63 p) xs) (List.map (Z_to_mod63 p) ys).
-Proof.
-  intros Hv Hlen.
-  revert ys Hlen. induction xs as [|x xs' IH]; intros ys Hlen.
-  - destruct ys; [reflexivity | simpl in Hlen; lia].
-  - destruct ys as [|y ys']; [simpl in Hlen; lia |].
-    simpl. f_equal.
-    + (* addmod63 p (Z_to_mod63 p x) (Z_to_mod63 p y)
-         = Z_to_mod63 p (x + y) *)
-      unfold addmod63.
-      (* Both sides should equal of_Z((x + y) mod to_Z p) *)
-      apply Uint63.to_Z_inj.
-      rewrite mod_spec. rewrite add_spec.
-      rewrite !Z_to_mod63_spec; [|exact Hv|exact Hv|exact Hv].
-      destruct Hv as [Hp1 Hp2].
-      set (pv := Uint63.to_Z p) in *.
-      assert (H1 : (0 <= x mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
-      assert (H2 : (0 <= y mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
-      rewrite (Z.mod_small _ wB); [| split; [lia|]; apply (no_overflow_add _ _ _ H1 H2 Hp2)].
-      rewrite Zplus_mod_idemp_l. rewrite Zplus_mod_idemp_r. reflexivity.
-    + apply IH. simpl in Hlen. lia.
-Qed.
-
 
 (* ---- Scalar-vector multiplication ---- *)
 Lemma vscale_mod_sound (p : int) (c : Z) (xs : list Z) :
