@@ -7,8 +7,8 @@
    list in `Witness.v` by `vm_compute`.
    ================================================================== *)
 
-From Stdlib Require Import List.
-From mathcomp Require Import all_ssreflect.
+From Stdlib Require Import List Lia.
+From mathcomp Require Import all_ssreflect zify.
 From PrimeGapS1 Require Import Witness.
 
 Import ListNotations.
@@ -27,5 +27,54 @@ Definition maynard_basis : list (nat * nat) :=
   ; (1, 5); (3, 4); (5, 3); (7, 2); (9, 1); (11, 0)
   ]%nat.
 
+Lemma maynard_basis_size : length maynard_basis = 42.
+Proof. reflexivity. Qed.
+
 Lemma maynard_basis_eq_witness : maynard_basis = Witness.basis.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ==================================================================
+   Set-level characterization of the basis.
+
+   The hand-listed 42 pairs are pinned to the canonical predicate
+   `b + 2c <= 11` so a reviewer never has to inspect the literal list:
+   the basis is exactly the multiset {(b, c) in N^2 : b + 2c <= 11}.
+   ================================================================== *)
+
+(* Canonical enumeration of {(b, c) : b + 2c <= 11}, as a filter on
+   the cartesian product of bounded ranges. *)
+Definition canonical_basis : seq (nat * nat) :=
+  [seq p <- [seq (b, c) | b <- iota 0 12, c <- iota 0 6]
+        | (p.1 + 2 * p.2 <= 11)%N].
+
+Lemma maynard_basis_perm_canonical :
+  perm_eq maynard_basis canonical_basis.
+Proof. by vm_compute. Qed.
+
+Lemma canonical_basis_spec p :
+  (p \in canonical_basis) = (p.1 + 2 * p.2 <= 11)%N.
+Proof.
+  case: p => b c.
+  rewrite /canonical_basis mem_filter.
+  case Hp: (b + 2 * c <= 11)%N => /=; last by [].
+  have Hb : b \in iota 0 12.
+    rewrite mem_iota /= add0n ltnS.
+    by apply: leq_trans Hp; rewrite leq_addr.
+  have Hc : c \in iota 0 6.
+    rewrite mem_iota /= add0n.
+    have H2c : 2 * c <= 11 by apply: leq_trans Hp; rewrite leq_addl.
+    lia.
+  exact: (allpairs_f (fun a d => (a, d)) Hb Hc).
+Qed.
+
+(* Headline: the basis is exactly the set {(b, c) : b + 2c <= 11}. *)
+Lemma maynard_basis_spec p :
+  (p \in maynard_basis) = (p.1 + 2 * p.2 <= 11)%N.
+Proof.
+  by rewrite (perm_mem maynard_basis_perm_canonical) canonical_basis_spec.
+Qed.
+
+(* Together with maynard_basis_size = 42 and the bound `b + 2c <= 11`,
+   uniqueness pins the basis to a true set (no repeats). *)
+Lemma maynard_basis_uniq : uniq maynard_basis.
+Proof. by vm_compute. Qed.
