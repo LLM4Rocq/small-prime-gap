@@ -59,16 +59,6 @@ Proof.
   apply IHl. intros c Hc. apply H. right. exact Hc.
 Qed.
 
-(* If every coefficient of a polynomial is 0, its normal form is []. *)
-Lemma all_zero_pnorm_nil : forall p : pol,
-  (forall c, In c p -> c = 0%Z) -> pnorm p = [].
-Proof.
-  intros p H. unfold pnorm.
-  rewrite drop_leading_zeros_all_zero.
-  - reflexivity.
-  - intros c Hc. apply H. apply in_rev. exact Hc.
-Qed.
-
 (* --- max_abs_coeff properties ---------------------------------- *)
 
 (* The fold computing max_abs_coeff is monotone in the accumulator. *)

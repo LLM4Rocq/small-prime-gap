@@ -6,7 +6,6 @@
      L1 (IVT root existence) — Qed, zero project axioms
      L2 (root transfer)      — Qed, via rootZ + map_polyZ
      L3 (root ↔ eigenvalue)  — Qed, via map_char_poly
-     L4 (Maynard bridge)     — Qed, via ltr_pdivrMr
 
    charpoly_int_Dq_scaled is imported from CertL2.v (Qed there).
    Zero Admitted anywhere in the chain.
@@ -80,24 +79,6 @@ Lemma eigenvalue_of_root_realalg (lambda : realalg) :
 Proof.
   rewrite (map_char_poly (ratr : {rmorphism rat -> realalg})).
   by rewrite eigenvalue_root_char.
-Qed.
-
-(* ------------------------------------------------------------------
-   L4 — Maynard bridge: existence of an eigenvalue > 4/105 implies
-   the existence of an eigenvalue λ with 4 < 105 * λ, i.e., M_{105} > 4.
-   This is an elementary rescaling of the bound.
-   ------------------------------------------------------------------ *)
-Lemma maynard_bridge_L4 :
-  (exists lambda : realalg,
-      eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-      /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda) ->
-  exists lambda : realalg,
-      eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-      /\ (4%:R < 105%:R * lambda :> realalg).
-Proof.
-  case=> [lambda [Heig Hlt]]; exists lambda; split=> //.
-  rewrite mulrC -ltr_pdivrMr; last by rewrite ltr0n.
-  by rewrite (_ : (4 / 105 : realalg) = ratr (4%:~R / 105%:~R)).
 Qed.
 
 (* ------------------------------------------------------------------
