@@ -5,7 +5,6 @@ theories/S1/WitnessChain.v
 theories/S1/Smoke.v
 theories/S1/IntPoly.v
 theories/S1/IntMat.v
-theories/S1/BrownTraub.v
 theories/S1/SignChain.v
 theories/S1/CharPoly.v
 theories/S1/ModularArith.v

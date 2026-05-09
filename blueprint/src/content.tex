@@ -775,23 +775,17 @@ $\texttt{charpoly\_int}$ above $4/105$. The strategy is the
 \emph{intermediate value theorem} on a real-closed field: we show
 $P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from the
 shipped sign vectors, and let MathComp's \texttt{poly\_ivtoo} produce
-a root in the interval. The material lives in \texttt{BrownTraub.v},
-\texttt{SignChain.v}, \texttt{CRTSigns.v}, \texttt{Smoke.v},
-\texttt{Bridge.v} and \texttt{CertL1.v}.
+a root in the interval. The material lives in \texttt{SignChain.v},
+\texttt{CRTSigns.v}, \texttt{Smoke.v}, \texttt{Bridge.v} and
+\texttt{CertL1.v}.
 
-\section{The Brown--Traub Sturm chain}
+\section{The shipped Sturm chain}
 
-\begin{definition}[Modified Sturm chain]\label{def:sturm_chain}
-\rocq{PrimeGapS1.BrownTraub.sturm_chain,
-      PrimeGapS1.BrownTraub.next_mod}
-\rocqok
-\uses{def:pol}
-For $p \in \texttt{pol}$, $\texttt{sturm\_chain}\,p$ is the list of
-polynomials produced by iterating $q \mapsto -\texttt{prem}(p_{i-1}, q)$
-starting from $(p, p')$, where \texttt{prem} is the integer
-pseudo-remainder (Brown--Traub PRS). This mirrors
-\texttt{mathcomp.real\_closed.qe\_rcf\_th.mods} up to sign.
-\end{definition}
+The 43-polynomial Sturm chain that the FLINT layer ships in
+\texttt{WitnessChain.v} is the Brown--Traub PRS chain of
+\texttt{charpoly\_int} (\textbf{up to sign convention}); the
+headline IVT proof reads only entry $0$ of the chain, anchored to
+\texttt{charpoly\_int} by Lemma~\ref{lem:chain_0_matches}.
 
 \begin{definition}[Sign-variation count]\label{def:variation}
 \rocq{PrimeGapS1.SignChain.variation,
@@ -1266,7 +1260,7 @@ The dependency graph has two independent backbones merging at
 
 \paragraph{Sturm-chain backbone.}
 \texttt{Witness} $\to$ \texttt{WitnessChain} $\to$
-\texttt{IntPoly} / \texttt{BrownTraub} / \texttt{SignChain} $\to$
+\texttt{IntPoly} / \texttt{SignChain} $\to$
 \texttt{CRTSigns} $\to$ \texttt{Bridge} $\to$ \texttt{CertL1}.
 Headline output: Theorem~\ref{thm:maynard_L1}.
 

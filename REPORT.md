@@ -308,17 +308,6 @@ The reason is that `'M[R]_42` does not reduce under `vm_compute` at the
 sizes we need, but nested `list (list Z)` does (a 42×42 matrix
 multiplication takes ~0.14 s by `vm_compute`).
 
-**`BrownTraub.v`**. The modified Sturm chain at the `list Z` level:
-
-```rocq
-Definition next_mod (p q : pol) : pol := pneg (prem p q).
-Fixpoint mods_int_loop (steps : nat) (p q : pol) : list pol := ...
-Definition sturm_chain (p : pol) : list pol := mods_int p (pderiv p).
-```
-
-This mirrors `mathcomp.real_closed.qe_rcf_th.mods` up to sign, using the
-integer pseudo-remainder from IntPoly (which already absorbs the
-`lc(q)^(deg p - deg q + 1)` scaling, so we only need one negation).
 
 **`SignChain.v`**. The sign-variation counter: `sgn_Z`, `sign_at_rat`,
 `sign_at_pinf`, `sign_at_minf`, `variation`, `variation_at_rat`,
@@ -375,7 +364,7 @@ to `char_poly (mat_int_to_rat A_int 1 42)` by `char_poly_int_correct`.
 ### 3.4 The Sturm-chain → root bridge (L1)
 
 **`Bridge.v`** (~2 000 lines). The mostly-technical bridge between the
-concrete `list Z`-level Sturm machinery (IntPoly/BrownTraub/SignChain)
+concrete `list Z`-level Sturm machinery (IntPoly/SignChain)
 and the abstract MathComp `real_closed` machinery (`mods`,
 `changes_horner`, `rootsR`, `taq_itv`). Defines
 `pol_to_polyralg : pol -> {poly realalg}` as the composition of
@@ -1310,7 +1299,7 @@ The dependency graph has roughly two independent backbones that merge at
 Cert.v:
 
 - **Sturm-chain backbone**: Witness → WitnessChain → IntPoly /
-  BrownTraub / SignChain → CRTSigns → Bridge → CertL1.
+  SignChain → CRTSigns → Bridge → CertL1.
 - **CharPoly backbone**: Witness → IntMat / IntPoly → CharPoly →
   ModularArith → CharPolyAgree + CRTBridge → CRTLift → CharPolyScale →
   CertL2.
