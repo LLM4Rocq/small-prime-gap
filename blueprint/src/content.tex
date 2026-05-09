@@ -787,18 +787,6 @@ The 43-polynomial Sturm chain that the FLINT layer ships in
 headline IVT proof reads only entry $0$ of the chain, anchored to
 \texttt{charpoly\_int} by Lemma~\ref{lem:chain_0_matches}.
 
-\begin{definition}[Sign-variation count]\label{def:variation}
-\rocq{PrimeGapS1.SignChain.variation,
-      PrimeGapS1.SignChain.sturm_count_in,
-      PrimeGapS1.SignChain.sturm_count_above}
-\rocqok
-\uses{def:sturm_chain}
-\texttt{variation} walks a list of $\{-1, 0, +1\}$ signs and counts
-sign changes (skipping zeros). \texttt{sturm\_count\_above}~$p\,a$
-returns $V(a) - V(+\infty)$, the standard Sturm-theorem count for the
-number of real roots of $p$ in $(a, +\infty)$.
-\end{definition}
-
 \section{Anchoring \texttt{chain[0]} to \texttt{charpoly\_int}}
 
 \begin{lemma}[Chain anchors to \texttt{charpoly\_int}]
