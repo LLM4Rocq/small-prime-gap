@@ -165,8 +165,7 @@ prime_gap/
     |
     +-- IntPoly.v                   list Z polynomial library
     +-- IntMat.v                    list (list Z) matrix library
-    +-- BrownTraub.v                modified Sturm chain on list Z
-    +-- SignChain.v                 sign-variation counting
+    +-- SignChain.v                 sign-variation counting (sgn_Z, sign_at_*)
     |
     +-- CharPoly.v                  Faddeev-LeVerrier + rat bridges
     +-- CharPolyAgree.v             710-prime CRT assembly

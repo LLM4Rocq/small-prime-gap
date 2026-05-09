@@ -18,7 +18,7 @@ From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import polyrcf qe_rcf_th realalg.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntPoly BrownTraub SignChain Witness Bridge.
+From PrimeGapS1 Require Import IntPoly SignChain Witness Bridge.
 From PrimeGapS1 Require Import WitnessChain CRTSigns Recompose Smoke.
 
 Local Open Scope ring_scope.
