@@ -135,7 +135,8 @@ Proof.
   (* 6. Apply char_poly_mod_sound *)
   assert (Hsound := char_poly_mod_sound p M1_int Hvp Hsq Hbound Hfl Hfermat).
   (* Hsound : map (Z_to_mod63 p) (char_poly_int M1_int) = char_poly_mod p M1_int *)
-  (* 7. M1_det_nz_mod says hd of char_poly_mod p M1_int != 0 *)
+  (* 7. hd of char_poly_mod p M1_int != 0 (one-shot vm_compute on the
+     first 710-prime) *)
   assert (Hnz_mod : Uint63.eqb (List.hd 0%uint63 (char_poly_mod p M1_int)) 0%uint63 = false).
   { vm_compute. reflexivity. }
   (* 8. Connect: hd of map f l = f (hd d l) for non-nil l *)

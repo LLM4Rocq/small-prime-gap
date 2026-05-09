@@ -55,16 +55,6 @@ From Stdlib Require Import Lia.
    ================================================================== *)
 
 (* ------------------------------------------------------------------
-   1. M1 det nonzero check
-   ------------------------------------------------------------------ *)
-
-Definition check_M1_det_nz : bool :=
-  negb (Uint63.eqb (List.hd 0 (char_poly_mod (List.hd 0 crt_primes_all) M1_int)) 0).
-
-Lemma M1_det_nz_mod : check_M1_det_nz = true.
-Proof. vm_compute. reflexivity. Qed.
-
-(* ------------------------------------------------------------------
    2. Size lemmas for charpoly_int and charpoly_of_A_int
    ------------------------------------------------------------------ *)
 
