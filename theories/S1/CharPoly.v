@@ -957,113 +957,6 @@ Proof.
   by rewrite /intmul /=.
 Qed.
 
-Section FL_Invariant_Proof.
-
-Variable M : mat.
-Variable sz : nat.
-
-Let A := mat_int_to_rat M 1 sz.
-
-Variable fl_M : nat -> mat.
-Variable fl_c : nat -> Z.
-
-Hypothesis fl_base_M : fl_M 0 = mzero sz.
-Hypothesis fl_base_c : fl_c 0 = Zpos xH.
-
-Hypothesis fl_step_M : forall k, (k < sz)%N ->
-  fl_M k.+1 = madd (mmul M (fl_M k)) (mscale (fl_c k) (meye sz)).
-
-Hypothesis fl_step_c : forall k, (k < sz)%N ->
-  fl_c k.+1 = BinInt.Z.div
-                (BinInt.Z.opp (mtrace (mmul M (fl_M k.+1))))
-                (BinInt.Z.of_nat k.+1).
-
-Hypothesis fl_M_dim : forall k, (k <= sz)%N -> mat_dim (fl_M k) = sz.
-Hypothesis fl_M_rows : forall k, (k <= sz)%N -> all_rows_len sz (fl_M k).
-
-Hypothesis M_dim : mat_dim M = sz.
-Hypothesis M_rows : all_rows_len sz M.
-
-Hypothesis meye_rows : all_rows_len sz (meye sz).
-
-Hypothesis fl_div : forall k, (k < sz)%N ->
-  BinInt.Z.rem (mtrace (mmul M (fl_M k.+1)))
-               (BinInt.Z.of_nat k.+1) = Z0.
-
-Hypothesis mmul_dim : forall A' B' : mat,
-  mat_dim A' = sz -> mat_dim B' = sz -> mat_dim (mmul A' B') = sz.
-Hypothesis mmul_rows : forall A' B' : mat,
-  mat_dim A' = sz -> mat_dim B' = sz ->
-  all_rows_len sz A' -> all_rows_len sz B' ->
-  all_rows_len sz (mmul A' B').
-Hypothesis mscale_dim : forall c (A' : mat), mat_dim A' = sz -> mat_dim (mscale c A') = sz.
-Hypothesis mscale_rows : forall c (A' : mat),
-  all_rows_len sz A' -> all_rows_len sz (mscale c A').
-
-Lemma fl_invariant_L2_gen (k : nat) :
-  (k <= sz)%N ->
-  mat_int_to_rat (fl_M k) 1 sz = fl_M_rat A k
-  /\
-  ((Z_to_int (fl_c k))%:~R : rat) = fl_c_rat A k.
-Proof.
-  elim: k => [|k IH] Hle.
-  - rewrite fl_base_M fl_base_c.
-    split.
-    + rewrite mat_int_to_rat_mzero. reflexivity.
-    + exact Z_to_int_1_rat.
-  - have Hk_le : (k <= sz)%N by apply: ltnW.
-    have Hk_lt : (k < sz)%N by exact Hle.
-    have [IHmat IHcoeff] := IH Hk_le.
-    rewrite /fl_M_rat /fl_c_rat /= -/fl_loop_rat.
-    rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
-    rewrite -IHmat -IHcoeff.
-    split.
-    + rewrite (fl_step_M Hk_lt).
-      rewrite (mat_int_to_rat_madd
-                 (mmul M (fl_M k)) (mscale (fl_c k) (meye sz)) sz
-                 (mmul_dim M_dim (fl_M_dim Hk_le))
-                 (mscale_dim (fl_c k) (mat_dim_meye sz))
-                 (mmul_rows M_dim (fl_M_dim Hk_le) M_rows (fl_M_rows Hk_le))
-                 (@mscale_rows (fl_c k) (meye sz) meye_rows)).
-      rewrite (mat_int_to_rat_mmul M (fl_M k) sz M_dim (fl_M_dim Hk_le)
-                 M_rows (fl_M_rows Hk_le)).
-      rewrite mat_int_to_rat_mscale mat_int_to_rat_meye.
-      reflexivity.
-    + rewrite (fl_step_c Hk_lt).
-      have Hkp : BinInt.Z.of_nat k.+1 <> Z0.
-      { rewrite Nat2Z.inj_succ. lia. }
-      have Hdiv_opp :
-        Z.rem (BinInt.Z.opp (mtrace (mmul M (fl_M k.+1))))
-              (BinInt.Z.of_nat k.+1) = Z0
-        by rewrite Z.rem_opp_l // fl_div.
-      rewrite (@Z_div_exact_rat _ _ Hkp Hdiv_opp).
-      rewrite Z_to_int_opp rmorphN /=.
-      rewrite SuccNat2Pos.id_succ -pmulrn.
-      congr (_ / _)%R. congr (- _)%R.
-      have HMk1_dim : mat_dim (fl_M k.+1) = sz
-        by apply fl_M_dim; exact Hle.
-      have HMk1_rows : all_rows_len sz (fl_M k.+1)
-        by apply fl_M_rows; exact Hle.
-      have Hmmul_dim : mat_dim (mmul M (fl_M k.+1)) = sz
-        by exact (mmul_dim M_dim HMk1_dim).
-      rewrite (mtrace_int_to_rat (mmul M (fl_M k.+1)) sz Hmmul_dim).
-      rewrite (mat_int_to_rat_mmul M (fl_M k.+1) sz M_dim HMk1_dim
-                 M_rows HMk1_rows).
-      rewrite (fl_step_M Hk_lt).
-      rewrite (mat_int_to_rat_madd
-                 (mmul M (fl_M k)) (mscale (fl_c k) (meye sz)) sz
-                 (mmul_dim M_dim (fl_M_dim Hk_le))
-                 (mscale_dim (fl_c k) (mat_dim_meye sz))
-                 (mmul_rows M_dim (fl_M_dim Hk_le) M_rows (fl_M_rows Hk_le))
-                 (@mscale_rows (fl_c k) (meye sz) meye_rows)).
-      rewrite (mat_int_to_rat_mmul M (fl_M k) sz M_dim (fl_M_dim Hk_le)
-                 M_rows (fl_M_rows Hk_le)).
-      rewrite mat_int_to_rat_mscale mat_int_to_rat_meye.
-      reflexivity.
-Qed.
-
-End FL_Invariant_Proof.
-
 (* ==================================================================
    4. fl_loop_rat_is_char_poly_L2 — the abstract identity.
    ================================================================== *)
@@ -1501,20 +1394,6 @@ Qed.
 (* ==================================================================
    5. Base case helper.
    ================================================================== *)
-
-Lemma fl_base_case_mat (sz : nat) :
-  let A := mat_int_to_rat (mzero sz) 1 sz in
-  mat_int_to_rat (mzero sz) 1 sz = fl_M_rat A 0.
-Proof.
-  simpl. rewrite mat_int_to_rat_mzero. reflexivity.
-Qed.
-
-Lemma fl_base_case_coeff (sz : nat) :
-  let A := mat_int_to_rat (mzero sz) 1 sz in
-  ((Z_to_int (Zpos xH))%:~R : rat) = fl_c_rat A 0.
-Proof.
-  simpl. exact Z_to_int_1_rat.
-Qed.
 
 (* ==================================================================
    6. Well-formedness lemmas for integer matrix operations.
