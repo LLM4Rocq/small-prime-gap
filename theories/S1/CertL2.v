@@ -91,10 +91,6 @@ Proof. move=> HD; apply/eqP => Hz. apply HD.
   - injection Hz => Hz'. have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
   - discriminate Hz. Qed.
 
-Lemma Z_to_int_unit' (D : BinInt.Z) :
-  D <> BinInt.Z0 -> (Z_to_int D)%:~R \is a @GRing.unit rat.
-Proof. move=> HD. rewrite GRing.unitfE intr_eq0. exact: Z_to_int_neq0'. Qed.
-
 (* ================================================================ *)
 (*  M1 invertibility                                                   *)
 (* ================================================================ *)
