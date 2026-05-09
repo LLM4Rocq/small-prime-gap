@@ -50,15 +50,6 @@ Qed.
 
 (* --- Polynomial helpers ---------------------------------------- *)
 
-(* If every element of a list is 0, drop_leading_zeros returns []. *)
-Lemma drop_leading_zeros_all_zero : forall l : list Z,
-  (forall c, In c l -> c = 0%Z) -> drop_leading_zeros l = [].
-Proof.
-  induction l; intros H; simpl; auto.
-  rewrite (H a (or_introl eq_refl)). simpl.
-  apply IHl. intros c Hc. apply H. right. exact Hc.
-Qed.
-
 (* --- max_abs_coeff properties ---------------------------------- *)
 
 (* The fold computing max_abs_coeff is monotone in the accumulator. *)
