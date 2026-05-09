@@ -143,12 +143,6 @@ Qed.
 Definition in_range (p : int) (x : int) : Prop :=
   (0 <= Uint63.to_Z x < Uint63.to_Z p)%Z.
 
-(* A modular vector is in range *)
-Definition vec_in_range (p : int) (v : list int) : Prop :=
-  Forall (in_range p) v.
-
-(* A modular matrix is in range *)
-
 (* ================================================================== *)
 (* Section 4: Operation-level correspondence                           *)
 (*                                                                     *)
