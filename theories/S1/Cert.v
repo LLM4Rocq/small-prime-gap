@@ -63,9 +63,7 @@ Lemma charpoly_root_transfer (lambda : realalg) :
 Proof.
   rewrite /charpoly_as_poly_realalg charpoly_int_Dq_scaled map_polyZ rootZ //.
   rewrite /ratr fmorph_eq0 intr_eq0.
-  apply/eqP => Hz.
-  have : D_q = BinNums.Z0 by destruct D_q as [|p|p]; [reflexivity|exfalso;rewrite /Z_to_int /= in Hz; injection Hz => Hz'; have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0)|exfalso; discriminate Hz].
-  discriminate.
+  by apply: Z_to_int_neq0'; discriminate.
 Qed.
 
 (* ------------------------------------------------------------------
@@ -133,8 +131,9 @@ Theorem maynard_M105_certified :
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof.
-  split; [exact all_match_M1Z_true |
-   split; [exact all_match_M2Z_true |
-    split; [exact MaynardSpecBridge.M1_spec_rat_eq |
-     split; [exact MaynardSpecBridge.M2_spec_rat_eq | exact maynard_eigenvalue_S1]]]].
+  split; first exact: all_match_M1Z_true.
+  split; first exact: all_match_M2Z_true.
+  split; first exact: MaynardSpecBridge.M1_spec_rat_eq.
+  split; first exact: MaynardSpecBridge.M2_spec_rat_eq.
+  exact: maynard_eigenvalue_S1.
 Qed.
