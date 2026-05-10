@@ -10,60 +10,6 @@ Import ListNotations.
 From PrimeGapS1 Require Import Recompose.
 Open Scope Z_scope.
 
-Definition dim : nat := 42.
-Definition k_param : nat := 105.
-Definition deg_max : nat := 11.
-
-Definition threshold_num : Z := 4%Z.
-Definition threshold_den : Z := 105%Z.
-
-  (* The 42 basis monomials (b, c) with b + 2c <= 11. *)
-  Definition basis : list (nat * nat) :=
-    [
-      (0%nat, 0%nat) ;
-(1%nat, 0%nat) ;
-(0%nat, 1%nat) ;
-(2%nat, 0%nat) ;
-(1%nat, 1%nat) ;
-(3%nat, 0%nat) ;
-(0%nat, 2%nat) ;
-(2%nat, 1%nat) ;
-(4%nat, 0%nat) ;
-(1%nat, 2%nat) ;
-(3%nat, 1%nat) ;
-(5%nat, 0%nat) ;
-(0%nat, 3%nat) ;
-(2%nat, 2%nat) ;
-(4%nat, 1%nat) ;
-(6%nat, 0%nat) ;
-(1%nat, 3%nat) ;
-(3%nat, 2%nat) ;
-(5%nat, 1%nat) ;
-(7%nat, 0%nat) ;
-(0%nat, 4%nat) ;
-(2%nat, 3%nat) ;
-(4%nat, 2%nat) ;
-(6%nat, 1%nat) ;
-(8%nat, 0%nat) ;
-(1%nat, 4%nat) ;
-(3%nat, 3%nat) ;
-(5%nat, 2%nat) ;
-(7%nat, 1%nat) ;
-(9%nat, 0%nat) ;
-(0%nat, 5%nat) ;
-(2%nat, 4%nat) ;
-(4%nat, 3%nat) ;
-(6%nat, 2%nat) ;
-(8%nat, 1%nat) ;
-(10%nat, 0%nat) ;
-(1%nat, 5%nat) ;
-(3%nat, 4%nat) ;
-(5%nat, 3%nat) ;
-(7%nat, 2%nat) ;
-(9%nat, 1%nat) ;
-(11%nat, 0%nat)
-    ].
-
 (* M1[i,j] = M1_int[i][j] / D_M1.  Symmetric, positive definite over Q. *)
 Definition D_M1 : Z := 308857268757354722981071348762547160366309450679454185367644461515697994870656196471123363056046190863367713133901668592148625627226398911869086360030375176344316428167833190400000000000000000000000000000%Z.
 
@@ -5826,10 +5772,6 @@ Definition signs_at_inf : list Z := [
    1%Z ;
    (-1)%Z
   ].
-
-Definition V_x0  : nat := 22%nat.
-Definition V_inf : nat := 21%nat.
-Definition roots_in_x0_inf : nat := 1%nat.
 
 (* Independent Arb 256-bit cross-check (advisory; not part of the proof):
      top eigenvalue of A          = 0.038114950113695686

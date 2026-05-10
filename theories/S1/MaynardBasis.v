@@ -1,15 +1,12 @@
 (* ==================================================================
-   MaynardBasis.v — the 42-element basis matching Witness.basis.
+   MaynardBasis.v — the 42-element basis used by Maynard's spec.
 
    Order is the Mathematica xExponents[5]/yExponents[5] enumeration
-   (see python/flint_probe.py:xExponents_mma / yExponents_mma).  The bridge
-   lemma `maynard_basis_eq_witness` pins it to the shipped `basis`
-   list in `Witness.v` by `vm_compute`.
+   (see python/flint_probe.py:xExponents_mma / yExponents_mma).
    ================================================================== *)
 
 From Stdlib Require Import List Lia.
 From mathcomp Require Import all_ssreflect zify.
-From PrimeGapS1 Require Import Witness.
 
 Import ListNotations.
 
@@ -29,9 +26,6 @@ Definition maynard_basis : list (nat * nat) :=
 
 Lemma maynard_basis_size : length maynard_basis = 42.
 Proof. reflexivity. Qed.
-
-Lemma maynard_basis_eq_witness : maynard_basis = Witness.basis.
-Proof. vm_compute. reflexivity. Qed.
 
 (* ==================================================================
    Set-level characterization of the basis.
