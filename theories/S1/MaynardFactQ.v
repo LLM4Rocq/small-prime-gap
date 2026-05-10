@@ -12,12 +12,12 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Import GRing.Theory.
+Import GRing.Theory Num.Theory.
 Local Open Scope ring_scope.
 
 Definition factQ (n : nat) : rat := (n`!)%:R.
 Definition binQ (n k : nat) : rat := ('C(n, k))%:R.
 
 Lemma factQ_nz (n : nat) : factQ n != 0.
-Proof. by rewrite /factQ Num.Theory.pnatr_eq0 -lt0n fact_gt0. Qed.
+Proof. by rewrite /factQ pnatr_eq0 -lt0n fact_gt0. Qed.
 

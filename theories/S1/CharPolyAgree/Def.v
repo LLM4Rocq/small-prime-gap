@@ -43,9 +43,6 @@ Definition bigZ_to_mod63 (p : int) (x : BigZ.t_) : int :=
   let p_bigZ := BigZ.of_Z (Uint63.to_Z p) in
   Uint63.of_Z (BigZ.to_Z (BigZ.modulo x p_bigZ)).
 
-Definition charpoly_mod (p : int) : list int :=
-  List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ.
-
 (* ==================================================================
    Section: CRT primes (copied from CRTCheck.v since it compiles
    after this file in _CoqProject order)

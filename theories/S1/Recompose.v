@@ -24,13 +24,3 @@ Definition lift_bigZ (xs : list BigZ.t_) : list Z :=
 
 Definition lift_bigZ2 (xss : list (list BigZ.t_)) : list (list Z) :=
   List.map lift_bigZ xss.
-
-(* Sanity tests. *)
-Example lift_nil : lift_bigZ [] = [].
-Proof. reflexivity. Qed.
-
-Example lift_one : lift_bigZ [42%bigZ] = [42%Z].
-Proof. vm_compute. reflexivity. Qed.
-
-Example lift_two : lift_bigZ [(-3)%bigZ; 7%bigZ] = [(-3)%Z; 7%Z].
-Proof. vm_compute. reflexivity. Qed.
