@@ -46,27 +46,22 @@ Lemma fermat_nat_eq (pp kn : nat) :
   (0 < kn < pp.+2)%N ->
   exists q, Nat.mul kn (Nat.pow kn pp) = Nat.add 1 (Nat.mul q (S (S pp))).
 Proof.
-  intros Hprime Hbnd.
+  move=> Hprime Hbnd.
   have Hfm := fermat_mod pp Hprime kn Hbnd.
   rewrite subn2 in Hfm.
   have Hge : (1 <= muln kn (expn kn pp))%N.
   { have /andP [Hk _] := Hbnd.
     by rewrite muln_gt0 expn_gt0 Hk. }
   have Hdvd : dvdn pp.+2 (muln kn (expn kn pp) - 1).
-  { rewrite -(eqn_mod_dvd _ Hge). by apply/eqP. }
+  { by rewrite -(eqn_mod_dvd _ Hge); apply/eqP. }
   move/dvdnP: Hdvd => [q Hq].
   exists q.
-  (* Hq : muln kn (expn kn pp) - 1 = muln q pp.+2, using MathComp ops *)
-  (* Convert to Stdlib *)
-  (* subnK : n <= m -> n + (m - n) = m, i.e., 1 + (prod - 1) = prod *)
-  have HK := subnK Hge.  (* 1 + (muln kn (expn kn pp) - 1) = muln kn (expn kn pp) *)
-  (* Rewrite Hq: subn ... = muln q pp.+2 *)
-  (* Goal: muln kn (expn kn pp) = 1 + muln q pp.+2 in nat *)
-  (* From HK and Hq: muln kn (expn kn pp) = 1 + (muln kn ... - 1) = 1 + muln q pp.+2 *)
-  rewrite Hq in HK.  (* HK : 1 + muln q pp.+2 = muln kn (expn kn pp) *)
-  (* Convert HK to Stdlib form *)
-  rewrite addnC addnE !mulnE expn_pow in HK.
-  symmetry in HK. exact HK.
+  (* subnK Hge : 1 + (muln kn (expn kn pp) - 1) = muln kn (expn kn pp);
+     rewrite Hq inside flips the LHS to 1 + muln q pp.+2.
+     Then addnC/addnE/mulnE/expn_pow shifts to Stdlib ops. *)
+  have HK := subnK Hge.
+  rewrite Hq addnC addnE !mulnE expn_pow in HK.
+  by rewrite -HK.
 Qed.
 
 From Stdlib Require Import ZArith Lia.
@@ -77,23 +72,21 @@ Lemma fermat_Z (pv : Z) :
   forall j : Z, (0 < j < pv)%Z ->
   ((j * j ^ (pv - 2)) mod pv = 1 mod pv)%Z.
 Proof.
-  intros Hp1 Hprime j [Hj0 Hjp].
-  remember (Z.to_nat j) as kn eqn:Hkn.
-  remember (Z.to_nat pv) as pn eqn:Hpn.
-  assert (Hexists: exists pp, pn = S (S pp)) by (exists (pn - 2)%coq_nat; lia).
-  destruct Hexists as [pp Hpp].
-  assert (Hprime' : prime pp.+2) by (rewrite -Hpp; exact Hprime).
-  assert (Hkn_pos : (0 < kn)%coq_nat) by (subst kn; lia).
-  assert (Hkn_lt : (kn < S (S pp))%coq_nat) by (subst kn pn; lia).
-  assert (HbndN : is_true (ltn 0 kn && ltn kn pp.+2))
-    by (apply/andP; split; apply/ltP; assumption).
-  destruct (fermat_nat_eq pp kn Hprime' HbndN) as [q Hq].
+  move=> Hp1 Hprime j [Hj0 Hjp].
+  set kn := Z.to_nat j.
+  set pn := Z.to_nat pv.
+  have [pp Hpp] : exists pp, pn = S (S pp) by exists (pn - 2)%coq_nat; lia.
+  have Hprime' : prime pp.+2 by rewrite -Hpp; exact Hprime.
+  have Hkn_pos : (0 < kn)%coq_nat by rewrite /kn; lia.
+  have Hkn_lt : (kn < S (S pp))%coq_nat by rewrite /kn -Hpp /pn; lia.
+  have HbndN : is_true (ltn 0 kn && ltn kn pp.+2)
+    by apply/andP; split; apply/ltP.
+  have [q Hq] := fermat_nat_eq pp kn Hprime' HbndN.
   (* Hq : Nat.mul kn (Nat.pow kn pp) = Nat.add 1 (Nat.mul q (S (S pp))) *)
   replace pv with (Z.of_nat (S (S pp))) by lia.
   replace j with (Z.of_nat kn) by lia.
   replace (Z.of_nat (S (S pp)) - 2)%Z with (Z.of_nat pp) by lia.
   rewrite -Nat2Z.inj_pow -Nat2Z.inj_mul.
   change 1%Z with (Z.of_nat 1).
-  rewrite Hq Nat2Z.inj_add Nat2Z.inj_mul.
-  rewrite Z_mod_plus_full. reflexivity.
+  by rewrite Hq Nat2Z.inj_add Nat2Z.inj_mul Z_mod_plus_full.
 Qed.

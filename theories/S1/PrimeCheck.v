@@ -65,28 +65,29 @@ From mathcomp Require Import all_boot.
 Lemma Zprime_to_ssrprime (p : Z) :
   (1 < p)%Z -> Znumtheory.prime p -> prime (Z.to_nat p).
 Proof.
-  intros Hp1 Hzp.
+  move=> Hp1 Hzp.
   have Hp2 : (1 < Z.to_nat p)%coq_nat by lia.
-  apply/primeP. split; [apply/ltP; exact Hp2|].
-  intros d Hd. apply/orP.
+  apply/primeP; split; [by apply/ltP|].
+  move=> d Hd; apply/orP.
   have /dvdnP [q Hq] := Hd.
   rewrite mulnE in Hq.
-  assert (Hdz : (Z.of_nat d | p)%Z).
-  { exists (Z.of_nat q). rewrite -Nat2Z.inj_mul -Hq Z2Nat.id; lia. }
-  assert (Hd_le : (d <= Z.to_nat p)%coq_nat).
-  { apply/leP. apply dvdn_leq; [apply/ltP; lia | exact Hd]. }
-  destruct (Nat.eq_dec d 1) as [->|Hne1]; [left; done|].
-  destruct (Nat.eq_dec d (Z.to_nat p)) as [->|Hne2]; [right; done|].
+  have Hdz : (Z.of_nat d | p)%Z.
+  { by exists (Z.of_nat q); rewrite -Nat2Z.inj_mul -Hq Z2Nat.id; lia. }
+  have Hd_le : (d <= Z.to_nat p)%coq_nat.
+  { by apply/leP; apply: dvdn_leq Hd; apply/ltP; lia. }
+  case: (Nat.eq_dec d 1) => [->|Hne1]; [by left|].
+  case: (Nat.eq_dec d (Z.to_nat p)) => [->|Hne2]; [by right|].
   exfalso.
-  assert (Hd_ge2 : (2 <= Z.of_nat d)%Z).
-  { assert (Hd0 : d <> O) by (intro; subst d; simpl in Hq; lia). lia. }
-  assert (Hd_bound : (1 <= Z.of_nat d < p)%Z) by lia.
-  inversion Hzp as [_ Hrel].
+  have Hd_ge2 : (2 <= Z.of_nat d)%Z.
+  { have Hd0 : d <> O by move=> Hd0; rewrite Hd0 /= in Hq; lia.
+    lia. }
+  have Hd_bound : (1 <= Z.of_nat d < p)%Z by lia.
+  case: Hzp => _ Hrel.
   have Hrp := Hrel (Z.of_nat d) Hd_bound.
-  assert (Hgcd1 : Z.gcd (Z.of_nat d) p = 1%Z).
-  { apply Zis_gcd_gcd; [lia|exact Hrp]. }
-  assert (Hgcd_ge : (Z.of_nat d <= Z.gcd (Z.of_nat d) p)%Z).
-  { apply Z.divide_pos_le; [lia|]. apply Z.gcd_greatest; [exists 1; lia | exact Hdz]. }
+  have Hgcd1 : Z.gcd (Z.of_nat d) p = 1%Z by apply: Zis_gcd_gcd; [lia|].
+  have Hgcd_ge : (Z.of_nat d <= Z.gcd (Z.of_nat d) p)%Z.
+  { apply: Z.divide_pos_le; [lia|].
+    by apply: Z.gcd_greatest; [exists 1; lia|]. }
   lia.
 Qed.
 
