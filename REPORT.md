@@ -230,36 +230,25 @@ The Rocq layer consumes:
 
 It verifies, in this order:
 
-1. The shipped Sturm chain is consistent (sign data agrees with direct
-   evaluation on the chain) **and is independently cross-checked
-   against the Brown–Traub PRS recurrence**: for each consecutive
-   triple `(A, B, C)` of chain entries together with the shipped
-   quotient `Q` and `beta`, the identity
-   `lc(B)^d · A ≡ Q·B + beta·C  (mod p)` is verified mod 10
-   distinct ~2³⁰ primes (themselves proved prime in Rocq via Uint63
-   trial division). This is exposed as `Smoke.sturm_chain_real_cross_check`
-   (a thin alias for `CRTCheck.full_prs_chain_verified`) and
-   anchors the entire chain to `charpoly_int` through Rocq's own
-   arithmetic. The chain is therefore no longer just self-consistent;
-   a wrong chain shipped by FLINT would fail this modular PRS
-   identity with overwhelming probability (false positive requires
-   a residual divisible by all 10 primes, i.e. a multiple of a
-   ~2³⁰⁰-bit number). Note that this Qed is **not** consumed by
-   `maynard_eigenvalue_S1` or `maynard_M105_certified`: the L1 IVT
-   proof reads only `signs_at_x0[0]` and `signs_at_inf[0]`, both
-   of which reduce to direct evaluation of `charpoly_int` via
-   `chain_0_matches_charpoly` plus `fl_eq_flint`. The PRS
-   cross-check is *independent* FLINT-data assurance, not part of
-   the headline trust contract.
-2. `V(4/105) - V(+∞) = 1`; hence, by an IVT step, there is a real
-   algebraic root of `charpoly_int` above `4/105`.
-3. `char_poly_int A_int = charpoly_of_A_int` as lists of `Z` (proved via
-   CRT over 710 Uint63 primes).
-4. `pol_to_polyrat charpoly_int = D_q *: char_poly A_rat` in `{poly rat}`,
-   where `A_rat : 'M[rat]_42` is the MathComp-level rational matrix.
-5. Therefore any root of `charpoly_int` is a root of `char_poly A_rat`
-   after clearing the nonzero scalar `D_q`; by `eigenvalue_root_char` +
-   `map_char_poly` that root is an eigenvalue of `A_rat` over `realalg`.
+1. The IVT proof reads `signs_at_x0[0]` and `signs_at_inf[0]` (the
+   sign of `charpoly_int` at `4/105` and at `+∞`); both are anchored
+   to `charpoly_int` by `Smoke.chain_0_matches_charpoly` (the
+   round-trip from the shipped chain entry 0) plus
+   `CRTSigns.signs_at_*_shipped` (BigZ evaluation Qed). Chain
+   entries `1..42` are FLINT-shipped data the headline does not
+   consume; they are not separately validated.
+2. There is a real algebraic root of `charpoly_int` above `4/105`,
+   established by `poly_ivtoo` from `P(4/105) < 0` and
+   `P(cauchy_bound) > 0`.
+3. `char_poly_int A_int = charpoly_of_A_int` as lists of `Z` (proved
+   via CRT over 710 Uint63 primes).
+4. `pol_to_polyrat charpoly_int = D_q *: char_poly A_rat` in
+   `{poly rat}`, where `A_rat : 'M[rat]_42` is the MathComp-level
+   rational matrix.
+5. Therefore any root of `charpoly_int` is a root of
+   `char_poly A_rat` after clearing the nonzero scalar `D_q`; by
+   `eigenvalue_root_char` + `map_char_poly` that root is an
+   eigenvalue of `A_rat` over `realalg`.
 
 ## 3. The Rocq tree, file by file
 
@@ -1112,13 +1101,6 @@ by rewrite eigenvalue_root_char.
 for a ring morphism *f*; `eigenvalue_root_char` says an eigenvalue is
 exactly a root of the char poly.
 
-### L4 — Rescale to `M_{105} > 4`
-
-`maynard_bridge_L4` is the schoolbook rescaling *4 < 105λ ⟺ 4/105 < λ*,
-done as one `rewrite mulrC -ltr_pdivrMr`. Included for reference; the
-headline `Theorem maynard_eigenvalue_S1` states the *4/105 < λ* form
-directly.
-
 ## 6. Trust base
 
 The recommended canonical Print-Assumptions target is
@@ -1173,28 +1155,12 @@ build would stop:
   `M1·A = (D_M1·D_A/D_M2)·M2` identity holds, mod 710 primes.
 - `CRTSigns.signs_at_x0_shipped`, `CRTSigns.signs_at_inf_shipped` —
   the shipped sign vectors agree with direct BigZ evaluation on the
-  shipped Sturm chain.
-- `Smoke.sturm_chain_real_cross_check = true` (a thin alias for
-  `CRTCheck.full_prs_chain_verified`) — every consecutive triple
-  of shipped chain entries satisfies the Brown–Traub PRS identity
-  `lc(B)^d·A ≡ Q·B + beta·C` mod each of 10 distinct ~2³⁰ primes
-  (themselves verified prime via Uint63 trial division). **Unlike
-  the four entries above, this is a probabilistic check, not a
-  Z-level identity.** A wrong chain shipped by FLINT would fail this
-  with overwhelming probability — the false-positive event requires
-  a residual divisible by all 10 primes simultaneously, i.e. by a
-  number exceeding 2³⁰⁰ — but a sufficiently determined adversary
-  who reads the source could in principle craft a chain whose
-  residuals are all such multiples and slip past the check.
-  Note: this Qed is **not** on the critical path of the headline
-  theorem `maynard_M105_certified`. The L1 IVT proof reads only
-  `signs_at_x0[0]` and `signs_at_inf[0]`, both of which reduce to
-  direct evaluation of `charpoly_int` via `chain_0_matches_charpoly`
-  plus `fl_eq_flint` — those are the load-bearing chain facts. The
-  PRS cross-check is *independent* FLINT-data assurance: it makes
-  the shipped chain a real cross-check rather than just internally
-  sign-consistent, but its absence would not weaken the headline
-  trust contract.
+  shipped Sturm chain. The L1 IVT proof reads only `signs_at_x0[0]`
+  and `signs_at_inf[0]`, both anchored to `charpoly_int` via
+  `Smoke.chain_0_matches_charpoly` (entry 0 of the chain matches the
+  cleared char-poly).  Chain entries `1..42` are FLINT-shipped
+  pipeline artefacts that the headline does not consume; they are
+  not separately validated.
 
 Each of these is `Qed` and reduces in pure kernel arithmetic. The
 repository has zero `Axiom` declarations and zero `Admitted` lemmas
@@ -1280,19 +1246,14 @@ L3 (char_poly root → eigenvalue)
   Cert.v   eigenvalue_of_root_realalg
     + MathComp: map_char_poly, eigenvalue_root_char
 
-L4 (ltr_pdivrMr rescale)
-  Cert.v   maynard_bridge_L4
-
 Headline (canonical, end-to-end):
   Cert.v   maynard_M105_certified
-    = all_match_M1Z_true /\ all_match_M2Z_true /\ maynard_eigenvalue_S1
+    = all_match_M1Z_true /\ all_match_M2Z_true
+      /\ M1_spec_rat_eq /\ M2_spec_rat_eq
+      /\ maynard_eigenvalue_S1
 
 Headline (eigenvalue-only sibling, kept for backward compatibility):
   Cert.v   maynard_eigenvalue_S1
-
-Sanity Qeds (§6):
-  Smoke.v      sturm_chain_real_cross_check  (M-3)
-  CRTCheck.v   full_prs_chain_verified       (load-bearing PRS check)
 ```
 
 The dependency graph has roughly two independent backbones that merge at
