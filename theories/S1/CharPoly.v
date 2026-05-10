@@ -1286,7 +1286,7 @@ Proof.
   rewrite (fl_M_expansion Hk').
   rewrite mulmx_sumr mulmx_sumr raddf_sum.
   apply eq_bigr => j _.
-  rewrite /matrix_mxtrace__canonical__Algebra_Additive /=.
+  rewrite -[LHS]/(\tr _)%R.
   rewrite -(scalemxAr (fl_c_rat B j) B).
   rewrite -(scalemxAr (fl_c_rat B j) B).
   rewrite mxtraceZ.
