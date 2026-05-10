@@ -157,17 +157,9 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  apply M1_charpoly_hd_nz. apply intr_rat_eq0.
-  rewrite -(pol_to_polyrat_coef0 _ Hne) -horner_coef0 Hcpi /char_poly.
-  have Hdm := det_map_mx (horner_eval 0) (char_poly_mx (mat_int_to_rat M1_int 1 42)).
-  change (horner_eval 0 (\det (char_poly_mx (mat_int_to_rat M1_int 1 42))) = 0).
-  rewrite -Hdm.
-  have -> : (char_poly_mx (mat_int_to_rat M1_int 1 42) ^ horner_eval 0)%sesqui =
-    - mat_int_to_rat M1_int 1 42.
-  { apply/matrixP => i j. rewrite mxE /char_poly_mx mxE.
-    rewrite GRing.rmorphD /=. rewrite !mxE /horner_eval /=.
-    by rewrite hornerMn hornerX GRing.mul0rn GRing.add0r hornerN hornerC. }
-  by rewrite -scaleN1r detZ Hdet0 GRing.mulr0.
+  apply M1_charpoly_hd_nz; apply: intr_rat_eq0.
+  rewrite -(pol_to_polyrat_coef0 _ Hne) Hcpi.
+  by rewrite char_poly_det Hdet0 mulr0.
 Qed.
 
 (* ================================================================ *)
