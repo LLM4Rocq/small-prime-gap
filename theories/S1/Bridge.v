@@ -14,7 +14,7 @@
 (*  Pre-cleanup, this file also carried ~1300 lines of mods_int /       *)
 (*  pnorm / prem-step / variation-bridge lemmas that fed the abstract   *)
 (*  Sturm-count layer; that layer was retired and the helpers along     *)
-(*  with it.  The file now lives at ~580 lines.                         *)
+(*  with it.  The file now lives at ~510 lines.                         *)
 (* ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -23,6 +23,7 @@ Import ListNotations.
 From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import polyrcf qe_rcf_th realalg.
 Import GRing.Theory Num.Theory.
+Import order.Order.POrderTheory.
 
 From PrimeGapS1 Require Import IntPoly SignChain CharPoly.
 
@@ -51,7 +52,7 @@ Definition threshold_ralg (num den : Z) : realalg :=
 (* product) is only stated there; `realalg` is a realDomainType.       *)
 (* ------------------------------------------------------------------ *)
 
-Section VariationChangesBridge.
+Section SgnMatches.
 
 Variable R : rcfType.
 
@@ -67,7 +68,7 @@ Lemma sgn_matches_Rnz n r : sgn_matches n r -> n <> BinInt.Z0 -> (r != 0)%R.
 Proof. by case=> [H1 _] Hn; apply/eqP => Hr; apply: Hn; apply/H1. Qed.
 
 
-End VariationChangesBridge.
+End SgnMatches.
 
 (* ------------------------------------------------------------------ *)
 (*  Sub-bridge helpers: "sign of `plead p` matches `sgz (lead_coef ...)`"*)
@@ -127,22 +128,22 @@ have Hneg_neg : forall q : positive, ((Z_to_int (Z.neg q))%:~R : realalg) < 0.
 case: n => [|q|q] /=.
 - split; last split.
   + split; first by []. by move=> _.
-  + split; first by []. by rewrite order.Order.POrderTheory.ltxx.
-  + split; first by []. by rewrite order.Order.POrderTheory.ltxx.
+  + split; first by []. by rewrite ltxx.
+  + split; first by []. by rewrite ltxx.
 - split; last split.
   + split; first by [].
-    move=> H; have := Hpos_pos q; by rewrite H order.Order.POrderTheory.ltxx.
+    move=> H; have := Hpos_pos q; by rewrite H ltxx.
   + split; first by [].
-    move=> H; have := Hpos_pos q; by rewrite order.Order.POrderTheory.lt_gtF.
+    move=> H; have := Hpos_pos q; by rewrite lt_gtF.
   + split; first by move=> _; exact: Hpos_pos.
     by [].
 - split; last split.
   + split; first by [].
-    move=> H; have := Hneg_neg q; by rewrite H order.Order.POrderTheory.ltxx.
+    move=> H; have := Hneg_neg q; by rewrite H ltxx.
   + split; first by move=> _; exact: Hneg_neg.
     by [].
   + split; first by [].
-    move=> H; have := Hneg_neg q; by rewrite order.Order.POrderTheory.lt_gtF.
+    move=> H; have := Hneg_neg q; by rewrite lt_gtF.
 Qed.
 
 (* Auxiliary: Z -> realalg lifts nonzero integers to nonzero realalg. *)
@@ -466,22 +467,22 @@ have Hgen2 : forall z, sgn_matches realalg z ((Z_to_int z)%:~R : realalg).
   case: z => [|q|q].
   - split; last split.
     + by split => // _; rewrite /Z_to_int /= mulr0z.
-    + by split => //; rewrite /Z_to_int /= mulr0z order.Order.POrderTheory.ltxx.
-    + by split => //; rewrite /Z_to_int /= mulr0z order.Order.POrderTheory.ltxx.
+    + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
+    + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
   - split; last split.
     + split => //.
-      move=> H; have := Hpos_pos q; by rewrite H order.Order.POrderTheory.ltxx.
+      move=> H; have := Hpos_pos q; by rewrite H ltxx.
     + split => //.
-      move=> H; have := Hpos_pos q; by rewrite order.Order.POrderTheory.lt_gtF.
+      move=> H; have := Hpos_pos q; by rewrite lt_gtF.
     + split; first by move=> _; exact: Hpos_pos.
       by [].
   - split; last split.
     + split => //.
-      move=> H; have := Hneg_neg q; by rewrite H order.Order.POrderTheory.ltxx.
+      move=> H; have := Hneg_neg q; by rewrite H ltxx.
     + split; first by move=> _; exact: Hneg_neg.
       by [].
     + split => //.
-      move=> H; have := Hneg_neg q; by rewrite order.Order.POrderTheory.lt_gtF. }
+      move=> H; have := Hneg_neg q; by rewrite lt_gtF. }
 exact: Hgen2.
 Qed.
 
