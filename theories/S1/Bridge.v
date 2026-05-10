@@ -116,20 +116,23 @@ Proof. by rewrite /pol_to_polyralg pol_to_polyrat_nil rmorph0. Qed.
 
 (* Symbolic sign-matching for a realalg element that comes from an int.
    We split on `n` into its three Z constructors and dispatch each sub-case
-   by reducing to integer-to-real ordering lemmas `ltr0z` / `ltrz0`. *)
-Lemma sgn_matches_int (n : Z) :
-  sgn_matches realalg (sgn_Z n) ((Z_to_int n)%:~R : realalg).
+   by reducing to integer-to-real ordering lemmas `ltr0z` / `ltrz0`.
+   The predicate `sgn_matches` only inspects the comparisons of its first
+   argument with 0, so passing `n` itself yields the same content as
+   passing `sgn_Z n` (cf. corollary `sgn_matches_int`). *)
+Lemma sgn_matches_z (n : Z) :
+  sgn_matches realalg n ((Z_to_int n)%:~R : realalg).
 Proof.
-rewrite /sgn_matches /sgn_Z.
+rewrite /sgn_matches.
 have Hpos_pos : forall q : positive, ((Z_to_int (Z.pos q))%:~R : realalg) > 0.
 { by move=> q; rewrite ltr0z /Z_to_int; apply/ltP/Pos2Nat.is_pos. }
 have Hneg_neg : forall q : positive, ((Z_to_int (Z.neg q))%:~R : realalg) < 0.
 { by move=> q; rewrite ltrz0 /Z_to_int; case: (Pos.to_nat _). }
 case: n => [|q|q] /=.
 - split; last split.
-  + split; first by []. by move=> _.
-  + split; first by []. by rewrite ltxx.
-  + split; first by []. by rewrite ltxx.
+  + by split => // _; rewrite /Z_to_int /= mulr0z.
+  + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
+  + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
 - split; last split.
   + split; first by [].
     move=> H; have := Hpos_pos q; by rewrite H ltxx.
@@ -145,6 +148,18 @@ case: n => [|q|q] /=.
   + split; first by [].
     move=> H; have := Hneg_neg q; by rewrite lt_gtF.
 Qed.
+
+(* Bridge: passing `sgn_Z n` instead of `n` to `sgn_matches` is equivalent,
+   because `sgn_matches` only inspects comparisons with 0. *)
+Lemma sgn_matches_sgn_Z (R : rcfType) (n : Z) (r : R) :
+  sgn_matches R (sgn_Z n) r <-> sgn_matches R n r.
+Proof. by rewrite /sgn_matches /sgn_Z; case: n; intuition congruence. Qed.
+
+(* Corollary in the `sgn_Z`-rewritten form, retained for the four callers
+   that already produced `sgn_Z n` in their goal. *)
+Lemma sgn_matches_int (n : Z) :
+  sgn_matches realalg (sgn_Z n) ((Z_to_int n)%:~R : realalg).
+Proof. by apply/sgn_matches_sgn_Z; exact: sgn_matches_z. Qed.
 
 (* Auxiliary: Z -> realalg lifts nonzero integers to nonzero realalg. *)
 Lemma Z_to_int_realalg_nz (x : Z) :
@@ -446,44 +461,12 @@ rewrite Hp in Hid. rewrite Hp /= in Hdp_pos. simpl.
 clear Hp.
 set H := (pol_to_polyralg p).[_].
 have Hdp_ra_pos : ((Z_to_int dp)%:~R : realalg) > 0 by exact: Hgen.
-(* We want sgn_matches _ v H.
-   By sgn_matches_mul_pos_r, it suffices: sgn_matches _ v (H * dp_ra),
-   where dp_ra = (Z_to_int dp)%:~R.
-   By Hid, H * dp_ra = (Z_to_int v)%:~R, and the sign of that w.r.t. v
-   is sgn_matches_int (after reducing sgn_Z to Z.lt/eq).
-   But sgn_matches_int gives `sgn_matches _ (sgn_Z v) (Z_to_int v)%:~R`,
-   which is sgn_matches of `sgn_Z v`, not `v`. However the two are
-   equivalent on v because `sgn_matches` only uses the comparisons with 0. *)
+(* By sgn_matches_mul_pos_r it suffices to prove sign-matching for
+   H * (Z_to_int dp)%:~R, which Hid rewrites to (Z_to_int v)%:~R; that
+   is exactly `sgn_matches_z v`. *)
 apply: (sgn_matches_mul_pos_r _ _ _ Hdp_ra_pos).
 rewrite Hid. clear Hid H Hdp_ra_pos Hdp_pos Hgen.
-(* Goal: sgn_matches _ v (Z_to_int v)%:~R.
-   Prove by case on v. *)
-have Hgen2 : forall z, sgn_matches realalg z ((Z_to_int z)%:~R : realalg).
-{ move=> z; rewrite /sgn_matches.
-  have Hpos_pos : forall q : positive, ((Z_to_int (Z.pos q))%:~R : realalg) > 0.
-  { by move=> q; rewrite ltr0z /Z_to_int; apply/ltP/Pos2Nat.is_pos. }
-  have Hneg_neg : forall q : positive, ((Z_to_int (Z.neg q))%:~R : realalg) < 0.
-  { by move=> q; rewrite ltrz0 /Z_to_int; case: (Pos.to_nat _). }
-  case: z => [|q|q].
-  - split; last split.
-    + by split => // _; rewrite /Z_to_int /= mulr0z.
-    + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
-    + by split => //; rewrite /Z_to_int /= mulr0z ltxx.
-  - split; last split.
-    + split => //.
-      move=> H; have := Hpos_pos q; by rewrite H ltxx.
-    + split => //.
-      move=> H; have := Hpos_pos q; by rewrite lt_gtF.
-    + split; first by move=> _; exact: Hpos_pos.
-      by [].
-  - split; last split.
-    + split => //.
-      move=> H; have := Hneg_neg q; by rewrite H ltxx.
-    + split; first by move=> _; exact: Hneg_neg.
-      by [].
-    + split => //.
-      move=> H; have := Hneg_neg q; by rewrite lt_gtF. }
-exact: Hgen2.
+exact: sgn_matches_z.
 Qed.
 
 Lemma sign_at_rat_matches (p : pol) (num den : Z) :
