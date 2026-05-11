@@ -1,55 +1,30 @@
 # Maynard `M_{105} > 4` — a Rocq replacement for the Mathematica notebook
 
-[![Blueprint](https://img.shields.io/badge/blueprint-online-blue)](https://gbaudart.github.io/prime_gap/blueprint/)
-[![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
+[![Blueprint CI](https://img.shields.io/github/actions/workflow/status/LLM4Rocq/small-prime-gap/blueprint.yml?branch=main&style=for-the-badge&label=blueprint%20CI)](https://github.com/LLM4Rocq/small-prime-gap/actions/workflows/blueprint.yml)
+[![Blueprint](https://img.shields.io/badge/blueprint-online-blue?style=for-the-badge)](https://gbaudart.github.io/prime_gap/blueprint/)
+[![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red?style=for-the-badge)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
+[![Rocq 9.1.1](https://img.shields.io/badge/rocq-9.1.1-orange?style=for-the-badge)](https://rocq-prover.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg?style=for-the-badge)](https://creativecommons.org/licenses/by/4.0/)
 
-An independently auditable re-implementation of the numerical
-computation underlying **Proposition 4.3 / formula (8.15)** of James
-Maynard's *Small gaps between primes*
-([arXiv:1311.4600](https://arxiv.org/abs/1311.4600); Annals of
-Mathematics **181** (2015), 383--413):
+This repository contains a re-implementation of the numerical
+computation involved in the proof of **Proposition 4.3 / formula (8.15)**` of James Maynard's article *Small gaps between primes*
+(Annals of Mathematics **181** (2015), 383--413), also available as a preprint ([arXiv:1311.4600](https://arxiv.org/abs/1311.4600)). The present README refers to the labels used in this published version of the article. Maynard's proof relies on a (single) computational proof in order to establish a lower bound:
 
-> **`M_{105} = 105 * lambda_max((M2, M1)) > 4`**
+ $$M_{105}  > 4$$
 
-The original proof carries out this numerical step in a Mathematica
-notebook (`Computations.nb`, distributed as supplementary material with
-the arXiv preprint). This repository replaces that Mathematica-based
-computation with two stages:
+where $M_k$ is defined in Proposition 4.2 as the supremum of some expression $E(F)$ over the set of Riemann-integrable functions $F : [0, 1]^k \rightarrow R$ .
 
-1. **A FLINT layer** (Python + `python-flint`) — the **candidate
-   generator**: rebuilds the 42x42 matrices from closed-form Beta
-   integrals (100% of 3528 entries internally verified), computes the
-   characteristic polynomial and Brown-Traub Sturm chain, and emits a
-   JSON certificate.
+In order to obtain this bound, the original proof resorts to an ancillary Mathematica notebook, distributed as supplementary material with
+the [arXiv:1311.4600](https://arxiv.org/abs/1311.4600) preprint.
 
-2. **A Rocq layer** (Rocq 9.1.1 + MathComp 2.5.0 + `mathcomp-real-closed` 2.0.3)
-   — the **verification**: consumes the certificate, kernel-checks every
-   entry against an independent Rocq-side derivation via CRT over 710
-   Uint63 native primes and BigZ evaluation, and proves the headline
-   eigenvalue theorem.
+This re-implementation aims at improving the reproducibility of the calculations, and the confidence in the proof of formula (8.15) by proposing two natures of alternatives:
 
-Only the Rocq layer is in the trust base; the FLINT outputs are inputs
-that the Rocq build cross-checks before accepting.
+1. **A FLINT layer** — This code can be used to perform an analogue computation to the original Mathematica session. In addition, it is used as an **oracle**, producing data that can be loaded as (untrusted) certificates by an independent verifier, in our case a formal proof. The current FLINT code produces several such data, and emits JSON certificates then converted to Rocq source files.
 
-**The headline proof is complete.**
+2. **A Rocq/MathComp layer** — which provides a mechanized version of the (8.15) inequality. The corresponding formal proof is machine-checked by Rocq's kernel. The guarantee relies on the correctness of the Rocq kernel, extended with Uint63 primitive integers and their standard axioms, as well as on the accurateness of the mechanized high-level statement of property (8.15), which has to be audited by a human reviewer. The data produced by the FLINT code is only used as certificates in the Rocq proof, and are thus **not** part of the trusted base of code. The formal verification does not rely on any specific axiom to this project.
 
-- 0 `Admitted` anywhere in the repository.
-- 0 `Axiom` declarations anywhere in the repository.
-- The only assumptions reported by `Print Assumptions
-  maynard_M105_certified` (the recommended end-to-end target; see
-  below) are Rocq's standard PrimInt63 kernel primitives
-  (`PrimInt63.*` / `Uint63Axioms.*`), which come with the compiler.
-  The same holds for the spectral-only sibling
-  `maynard_eigenvalue_S1`.
-- The 42×42 input matrices `M1_int`, `M2_int` are themselves
-  kernel-checked against Maynard's closed-form specification (§8,
-  Lemma 8.2 / eq. 8.4); the FLINT layer is the candidate generator,
-  not part of the trust base.
-
-This project does not change Maynard's computation; the contribution
-is the assurance level.
-
-## The headline theorem
+## The headline theorems
 
 ```rocq
 Theorem maynard_eigenvalue_S1 :
@@ -59,14 +34,14 @@ Theorem maynard_eigenvalue_S1 :
 Proof. (* L1 + L2 + L3 *) Qed.
 ```
 
-The full end-to-end trust contract is also packaged in a single Qed,
-which conjoins the closed-form match of the input matrices with the
-spectral bound:
+The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). This last step consists in checking that the computation-friendly version of each matrix agrees with its deduction-friendly version, which in turn essentially consists in changing the datastructure respectively used for integers and for matrices.
+
+Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as definitions for the coefficients of matrices `M1` and `M2` :
 
 ```rocq
 Theorem maynard_M105_certified :
-  all_match_M1Z = true /\
-  all_match_M2Z = true /\
+  MaynardVerify.all_match_M1Z = true /\
+  MaynardVerify.all_match_M2Z = true /\
   (forall i j : nat,
      MaynardSpec.M1_spec_ij i j
      = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
@@ -76,66 +51,24 @@ Theorem maynard_M105_certified :
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* assembled from the four Z-level / paper-form bridge facts
-          and `maynard_eigenvalue_S1` *) Qed.
+Proof. (* MaynardVerify.all_match_M{1,2}Z_true
+        + MaynardSpecBridge.M{1,2}_spec_rat_eq
+        + maynard_eigenvalue_S1 *) Qed.
 ```
 
-A single `Print Assumptions maynard_M105_certified` therefore covers
-both the 1764 + 1764 input-matrix entries (each kernel-checked against
-Maynard's closed form) and the eigenvalue-above-`4/105` statement.
-
-## What this proves, and what stays paper-side
-
-The contractual chain underlying `M_{105} > 4`:
-
-```
-   [ Rocq, kernel-checked  ]            [ Maynard's paper, Lemma 8.3 ]
-
-   λ_max(M₁⁻¹M₂) > 4/105      ────►     M_{105} = 105·λ_max > 4
-```
-
-This Rocq project closes the **left box** with kernel assurance — the
-same step the Mathematica notebook closes (the notebook uses a
-rational Rayleigh-quotient witness; we use IVT on
-`char_poly(M₁⁻¹M₂)`). The right arrow is Maynard's Lemma 8.3
-(`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`), proved in the Annals
-paper and refereed there; it is **not** formalised here. The
-project's scope is to replace the Mathematica computation, not to
-re-formalise Maynard's paper.
-
-Concretely:
-
-- A reader who trusts **Rocq's kernel + Maynard's Annals paper** gets
-  `M_{105} > 4` end-to-end.
-- A reader who trusts **only Rocq's kernel** gets `λ_max > 4/105` for
-  a specific kernel-verified 42×42 ℚ-matrix pencil — the
-  harder-to-trust half of Maynard's original argument, now
-  machine-checked.
-
-## Auditor's checklist
-
-See [`AUDITOR_CHECKLIST.md`](./AUDITOR_CHECKLIST.md) for the full
-8-row table mapping each claim to its Maynard-paper reference and the
-Rocq lemma backing it.
+A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
 
 ## Relation to Maynard's notebook
 
-Maynard's `Computations.nb` certifies `M_{105} > 4` via the *eigenvector
-route*: Mathematica numerically computes the top eigenvector of
-`M₁⁻¹M₂`, snaps it to a small-denominator rational vector, and
-evaluates the Rayleigh quotient `k · vᵀM₂v / vᵀM₁v` in exact rational
-arithmetic — a true rigorous lower bound on `λ_max(M₁⁻¹M₂)` regardless
-of how *v* was obtained. This project takes the *characteristic
-polynomial route* instead: IVT on `char_poly(M₁⁻¹M₂)` (using
-mathcomp-real-closed's `poly_ivtoo`) certifies a real-algebraic root
-strictly above `4/105`, without ever constructing an eigenvector. The
-IVT proof evaluates `charpoly_int` directly at the lower endpoint
-`4/105` (sign `-1`, by `vm_compute`) and uses the positivity of the
-leading coefficient at MathComp's `cauchy_bound`; no shipped Sturm
-chain is consumed. Both routes fit Maynard's §8 framework (Lemma 8.2
-+ Lemma 8.3); see `REPORT.md` §1.4 for the detailed comparison.
+Maynard's original Mathematica notebook `Computations.nb` essentially defines a certain 42x42 matrix, from the formulas provided by Lemmas (8.1) and (8.2), and computes a well-chosen eigenvector. Then, its snaps this vector to a small-denominator rational vector `v`, and evaluates the Rayleigh quotient of the matrix at `v`, using exact rational arithmetic. The value obtained is greater than 4, which provides a rigorous lower bound on the eignevalues of the initial matrix, where rigorous here should be understood in the sense of rigorous computation.
 
-## Repository layout
+In the current state of this project, the mechanized proof takes a different route. It consists in computing the characteristic
+polynomial of the same matrix, before applying the intermediate value theorem. As the size of the coefficients in the initial matrix are big, computing the characteristic polynomial is delicate. The formal proof thus compares modulo enough big primes the value obtained by the FLINT code with that obtained by a Rocq implementation of the Faddeev-Le Verrier algorithm, and concludes via the Chinese Reminder Theorem.
+
+
+## Repository layout and disclaimer
+Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:
+
 
 ```
 prime_gap/
@@ -144,6 +77,7 @@ prime_gap/
 +-- README.md                       this file
 +-- REPORT.md                       detailed technical walkthrough
 +-- SPEC_TO_PAPER.md                line-level mapping MaynardSpec -> arXiv §8
++-- AUDITOR_CHECKLIST.md            claim-to-Rocq-lemma audit table
 +-- _CoqProject                     .v files in dependency order
 |
 +-- notebook_reconstructed.md       reconstructed Mathematica notebook
@@ -155,7 +89,7 @@ prime_gap/
 |   +-- m1m2.pkl                    cached exact-rational M1, M2
 |   +-- certificate.json            small certificate (~510 KB)
 |
-+-- theories/S1/                    Rocq files (22 .v files)
++-- theories/S1/                    23 top-level .v files + 14 chunk files
     +-- Recompose.v                 bigZ <-> Z helpers
     +-- Witness.v                   certificate data (autogenerated)
     |
@@ -194,6 +128,7 @@ prime_gap/
 ```
 
 ## Prerequisites
+Here are the generated prerequisite informations:
 
 - **Python >= 3.11** + **`python-flint` 0.8.0**
 - **Rocq 9.1.1** with: `rocq-mathcomp-ssreflect`, `rocq-mathcomp-algebra`,
@@ -204,20 +139,22 @@ prime_gap/
 - Or simply: `opam install ./coq-prime-gap.opam --deps-only`
 
 ## How to use
+Here are the generated instructions. Note that running the Rocq verification **does not** require executing the FLINT code first. Timings are wall-clock measurements on a 16 GB / 6-thread machine.
 
 ```bash
 # 1. FLINT audit (optional -- certificates pre-built)
 source .venv/bin/activate && python python/build_certificate.py
 
 # 2. Regenerate Rocq witness files (optional -- pre-built)
-python python/json_to_v.py --with-chain
+python python/json_to_v.py
 
-# 3. Build all Rocq files (~24 min with `make -j` on a multi-core box).
-#    The two heaviest phases each split into 6 parallel chunks:
+# 3. Build all Rocq files (~28 min with `make -j6`, ~62 min with `make -j2`).
+#    The two heaviest phases each split into 6 parallel chunks so that
+#    they overlap under `make -j6`:
 #      - CharPolyAgree/Chunk_0..5.v    710-prime CRT checks
 #      - MaynardVerify/M2_0..5.v       42x42 M2 spec cross-check (7 rows each)
 coq_makefile -f _CoqProject -o Makefile
-make -j
+make -j6
 
 # 4. Verify the end-to-end theorem has no project-specific axioms.
 #    `maynard_M105_certified` is the recommended target: it conjoins
@@ -238,48 +175,6 @@ coqtop -Q theories/S1 PrimeGapS1 \
 ./verify.sh
 ```
 
-## Trust base
-
-The Rocq verification trusts only:
-- Rocq's kernel, including its standard `PrimInt63` / `Uint63Axioms`
-  primitive-integer interface. This footprint is the unavoidable cost
-  of any `vm_compute`-driven proof in modern Rocq and is listed by
-  `Print Assumptions` on every `vm_compute`-using lemma in this
-  project. **No project-specific axioms are introduced.**
-
-There are zero `Axiom` or `Admitted` lemmas anywhere in the repository.
-This includes the 42x42 input matrices: the headline
-`maynard_M105_certified` conjoins (i) the Z-level cross-multiplication
-match `all_match_M{1,2}Z = true` (`MaynardVerify.v`, vm_compute), (ii)
-the rat-level paper-form bridge `M{1,2}_spec_rat_eq` from
-`MaynardSpecBridge.v` (Qed, *Closed under the global context* — no
-axioms at all, not even `Uint63`), and (iii) the eigenvalue bound. So a
-single `Print Assumptions maynard_M105_certified` certifies that the
-FLINT-shipped integer matrices `M1_int`, `M2_int` agree with the
-rat-level paper-form `MaynardSpec.M{1,2}_entry` (which transcribes
-Maynard's Lemma 8.2 character-for-character) and that the resulting
-rational pencil has a real-algebraic eigenvalue strictly above `4/105`.
-
-The basis itself is also kernel-pinned: `MaynardBasis.maynard_basis_spec`
-certifies that the 42-element list contains exactly the multiset
-`{(b, c) ∈ ℕ² : b + 2c ≤ 11}` (a reviewer reads only the predicate
-`b + 2c ≤ 11`, not the literal list), and `maynard_basis_eq_witness`
-pins the *ordering* to the FLINT-shipped indexing (a vm_compute-Qed,
-needed because matrix rows/columns are read by integer index).
-
-The FLINT layer is **not** in the trust base of the Rocq proof. It
-serves only as (a) the candidate generator for the certificate data
-and (b) an independent cross-check. If the FLINT layer shipped wrong
-data on any of the *load-bearing* artefacts (the M1/M2 matrix entries
-or the cleared characteristic polynomial), the build would fail at one
-of the `vm_compute` checks. The IVT proof in `CertL1.v` evaluates
-`charpoly_int` directly at `4/105` (sign read by `vm_compute`) and at
-MathComp's `cauchy_bound` (sign from leading coefficient); no shipped
-Sturm chain or sign-vector data is consumed.
-
-See `SPEC_TO_PAPER.md` for a line-level mapping from the
-`MaynardSpec.{compositions, cff, G_2, alpha, M1_entry, M2_entry}` definitions
-back to arXiv:1311.4600 v3 §8.
 
 ## License
 
