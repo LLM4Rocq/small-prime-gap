@@ -10,6 +10,24 @@ Import ListNotations.
 From PrimeGapS1 Require Import Recompose.
 Open Scope Z_scope.
 
+(* The 42 basis monomials (b, c) with b + 2c <= 11, in the order used by
+   FLINT to lay out the M1_int / M2_int rows and columns.  Pinned to the
+   hand-listed `MaynardBasis.maynard_basis` by `maynard_basis_eq_witness`
+   so an auditor never has to manually check the 42 (b, c) pairs against
+   the FLINT enumeration. *)
+Definition basis : list (nat * nat) :=
+  [ (0%nat, 0%nat); (1%nat, 0%nat); (0%nat, 1%nat); (2%nat, 0%nat)
+  ; (1%nat, 1%nat); (3%nat, 0%nat); (0%nat, 2%nat); (2%nat, 1%nat)
+  ; (4%nat, 0%nat); (1%nat, 2%nat); (3%nat, 1%nat); (5%nat, 0%nat)
+  ; (0%nat, 3%nat); (2%nat, 2%nat); (4%nat, 1%nat); (6%nat, 0%nat)
+  ; (1%nat, 3%nat); (3%nat, 2%nat); (5%nat, 1%nat); (7%nat, 0%nat)
+  ; (0%nat, 4%nat); (2%nat, 3%nat); (4%nat, 2%nat); (6%nat, 1%nat)
+  ; (8%nat, 0%nat); (1%nat, 4%nat); (3%nat, 3%nat); (5%nat, 2%nat)
+  ; (7%nat, 1%nat); (9%nat, 0%nat); (0%nat, 5%nat); (2%nat, 4%nat)
+  ; (4%nat, 3%nat); (6%nat, 2%nat); (8%nat, 1%nat); (10%nat, 0%nat)
+  ; (1%nat, 5%nat); (3%nat, 4%nat); (5%nat, 3%nat); (7%nat, 2%nat)
+  ; (9%nat, 1%nat); (11%nat, 0%nat) ].
+
 (* M1[i,j] = M1_int[i][j] / D_M1.  Symmetric, positive definite over Q. *)
 Definition D_M1 : Z := 308857268757354722981071348762547160366309450679454185367644461515697994870656196471123363056046190863367713133901668592148625627226398911869086360030375176344316428167833190400000000000000000000000000000%Z.
 
