@@ -60,10 +60,12 @@ snaps it to a small-denominator rational vector, and evaluates the
 Rayleigh quotient $k\cdot v^T M_2 v / v^T M_1 v$ in exact rational
 arithmetic. This is a true rigorous lower bound regardless of how~$v$
 is obtained. Our Rocq proof takes the \emph{characteristic-polynomial
-route}: a Brown--Traub Sturm chain on $\charpolysym_{\Arat}$ certifies
-the existence of an eigenvalue strictly above $4/105$ via 1-D root
-counting (intermediate value theorem). No eigenvector is constructed.
-Both routes are sound; together, they form an independent
+route}: the intermediate value theorem on $\charpolysym_{\Arat}$
+certifies the existence of an eigenvalue strictly above $4/105$ from
+just the sign of the polynomial at the lower endpoint (negative, by
+direct \vmcompute{}) and at MathComp's \texttt{cauchy\_bound} (positive,
+from the leading-coefficient sign). No eigenvector or Sturm chain is
+constructed. Both routes are sound; together, they form an independent
 double-check of Maynard's headline value $\Mk[105] \approx 4.0021$.
 
 \paragraph{How to read this blueprint.}
@@ -817,74 +819,41 @@ indispensable.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The Sturm-chain root extraction}\label{ch:sturm}
+\chapter{The IVT root extraction}\label{ch:sturm}
 
 This chapter constructs an explicit real algebraic root of
 $\texttt{charpoly\_int}$ above $4/105$. The strategy is the
 \emph{intermediate value theorem} on a real-closed field: we show
-$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from the
-shipped sign vectors, and let MathComp's \texttt{poly\_ivtoo} produce
-a root in the interval. The material lives in \texttt{SignChain.v},
-\texttt{CRTSigns.v}, \texttt{Smoke.v}, \texttt{Bridge.v} and
-\texttt{CertL1.v}.
+$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from two direct
+\vmcompute{} sign Qeds on $\texttt{charpoly\_int}$ itself, and let
+MathComp's \texttt{poly\_ivtoo} produce a root in the interval. The
+material lives in \texttt{SignChain.v}, \texttt{Bridge.v} and
+\texttt{CertL1.v}; no Sturm chain is shipped or consumed.
 
-\section{The shipped Sturm chain}
+\section{Endpoint signs of \texttt{charpoly\_int}}
 
-The 43-polynomial Sturm chain that the FLINT layer ships in
-\texttt{WitnessChain.v} is the Brown--Traub PRS chain of
-\texttt{charpoly\_int} (\textbf{up to sign convention}); the
-headline IVT proof reads only entry $0$ of the chain, anchored to
-\texttt{charpoly\_int} by Lemma~\ref{lem:chain_0_matches}.
-
-\section{Anchoring \texttt{chain[0]} to \texttt{charpoly\_int}}
-
-\begin{lemma}[Chain anchors to \texttt{charpoly\_int}]
-\label{lem:chain_0_matches}
-\rocq{PrimeGapS1.Smoke.chain_0_matches_charpoly}
+\begin{lemma}[Sign at $4/105$]\label{lem:signs_at_x0}
+\rocq{PrimeGapS1.CertL1.sign_at_rat_charpoly}
 \rocqok
-\uses{def:sturm_chain}
-$\texttt{sturm\_chain}\,[0] = \texttt{charpoly\_int}$,
-i.e.\ the first entry of the shipped chain equals the cleared
-characteristic polynomial.
+$\texttt{sign\_at\_rat}\,\texttt{charpoly\_int}\,4\,105 = -1$.
+Equivalently, $\sgn(\texttt{charpoly\_int}(4/105)) = -1$, i.e.\
+$P(4/105) < 0$.
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} on a list of $43$ \BigZ\ coefficients.
+\vmcompute{} on the $43$-entry $\Z$-list \texttt{charpoly\_int}
+evaluated by \texttt{peval\_at\_rat} (clears the denominator and
+returns $105^{42}\cdot P(4/105)$, whose sign is $-1$).
 \end{proof}
 
-\begin{remark}[Chain entries 1--42 are pipeline artefacts]
-The IVT proof reads only $\texttt{signs\_at\_x0}[0]$ and
-$\texttt{signs\_at\_inf}[0]$, both anchored to $\texttt{charpoly\_int}$
-via Lemma~\ref{lem:chain_0_matches} plus the $\texttt{signs\_at\_*\_shipped}$
-agreements. Chain entries $1..42$ are FLINT-shipped data that the
-headline does not consume, and are not separately validated.
-\end{remark}
-
-\section{Sign vectors agree with the chain}
-
-\begin{lemma}[Shipped signs at $4/105$ are correct]\label{lem:signs_at_x0}
-\rocq{PrimeGapS1.CRTSigns.signs_at_x0_shipped}
+\begin{lemma}[Sign at $+\infty$]\label{lem:signs_at_inf}
+\rocq{PrimeGapS1.CertL1.sign_at_pinf_charpoly}
 \rocqok
-\uses{def:sturm_chain}
-For every $i$, the $i$-th entry of \texttt{signs\_at\_x0} equals
-$\sgn(P_i(4/105))$, where $P_i$ is the $i$-th polynomial of the
-shipped Sturm chain. Verified by direct \BigZ\ evaluation.
+$\texttt{sign\_at\_pinf}\,\texttt{charpoly\_int} = +1$.
+Equivalently, $\sgn(\lcoeff(\texttt{charpoly\_int})) = +1$ (the
+leading coefficient is positive).
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} on the chain (${\sim}1$~s total): each polynomial of the
-chain has up to ${\sim}200{,}000$-bit coefficients, but \BigZ\ uses
-native word arrays under \vmcompute{}.
-\end{proof}
-
-\begin{lemma}[Shipped signs at $+\infty$ are correct]
-\label{lem:signs_at_inf}
-\rocq{PrimeGapS1.CRTSigns.signs_at_inf_shipped}
-\rocqok
-\uses{def:sturm_chain}
-The $i$-th entry of \texttt{signs\_at\_inf} equals
-$\sgn(\lcoeff(P_i))$, the sign of the leading coefficient.
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} on $43$ leading coefficients.
+\vmcompute{} reads the sign of \texttt{plead\,charpoly\_int}.
 \end{proof}
 
 \section{IVT: a root exists above \texorpdfstring{$4/105$}{4/105}}
@@ -892,8 +861,7 @@ $\sgn(\lcoeff(P_i))$, the sign of the leading coefficient.
 \begin{theorem}[L1: IVT root]\label{thm:maynard_L1}
 \rocq{PrimeGapS1.CertL1.maynard_L1_concrete}
 \rocqok
-\uses{def:sturm_chain, lem:signs_at_x0, lem:signs_at_inf,
-      lem:chain_0_matches}
+\uses{lem:signs_at_x0, lem:signs_at_inf}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda
@@ -906,30 +874,26 @@ The proof rests on MathComp's intermediate value theorem
 \texttt{poly\_ivtoo} on a real-closed field. We need two sign facts at
 the endpoints:
 
-\textbf{Lower endpoint.} The first entry of \texttt{signs\_at\_x0} is
-$-1$ (verified by \vmcompute{} on the $\Z$-list). By
-Lemma~\ref{lem:signs_at_x0}, this is $\sgn(P_0(4/105))$ where
-$P_0 = \texttt{charpoly\_int}$, hence $P_0(4/105) < 0$.
+\textbf{Lower endpoint.} Lemma~\ref{lem:signs_at_x0} gives
+$\sgn(P(4/105)) = -1$, hence $P(4/105) < 0$ (via the
+\texttt{sgn\_matches}-style bridges in \texttt{Bridge.v}).
 
-\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P_0)$,
-MathComp's explicit rational upper bound for all real roots of $P_0$
-derived from its coefficients. Two facts: $P_0 \ne 0$ (it has degree
-$42$) and the first entry of \texttt{signs\_at\_inf} is $+1$ (by
-Lemma~\ref{lem:signs_at_inf}, $\sgn(\lcoeff(P_0)) = +1$). Since $cb$
-is a strict upper bound for all roots, $\sgn(P_0(cb)) = \sgn(\lcoeff(P_0)) = +1$,
-hence $P_0(cb) > 0$.
+\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P)$,
+MathComp's explicit rational upper bound for all real roots of $P$
+derived from its coefficients. Two facts: $P \ne 0$ (its leading
+coefficient is nonzero by Lemma~\ref{lem:signs_at_inf}) and
+$\sgn(\lcoeff(P)) = +1$. Since $cb$ is a strict upper bound for all
+roots, $\sgn(P(cb)) = \sgn(\lcoeff(P)) = +1$, hence $P(cb) > 0$.
 
-\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P_0(x) = 0$.
-Since $P_0(4/105) < 0$ but $P_0(x) = 0$, $x \ne 4/105$, hence
+\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P(x) = 0$.
+Since $P(4/105) < 0$ but $P(x) = 0$, $x \ne 4/105$, hence
 $4/105 < x$. Setting $\lambda := x$ closes the existential.
 \end{proof}
 
 \begin{remark}
-This is \emph{IVT}, not the full Sturm theorem: we only need the
-existence of some root above the threshold, not the exact count. The
-Sturm count $V(4/105) - V(+\infty) = 1$ confirms uniqueness but is
-mathematically superfluous for $L_4$. The bridge from
-\texttt{list Z}-level signs to MathComp's
+This is \emph{IVT}, not a Sturm-count proof: we only need the
+existence of some root above the threshold, not any count. The
+bridge from \texttt{list Z}-level signs to MathComp's
 $\texttt{sgp\_pinfty}$ / polynomial-value signs is supplied by
 \texttt{Bridge.v} (\texttt{pol\_to\_polyralg}, the
 $\texttt{sgn\_matches}$-style lemmas, \texttt{cauchy\_bound}
@@ -1203,10 +1167,9 @@ of a slightly longer build (the dominant \texttt{fl\_crt\_bound}
 The FLINT pipeline (Python + \texttt{python-flint}) is the candidate
 generator for the certificate data and an independent cross-check, but
 the Rocq proof never invokes Python and never loads the JSON
-certificates directly. The autogenerated \texttt{Witness.v} and
-\texttt{WitnessChain.v} are ordinary Rocq files; if the FLINT layer
-shipped wrong data, one of the following \vmcompute{}-based checks
-would fail:
+certificate directly. The autogenerated \texttt{Witness.v} is an
+ordinary Rocq file; if the FLINT layer shipped wrong data, one of the
+following \vmcompute{}-based checks would fail:
 \begin{itemize}
 \item Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}: the
   $42 \times 42$ matrix entries match Maynard's closed form
@@ -1216,10 +1179,10 @@ would fail:
 \item \texttt{matrix\_identity\_710}: the shipped denominator-clearing
   matrix identity holds modulo each of $710$ primes.
 \item Lemmas~\ref{lem:signs_at_x0} and~\ref{lem:signs_at_inf}: the
-  shipped sign vectors agree with direct \BigZ\ evaluation on the
-  shipped Sturm chain.
-\item Lemma~\ref{lem:chain_0_matches}: $\texttt{chain}[0] =
-  \texttt{charpoly\_int}$ (the only chain entry the IVT proof reads).
+  signs of \texttt{charpoly\_int} at $4/105$ and at $+\infty$ are
+  $-1$ and $+1$ respectively, by direct \vmcompute{} on the integer
+  list. These two facts feed the endpoint signs into
+  \texttt{poly\_ivtoo}.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.
 
@@ -1265,17 +1228,17 @@ introduced.
 \item \texttt{check\_charpoly\_710}, \texttt{matrix\_identity\_710}:
   ${\sim}5$--$10$~min each — $710 \times 42$-step modular FL.
 \item Theorem~\ref{thm:M1_match}: ${\sim}90$~s.
-\item \texttt{Witness.v}/\texttt{WitnessChain.v} parsing: ${\sim}1$~min
-  — \BigZ\ literal parser on ${\sim}20$~MB of shipped integers.
+\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal parser
+  on the shipped \texttt{charpoly\_of\_A\_int\_bigZ} integers.
 \end{itemize}
 With \texttt{make -j} the M2 \vmcompute{} runs concurrently with the
 CRT primality and 710-FL phases, so it does not strictly add
 $35$ minutes to the wall clock — but it dominates the tail.
 
-\paragraph{Project size.} $26$ \texttt{.v} files, ${\sim}19{,}200$
-lines total: ${\sim}7{,}500$ autogenerated certificate data
-(\texttt{Witness.v} + \texttt{WitnessChain.v}) and ${\sim}11{,}700$
-hand-written proof script.
+\paragraph{Project size.} $22$ \texttt{.v} files plus $12$ in two
+parallel-chunk subdirectories, ${\sim}13{,}000$ lines total under
+\texttt{theories/S1/}; \texttt{Witness.v} alone is ${\sim}5{,}700$
+lines of autogenerated certificate data.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
@@ -1283,10 +1246,9 @@ hand-written proof script.
 The dependency graph has two independent backbones merging at
 \texttt{Cert.v}:
 
-\paragraph{Sturm-chain backbone.}
-\texttt{Witness} $\to$ \texttt{WitnessChain} $\to$
-\texttt{IntPoly} / \texttt{SignChain} $\to$
-\texttt{CRTSigns} $\to$ \texttt{Bridge} $\to$ \texttt{CertL1}.
+\paragraph{IVT backbone.}
+\texttt{Witness} $\to$ \texttt{IntPoly} / \texttt{SignChain} $\to$
+\texttt{Bridge} $\to$ \texttt{CertL1}.
 Headline output: Theorem~\ref{thm:maynard_L1}.
 
 \paragraph{CharPoly backbone.}
