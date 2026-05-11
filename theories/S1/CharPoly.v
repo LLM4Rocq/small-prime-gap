@@ -10,9 +10,10 @@
 
    This Definition assumes the input is a square matrix. If so,
    all integer divisions by `k` performed during the recurrence are
-   exact (a classical identity from the Faddeev-LeVerrier proof;
-   proof postponed to a later sprint), and `Z.div` returns the
-   correct rational value.
+   exact (a classical identity from the Faddeev-LeVerrier proof),
+   and `Z.div` returns the correct rational value. The exactness is
+   discharged inside `char_poly_int_correct` (Qed below at the end
+   of this file) via `fl_divisibility_L2`.
 
    Dependencies:
    - PrimeGapS1.IntPoly (list Z polynomial library, by another agent)
@@ -71,8 +72,9 @@ From PrimeGapS1 Require Import IntPoly IntMat.
 
      [c_0; c_1; ...; c_{n-1}; 1]
 
-   Key identity used to justify `Z.div` (proof deferred):
-   at every step, `trace(A * M_k)` is divisible by `k` over Z.
+   Key identity used to justify `Z.div` (discharged below in
+   `fl_divisibility_L2`): at every step, `trace(A * M_k)` is
+   divisible by `k` over Z.
    ================================================================== *)
 
 (* One iteration of Faddeev-LeVerrier.

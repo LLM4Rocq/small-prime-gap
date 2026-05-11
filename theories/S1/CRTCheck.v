@@ -4,12 +4,6 @@
 (*  CRT (Chinese Remainder Theorem) helper lemmas used by CRTLift.v *)
 (*  to lift modular agreement (over 710 Uint63 primes) to identity  *)
 (*  over Z.                                                         *)
-(*                                                                  *)
-(*  The headline maynard_M105_certified takes the IVT route through *)
-(*  CertL1.maynard_L1_concrete; chain entries 1..42 of the shipped  *)
-(*  Sturm chain are not consumed by the headline.  The 10-prime PRS *)
-(*  cross-check that earlier validated those entries was retired in *)
-(*  the cleanup branch.                                             *)
 (* ============================================================== *)
 
 From Stdlib Require Import Uint63 ZArith List Bool Lia Znumtheory.

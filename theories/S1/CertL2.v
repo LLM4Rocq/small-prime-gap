@@ -2,9 +2,9 @@
 
    All lemmas in this file are Qed; no admits, no project axioms.
    The CRT lift (fl_eq_flint, matrix_identity_Z) is proved from
-   710-prime modular agreement plus the Hadamard-style coefficient
-   bound (see max_abs_entry_mzero and charpoly_coeff_bound_small
-   upstream in CRTLift.v). *)
+   710-prime modular agreement plus the FL-recurrence-based
+   coefficient bound (see max_abs_entry_mzero and
+   charpoly_coeff_bound upstream in CRTLift.v). *)
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 Import ListNotations.
@@ -41,7 +41,7 @@ Proof. by move=> i Hi; move: M1_int_rows_42; rewrite List.forallb_forall =>
    imports, avoiding scope issues.  The coefficient bound used there
    comes from the FL (Faddeev–LeVerrier) recurrence combined with the
    max_abs_entry bound on the input matrix; see
-   charpoly_fl_recurrence_bound / max_abs_entry_mzero in CRTLift.v. *)
+   charpoly_coeff_bound / max_abs_entry_mzero in CRTLift.v. *)
 Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
     List.fold_left (fun acc2 x => Z.max acc2 (Z.abs x)) row acc) M BinNums.Z0.
