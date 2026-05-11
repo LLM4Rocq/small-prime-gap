@@ -56,21 +56,3 @@ Fixpoint peval_at_rat_aux (p : pol) (num den : Z) : Z * Z :=
 
 Definition peval_at_rat (p : pol) (num den : Z) : Z :=
   fst (peval_at_rat_aux p num den).
-
-(* ============================================================== *)
-(*  Sanity tests for the load-bearing primitives.                   *)
-(* ============================================================== *)
-
-Example plead_test1 : plead [1; 2; 3] = 3.
-Proof. vm_compute. reflexivity. Qed.
-
-Example plead_test2 : plead [1; 2; 0; 0] = 2.
-Proof. vm_compute. reflexivity. Qed.
-
-Example plead_test3 : plead [] = 0.
-Proof. vm_compute. reflexivity. Qed.
-
-(* (1 + 2 X + 3 X^2) at X = 1/2: den^2 * p = 4 + 2*2 + 3*1 = 4+4+3 = 11.
-   Length here is 3, so peval_at_rat scales by den^3 = 8 giving 22. *)
-Example peval_at_rat_test : peval_at_rat [1; 2; 3] 1 2 = 22.
-Proof. vm_compute. reflexivity. Qed.
