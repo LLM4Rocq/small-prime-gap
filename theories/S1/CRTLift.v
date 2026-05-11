@@ -868,15 +868,6 @@ Proof. exact (forallb_all_rows_len 42%nat A_int A_int_rows_42). Qed.
 Lemma M2_int_wf : all_rows_len 42%nat M2_int.
 Proof. exact (forallb_all_rows_len 42%nat M2_int M2_int_rows_42). Qed.
 
-Lemma mmul_M1_A_wf : all_rows_len 42%nat (mmul M1_int A_int).
-Proof. apply all_rows_len_mmul; [exact A_int_dim | exact A_int_wf]. Qed.
-
-Lemma lhs_mat_wf : all_rows_len 42%nat (mscale D_M2 (mmul M1_int A_int)).
-Proof. apply all_rows_len_mscale. exact mmul_M1_A_wf. Qed.
-
-Lemma rhs_mat_wf : all_rows_len 42%nat (mscale (Z.mul D_M1 D_A) M2_int).
-Proof. apply all_rows_len_mscale. exact M2_int_wf. Qed.
-
 (* === Per-prime matrix agreement via deductive chain ===
    Uses matrix_identity_710 + mscale_mod_sound + mmul_mod_sound.
    All Uint63 modular, no Z-level matrix computation. *)

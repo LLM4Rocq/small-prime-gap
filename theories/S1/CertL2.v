@@ -2,9 +2,9 @@
 
    All lemmas in this file are Qed; no admits, no project axioms.
    The CRT lift (fl_eq_flint, matrix_identity_Z) is proved from
-   710-prime modular agreement plus the Hadamard-style coefficient
-   bound (see max_abs_entry_mzero and charpoly_coeff_bound_small
-   upstream in CRTLift.v). *)
+   710-prime modular agreement plus the FL-recurrence-based
+   coefficient bound (see max_abs_entry_mzero and
+   charpoly_coeff_bound upstream in CRTLift.v). *)
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
 Import ListNotations.
@@ -43,7 +43,7 @@ Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall i
    imports, avoiding scope issues.  The coefficient bound used there
    comes from the FL (Faddeev–LeVerrier) recurrence combined with the
    max_abs_entry bound on the input matrix; see
-   charpoly_fl_recurrence_bound / max_abs_entry_mzero in CRTLift.v. *)
+   charpoly_coeff_bound / max_abs_entry_mzero in CRTLift.v. *)
 Definition max_abs_entry (M : list (list Z)) : Z :=
   List.fold_left (fun acc row =>
     List.fold_left (fun acc2 x => Z.max acc2 (Z.abs x)) row acc) M BinNums.Z0.
@@ -59,7 +59,7 @@ Opaque Z_to_int.
 
 Lemma pol_to_polyrat_coef0 (l : list Z) :
   l <> @nil Z -> (pol_to_polyrat l)`_0 = (Z_to_int (head Z0 l))%:~R :> rat.
-Proof. destruct l as [|z l']; [tauto | ]. move=> _. rewrite /pol_to_polyrat coef_Poly /=. reflexivity. Qed.
+Proof. by case: l => [//|z l'] _; rewrite /pol_to_polyrat coef_Poly. Qed.
 
 Lemma intr_rat_eq0 (D : BinInt.Z) : (Z_to_int D)%:~R = 0 :> rat -> D = Z0.
 Proof. Transparent Z_to_int. move/eqP. rewrite intr_eq0 => /eqP H.
@@ -91,25 +91,13 @@ Proof. move=> HD; apply/eqP => Hz. apply HD.
   - injection Hz => Hz'. have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
   - discriminate Hz. Qed.
 
-Lemma Z_to_int_unit' (D : BinInt.Z) :
-  D <> BinInt.Z0 -> (Z_to_int D)%:~R \is a @GRing.unit rat.
-Proof. move=> HD. rewrite GRing.unitfE intr_eq0. exact: Z_to_int_neq0'. Qed.
-
 (* ================================================================ *)
 (*  M1 invertibility                                                   *)
 (* ================================================================ *)
 
-(* Z-level primality checker for ~10^9 primes (0.6s via vm_compute) *)
-Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
-  match fuel with
-  | O => true
-  | S f => negb (Z.eqb (Z.modulo p d) 0) && check_no_divisor p (d + 1) f
-  end.
-Definition check_prime_Z (p : Z) : bool :=
-  (1 <? p)%Z && check_no_divisor p 2 (Z.to_nat (Z.sqrt p - 1)).
-(* check_prime_Z_mc from PrimeCheck.v: fully proved, 0 axioms *)
+(* check_no_divisor / check_prime_Z / check_prime_Z_mc imported from PrimeCheck.v *)
 
-Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
+Lemma M1_charpoly_hd_neq0 : head Z0 (char_poly_int M1_int) <> Z0.
 Proof.
   set p := List.hd 0%uint63 crt_primes_all.
   (* 1. valid_prime p *)
@@ -135,7 +123,8 @@ Proof.
   (* 6. Apply char_poly_mod_sound *)
   assert (Hsound := char_poly_mod_sound p M1_int Hvp Hsq Hbound Hfl Hfermat).
   (* Hsound : map (Z_to_mod63 p) (char_poly_int M1_int) = char_poly_mod p M1_int *)
-  (* 7. M1_det_nz_mod says hd of char_poly_mod p M1_int != 0 *)
+  (* 7. hd of char_poly_mod p M1_int != 0 (one-shot vm_compute on the
+     first 710-prime) *)
   assert (Hnz_mod : Uint63.eqb (List.hd 0%uint63 (char_poly_mod p M1_int)) 0%uint63 = false).
   { vm_compute. reflexivity. }
   (* 8. Connect: hd of map f l = f (hd d l) for non-nil l *)
@@ -160,17 +149,9 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  apply M1_charpoly_hd_nz. apply intr_rat_eq0.
-  rewrite -(pol_to_polyrat_coef0 _ Hne) -horner_coef0 Hcpi /char_poly.
-  have Hdm := det_map_mx (horner_eval 0) (char_poly_mx (mat_int_to_rat M1_int 1 42)).
-  change (horner_eval 0 (\det (char_poly_mx (mat_int_to_rat M1_int 1 42))) = 0).
-  rewrite -Hdm.
-  have -> : (char_poly_mx (mat_int_to_rat M1_int 1 42) ^ horner_eval 0)%sesqui =
-    - mat_int_to_rat M1_int 1 42.
-  { apply/matrixP => i j. rewrite mxE /char_poly_mx mxE.
-    rewrite GRing.rmorphD /=. rewrite !mxE /horner_eval /=.
-    by rewrite hornerMn hornerX GRing.mul0rn GRing.add0r hornerN hornerC. }
-  by rewrite -scaleN1r detZ Hdet0 GRing.mulr0.
+  apply M1_charpoly_hd_neq0; apply: intr_rat_eq0.
+  rewrite -(pol_to_polyrat_coef0 _ Hne) Hcpi.
+  by rewrite char_poly_det Hdet0 mulr0.
 Qed.
 
 (* ================================================================ *)
@@ -277,12 +258,6 @@ Lemma length_charpoly_of_A_int : List.length charpoly_of_A_int = 43%nat.
 Proof. unfold charpoly_of_A_int. rewrite List.length_map.
   exact charpoly_of_A_int_bigZ_length. Qed.
 
-Lemma size_ship : size (map (fun z : Z => (Z_to_int z)%:~R : rat) charpoly_int) = 43.
-Proof. rewrite size_map. exact length_charpoly_int. Qed.
-
-Lemma size_cpA : size (map (fun z : Z => (Z_to_int z)%:~R : rat) charpoly_of_A_int) = 43.
-Proof. rewrite size_map. exact length_charpoly_of_A_int. Qed.
-
 (* ================================================================ *)
 (*  charpoly_int_Dq_scaled -- the headline L2 fact                    *)
 (* ================================================================ *)
@@ -348,9 +323,6 @@ Proof. exact: expf_neq0. Qed.
 
 Lemma size_char_poly_42 (M : 'M[rat]_42) : size (char_poly M) = 43.
 Proof. exact: size_char_poly. Qed.
-
-Lemma size_scale_rat (c : rat) (p : {poly rat}) : c != 0 -> size (c *: p) = size p.
-Proof. exact: size_scale. Qed.
 
 Lemma size_pol_to_polyrat_bound (l : list Z) :
   (size (pol_to_polyrat l) <= List.length l)%nat.

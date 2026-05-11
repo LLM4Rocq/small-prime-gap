@@ -1,7 +1,11 @@
 # Maynard `M_{105} > 4` — a Rocq replacement for the Mathematica notebook
 
-[![Blueprint](https://img.shields.io/badge/blueprint-online-blue)](https://gbaudart.github.io/prime_gap/blueprint/)
-[![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
+[![Blueprint CI](https://img.shields.io/github/actions/workflow/status/LLM4Rocq/small-prime-gap/blueprint.yml?branch=main&style=for-the-badge&label=blueprint%20CI)](https://github.com/LLM4Rocq/small-prime-gap/actions/workflows/blueprint.yml)
+[![Blueprint](https://img.shields.io/badge/blueprint-online-blue?style=for-the-badge)](https://gbaudart.github.io/prime_gap/blueprint/)
+[![Blueprint PDF](https://img.shields.io/badge/blueprint-PDF-red?style=for-the-badge)](https://gbaudart.github.io/prime_gap/blueprint.pdf)
+[![Rocq 9.1.1](https://img.shields.io/badge/rocq-9.1.1-orange?style=for-the-badge)](https://rocq-prover.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg?style=for-the-badge)](https://creativecommons.org/licenses/by/4.0/)
 
 This repository contains a re-implementation of the numerical
 computation involved in the proof of **Proposition 4.3 / formula (8.15)**` of James Maynard's article *Small gaps between primes*
@@ -12,7 +16,7 @@ computation involved in the proof of **Proposition 4.3 / formula (8.15)**` of Ja
 where $M_k$ is defined in Proposition 4.2 as the supremum of some expression $E(F)$ over the set of Riemann-integrable functions $F : [0, 1]^k \rightarrow R$ .
 
 In order to obtain this bound, the original proof resorts to an ancillary Mathematica notebook, distributed as supplementary material with
-the [arXiv:1311.4600](https://arxiv.org/abs/1311.4600) preprint. 
+the [arXiv:1311.4600](https://arxiv.org/abs/1311.4600) preprint.
 
 This re-implementation aims at improving the reproducibility of the calculations, and the confidence in the proof of formula (8.15) by proposing two natures of alternatives:
 
@@ -27,7 +31,7 @@ Theorem maynard_eigenvalue_S1 :
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* L1 + L2 + L3 + L4 *) Qed.
+Proof. (* L1 + L2 + L3 *) Qed.
 ```
 
 The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). This last step consists in checking that the computation-friendly version of each matrix agrees with its deduction-friendly version, which in turn essentially consists in changing the datastructure respectively used for integers and for matrices.
@@ -38,10 +42,18 @@ Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as def
 Theorem maynard_M105_certified :
   MaynardVerify.all_match_M1Z = true /\
   MaynardVerify.all_match_M2Z = true /\
+  (forall i j : nat,
+     MaynardSpec.M1_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
+  (forall i j : nat,
+     MaynardSpec.M2_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* MaynardVerify.all_match_M{1,2}Z_true + maynard_eigenvalue_S1 *) Qed.
+Proof. (* MaynardVerify.all_match_M{1,2}Z_true
+        + MaynardSpecBridge.M{1,2}_spec_rat_eq
+        + maynard_eigenvalue_S1 *) Qed.
 ```
 
 A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
@@ -51,11 +63,11 @@ A single `Print Assumptions maynard_M105_certified` therefore displays the axiom
 Maynard's original Mathematica notebook `Computations.nb` essentially defines a certain 42x42 matrix, from the formulas provided by Lemmas (8.1) and (8.2), and computes a well-chosen eigenvector. Then, its snaps this vector to a small-denominator rational vector `v`, and evaluates the Rayleigh quotient of the matrix at `v`, using exact rational arithmetic. The value obtained is greater than 4, which provides a rigorous lower bound on the eignevalues of the initial matrix, where rigorous here should be understood in the sense of rigorous computation.
 
 In the current state of this project, the mechanized proof takes a different route. It consists in computing the characteristic
-polynomial of the same matrix, before applying the intermediate value theorem. As the size of the coefficients in the initial matrix are big, computing the characteristic polynomial is delicate. The formal proof thus compares modulo enough big primes the value obtained by the FLINT code with that obtained by a Rocq implementation of the Faddeev-Le Verrier algorithm, and concludes via the Chinese Reminder Theorem. 
+polynomial of the same matrix, before applying the intermediate value theorem. As the size of the coefficients in the initial matrix are big, computing the characteristic polynomial is delicate. The formal proof thus compares modulo enough big primes the value obtained by the FLINT code with that obtained by a Rocq implementation of the Faddeev-Le Verrier algorithm, and concludes via the Chinese Reminder Theorem.
 
 
 ## Repository layout and disclaimer
-The current state of the code is not quite polished. In particular, it  entangles irrelevant formal verifications of FLINT data with the actual proof. Some proof scripts are also still quite clumsy, and far from the expected standards of the libraries they are built upon. Here is the generated layout description:
+Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:
 
 
 ```
@@ -65,7 +77,8 @@ prime_gap/
 +-- README.md                       this file
 +-- REPORT.md                       detailed technical walkthrough
 +-- SPEC_TO_PAPER.md                line-level mapping MaynardSpec -> arXiv §8
-+-- _CoqProject                     27 .v files in dependency order
++-- AUDITOR_CHECKLIST.md            claim-to-Rocq-lemma audit table
++-- _CoqProject                     .v files in dependency order
 |
 +-- notebook_reconstructed.md       reconstructed Mathematica notebook
 |
@@ -75,27 +88,26 @@ prime_gap/
 |   +-- json_to_v.py                JSON -> Rocq emitter
 |   +-- m1m2.pkl                    cached exact-rational M1, M2
 |   +-- certificate.json            small certificate (~510 KB)
-|   +-- certificate_chain.json      heavy Sturm chain (~14 MB)
 |
-+-- theories/S1/                    27 Rocq files
++-- theories/S1/                    23 top-level .v files + 14 chunk files
     +-- Recompose.v                 bigZ <-> Z helpers
     +-- Witness.v                   certificate data (autogenerated)
-    +-- WitnessChain.v              Sturm chain + quotients in bigZ
-    +-- Smoke.v                     round-trip tests
     |
     +-- IntPoly.v                   list Z polynomial library
-    +-- IntMat.v                    list (list Z) matrix library + det_int
-    +-- BrownTraub.v                modified Sturm chain on list Z
-    +-- SignChain.v                 sign-variation counting
+    +-- IntMat.v                    list (list Z) matrix library
+    +-- SignChain.v                 sign-variation counting (sgn_Z, sign_at_*)
     |
     +-- CharPoly.v                  Faddeev-LeVerrier + rat bridges
-    +-- CharPolyAgree.v             CRT cross-validation, 710 primes
+    +-- CharPolyAgree.v             710-prime CRT assembly
+    +-- CharPolyAgree/              definitions + 6 parallel chunks
+    |   +-- Def.v                   definitions (modular arith, prime list)
+    |   +-- Chunk_0.v ... Chunk_5.v 119-prime chunks (proved by `make -j`)
     +-- CharPolyScale.v             char_poly(c *: M) scaling formula
     |
     +-- ModularArith.v              shared Uint63 modular operations
     +-- CRTBridge.v                 FL modular soundness
-    +-- CRTCheck.v                  42-step PRS verified via CRT
-    +-- CRTSigns.v                  sign vectors verified via BigZ
+    +-- CRTCheck.v                  CRT correctness lemmas (max_abs_coeff,
+    |                               small_multiple_zero, all_primes_divide_product)
     +-- CRTLift.v                   CRT lift: fl_eq_flint + matrix_identity_Z
     +-- Fermat.v                    Fermat's little theorem bridges
     +-- PrimeCheck.v                Z-level trial division + MathComp bridge
@@ -103,10 +115,13 @@ prime_gap/
     +-- MaynardFactQ.v              factorial / binomial as rat
     +-- MaynardBasis.v              42-element basis with Witness bridge
     +-- MaynardSpec.v               G_{n,2}(k), M1_entry, M2_entry closed forms
-    +-- MaynardVerify.v             kernel-verifies M1_int, M2_int match the spec
+    +-- MaynardVerify.v             M1_int / M2_int match the spec, assembly
+    +-- MaynardVerify/              definitions + 6 parallel chunks
+    |   +-- Def.v                   definitions + the fast M1 Qed
+    |   +-- M2_0.v ... M2_5.v       7-row chunks of the M2 check
     +-- MaynardSpecBridge.v         kernel-Qed: paper-form (rat) <-> computational (Z) spec
     |
-    +-- Bridge.v                    L1 Sturm bridge
+    +-- Bridge.v                    L1 bridge to MathComp real-closed
     +-- CertL1.v                    L1 IVT proof
     +-- CertL2.v                    L2 assembly (charpoly_int_Dq_scaled)
     +-- Cert.v                      headline theorem
@@ -131,21 +146,22 @@ Here are the generated prerequisite informations:
 - Or simply: `opam install ./coq-prime-gap.opam --deps-only`
 
 ## How to use
-Here are the generated instructions. Note that running the Rocq verification **does not** require executing the FLINT code first. Timings may also be misleading.
+Here are the generated instructions. Note that running the Rocq verification **does not** require executing the FLINT code first. Timings are wall-clock measurements on a 16 GB / 6-thread machine.
 
 ```bash
 # 1. FLINT audit (optional -- certificates pre-built)
 source .venv/bin/activate && python python/build_certificate.py
 
 # 2. Regenerate Rocq witness files (optional -- pre-built)
-python python/json_to_v.py --with-chain
+python python/json_to_v.py
 
-# 3. Build all Rocq files (~24 min with `make -j` on a multi-core box).
-#    The two heaviest phases each split into 6 parallel chunks:
+# 3. Build all Rocq files (~28 min with `make -j6`, ~62 min with `make -j2`).
+#    The two heaviest phases each split into 6 parallel chunks so that
+#    they overlap under `make -j6`:
 #      - CharPolyAgree/Chunk_0..5.v    710-prime CRT checks
 #      - MaynardVerify/M2_0..5.v       42x42 M2 spec cross-check (7 rows each)
 coq_makefile -f _CoqProject -o Makefile
-make -j
+make -j6
 
 # 4. Verify the end-to-end theorem has no project-specific axioms.
 #    `maynard_M105_certified` is the recommended target: it conjoins

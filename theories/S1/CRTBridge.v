@@ -66,15 +66,6 @@ Proof.
     lia.
 Qed.
 
-(* Corollary: Z_to_mod63 values are bounded by p *)
-Lemma Z_to_mod63_bound (p : int) (z : Z) :
-  valid_prime p ->
-  (0 <= Uint63.to_Z (Z_to_mod63 p z) < Uint63.to_Z p)%Z.
-Proof.
-  intros Hv. rewrite Z_to_mod63_spec; [|exact Hv].
-  apply Z.mod_pos_bound. destruct Hv; lia.
-Qed.
-
 (* ================================================================== *)
 (* Section 2: Modular arithmetic soundness                             *)
 (* ================================================================== *)
@@ -116,21 +107,6 @@ Proof.
   rewrite (Z.mod_small _ wB Hnf). reflexivity.
 Qed.
 
-(* addmod63 soundness *)
-Lemma addmod63_spec (p a b : int) :
-  valid_prime p ->
-  (0 <= Uint63.to_Z a < Uint63.to_Z p)%Z ->
-  (0 <= Uint63.to_Z b < Uint63.to_Z p)%Z ->
-  Uint63.to_Z (addmod63 p a b) =
-    ((Uint63.to_Z a + Uint63.to_Z b) mod Uint63.to_Z p)%Z.
-Proof.
-  intros [Hp1 Hp2] Ha Hb.
-  unfold addmod63.
-  rewrite mod_spec. rewrite add_spec.
-  assert (Hnf : (0 <= Uint63.to_Z a + Uint63.to_Z b < wB)%Z).
-  { split; [lia|exact (no_overflow_add _ _ _ Ha Hb Hp2)]. }
-  rewrite (Z.mod_small _ wB Hnf). reflexivity.
-Qed.
 
 (* negmod63 soundness *)
 Lemma negmod63_spec (p a : int) :
@@ -167,25 +143,6 @@ Qed.
 Definition in_range (p : int) (x : int) : Prop :=
   (0 <= Uint63.to_Z x < Uint63.to_Z p)%Z.
 
-(* A modular vector is in range *)
-Definition vec_in_range (p : int) (v : list int) : Prop :=
-  Forall (in_range p) v.
-
-(* A modular matrix is in range *)
-Definition mat_in_range (p : int) (m : mmat) : Prop :=
-  Forall (vec_in_range p) m.
-
-(* reduce_mat_Z produces in-range matrices *)
-Lemma reduce_mat_Z_in_range (p : int) (M : list (list Z)) :
-  valid_prime p ->
-  mat_in_range p (reduce_mat_Z p M).
-Proof.
-  intros Hv. unfold reduce_mat_Z, mat_in_range.
-  apply Forall_map. apply Forall_forall. intros row _.
-  unfold vec_in_range. apply Forall_map. apply Forall_forall. intros z _.
-  unfold in_range. exact (Z_to_mod63_bound p z Hv).
-Qed.
-
 (* ================================================================== *)
 (* Section 4: Operation-level correspondence                           *)
 (*                                                                     *)
@@ -193,56 +150,6 @@ Qed.
 (* OP_mod, prove:                                                     *)
 (*   map (Z_to_mod63 p) (OP ...) = OP_mod p (map (Z_to_mod63 p) ...) *)
 (* ================================================================== *)
-
-(* ---- Vector addition ---- *)
-Lemma vadd_mod_sound (p : int) (xs ys : list Z) :
-  valid_prime p ->
-  List.length xs = List.length ys ->
-  List.map (Z_to_mod63 p) (vadd xs ys) =
-  mmat_vadd p (List.map (Z_to_mod63 p) xs) (List.map (Z_to_mod63 p) ys).
-Proof.
-  intros Hv Hlen.
-  revert ys Hlen. induction xs as [|x xs' IH]; intros ys Hlen.
-  - destruct ys; [reflexivity | simpl in Hlen; lia].
-  - destruct ys as [|y ys']; [simpl in Hlen; lia |].
-    simpl. f_equal.
-    + (* addmod63 p (Z_to_mod63 p x) (Z_to_mod63 p y)
-         = Z_to_mod63 p (x + y) *)
-      unfold addmod63.
-      (* Both sides should equal of_Z((x + y) mod to_Z p) *)
-      apply Uint63.to_Z_inj.
-      rewrite mod_spec. rewrite add_spec.
-      rewrite !Z_to_mod63_spec; [|exact Hv|exact Hv|exact Hv].
-      destruct Hv as [Hp1 Hp2].
-      set (pv := Uint63.to_Z p) in *.
-      assert (H1 : (0 <= x mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
-      assert (H2 : (0 <= y mod pv < pv)%Z) by (apply Z.mod_pos_bound; lia).
-      rewrite (Z.mod_small _ wB); [| split; [lia|]; apply (no_overflow_add _ _ _ H1 H2 Hp2)].
-      rewrite Zplus_mod_idemp_l. rewrite Zplus_mod_idemp_r. reflexivity.
-    + apply IH. simpl in Hlen. lia.
-Qed.
-
-(* ---- Matrix addition ---- *)
-Lemma madd_mod_sound (p : int) (A B : list (list Z)) :
-  valid_prime p ->
-  List.length A = List.length B ->
-  (forall i, (i < List.length A)%nat ->
-    List.length (List.nth i A []) = List.length (List.nth i B [])) ->
-  List.map (List.map (Z_to_mod63 p)) (madd A B) =
-  mmat_add p (List.map (List.map (Z_to_mod63 p)) A)
-             (List.map (List.map (Z_to_mod63 p)) B).
-Proof.
-  intros Hv. revert B.
-  induction A as [|ra A' IH]; intros B Hlen Hrows.
-  - destruct B; [reflexivity | simpl in Hlen; lia].
-  - destruct B as [|rb B']; [simpl in Hlen; lia|].
-    simpl. f_equal.
-    + apply vadd_mod_sound; [exact Hv|].
-      specialize (Hrows 0%nat). simpl in *. apply Hrows. lia.
-    + apply IH.
-      * simpl in Hlen. lia.
-      * intros i Hi. specialize (Hrows (S i)). simpl in *. apply Hrows. lia.
-Qed.
 
 (* ---- Scalar-vector multiplication ---- *)
 Lemma vscale_mod_sound (p : int) (c : Z) (xs : list Z) :
@@ -466,26 +373,6 @@ Qed.
 
 (* ---- Matrix multiplication ---- *)
 
-(* Helper: one row of mmul vs mmat_mul *)
-Lemma mmul_row_sound (p : int) (row : list Z) (Bt : list (list Z)) :
-  valid_prime p ->
-  (forall j, (j < List.length Bt)%nat ->
-    List.length (List.nth j Bt []) = List.length row) ->
-  List.map (Z_to_mod63 p) (List.map (fun col => dot_int row col) Bt) =
-  List.map (fun col => dot_mod p (List.map (Z_to_mod63 p) row) col)
-           (List.map (List.map (Z_to_mod63 p)) Bt).
-Proof.
-  intros Hv Hlens.
-  rewrite !List.map_map.
-  apply List.map_ext_in.
-  intros col Hin.
-  apply dot_mod_sound; [exact Hv|].
-  (* Need: length row = length col *)
-  (* col is in Bt, so its length = length row by Hlens *)
-  apply List.In_nth with (d := @nil Z) in Hin.
-  destruct Hin as [j [Hj Heq]]. subst col.
-  symmetry. exact (Hlens j Hj).
-Qed.
 
 Lemma mmul_mod_sound (p : int) (A B : list (list Z)) :
   valid_prime p ->
@@ -1351,33 +1238,13 @@ Qed.
 (* vm_compute on small examples and state the general result.          *)
 (* ================================================================== *)
 
-(* Small sanity check: the bridge holds on a 2x2 example *)
-Example bridge_2x2 :
-  let M := [[1; 2]; [3; 4]]%Z in
-  let p := 7%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
-Example bridge_3x3 :
-  let M := [[2; 0; 0]; [0; 3; 0]; [0; 0; 5]]%Z in
-  let p := 11%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
-Example bridge_eye3 :
-  let M := meye 3 in
-  let p := 13%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
 (* ================================================================== *)
 (* Section 9: Application to CRT lift                                  *)
 (*                                                                     *)
 (* Given char_poly_mod_sound, the CRT argument for CertL2.v works as: *)
 (*                                                                     *)
-(* 1. char_poly_int_agrees_with_flint (from CharPolyAgree.v, Qed)      *)
-(*    tells us:                                                        *)
-(*      forall p in crt_primes,                                        *)
+(* 1. char_poly_int_agrees_710 (from CharPolyAgree.v, Qed) tells us:   *)
+(*      forall p in crt_primes_all,                                    *)
 (*        char_poly_mod p A_int = charpoly_mod p                       *)
 (*                                                                     *)
 (* 2. char_poly_mod_sound tells us:                                    *)
@@ -1388,7 +1255,7 @@ Proof. vm_compute. reflexivity. Qed.
 (*                    = map (Z_to_mod63 p) charpoly_of_A_int           *)
 (*                                                                     *)
 (* 4. Combining (1)-(3):                                               *)
-(*      forall p in crt_primes, forall k,                              *)
+(*      forall p in crt_primes_all, forall k,                          *)
 (*        (char_poly_int A_int)[k] mod p                               *)
 (*        = charpoly_of_A_int[k] mod p                                 *)
 (*                                                                     *)
@@ -1397,53 +1264,5 @@ Proof. vm_compute. reflexivity. Qed.
 (*                                                                     *)
 (* Similarly for matrix_identity_Z.                                    *)
 (* ================================================================== *)
-
-(* The coefficient-wise CRT lift principle:
-   If two lists agree mod p for all primes p in a list,
-   and the product of the primes exceeds twice the max absolute
-   value of any difference, then the lists are equal over Z. *)
-
-(* We state the abstract CRT principle. Its proof requires only
-   standard number theory (Z.divide, prime factorization bounds). *)
-(* For our application, all primes are distinct, so their product
-   divides d when each prime divides d. We state this directly as
-   a hypothesis rather than deriving it from NoDup + prime.
-   The proof is standard: induction + Z.gauss (or Z.prime_mult). *)
-Lemma crt_lift_lists (l1 l2 : list Z) (primes : list Z) :
-  List.length l1 = List.length l2 ->
-  (* Agreement mod each prime *)
-  (forall p, In p primes ->
-    forall k, (k < List.length l1)%nat ->
-      ((List.nth k l1 0%Z) mod p = (List.nth k l2 0%Z) mod p)%Z) ->
-  (* Product of primes exceeds twice the max absolute difference *)
-  (forall k, (k < List.length l1)%nat ->
-    (Z.abs (List.nth k l1 0%Z - List.nth k l2 0%Z) <
-     List.fold_right Z.mul 1%Z primes)%Z) ->
-  (* Product of primes divides every difference (derived from above two + primality) *)
-  (forall k, (k < List.length l1)%nat ->
-    (List.fold_right Z.mul 1%Z primes |
-     List.nth k l1 0%Z - List.nth k l2 0%Z)%Z) ->
-  l1 = l2.
-Proof.
-  intros Hlen Hmod Hbound Hprod_dvd.
-  apply (List.nth_ext _ _ 0%Z 0%Z Hlen).
-  intros k Hk.
-  assert (Hdiff : (List.nth k l1 0%Z - List.nth k l2 0%Z = 0)%Z); [|lia].
-  set (d := (List.nth k l1 0%Z - List.nth k l2 0%Z)%Z).
-  destruct (Z.eq_dec d 0) as [e|Hne]; [exact e|].
-  exfalso.
-  assert (Hk' : (k < List.length l1)%nat) by lia.
-  pose proof (Hbound k Hk') as Habs.
-  pose proof (Hprod_dvd k Hk') as Hprod.
-  apply Hne. apply Z.abs_0_iff.
-  assert (Hp : (0 <= fold_right Z.mul 1 primes)%Z) by lia.
-  assert (Ha : (0 <= Z.abs d)%Z) by lia.
-  apply Z.le_antisymm; [|lia].
-  destruct (Z.eq_dec (Z.abs d) 0) as [e2|Hne2]; [lia|].
-  exfalso. apply (Z.lt_irrefl (fold_right Z.mul 1 primes)).
-  apply Z.le_lt_trans with (Z.abs d); [|lia].
-  apply Z.divide_pos_le; [lia|].
-  apply Z.divide_abs_r. exact Hprod.
-Qed.
 
 Close Scope uint63_scope.

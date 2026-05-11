@@ -96,26 +96,29 @@ has a directly corresponding operation in Part B. The kernel-Qed bridge
 between them lives in `theories/S1/MaynardSpecBridge.v`:
 
 ```rocq
-Theorem M1_spec_rat_eq (i j : nat) :
+Lemma M1_spec_rat_eq (i j : nat) :
   M1_spec_ij i j = qfrac (m1_num_den_at i j).
 
-Theorem M2_spec_rat_eq (i j : nat) :
+Lemma M2_spec_rat_eq (i j : nat) :
   M2_spec_ij i j = qfrac (m2_num_den_at i j).
 ```
 
 where `qfrac (n, d) := (Z_to_int n)%:~R / (Z_to_int d)%:~R : rat`. Both
-theorems are `Qed` and `Print Assumptions` reports *Closed under the
+lemmas are `Qed` and `Print Assumptions` reports *Closed under the
 global context* — no axioms, no `Uint63` primitives. The bridge is layered
 through `factZ_to_rat`, `dblratZ_to_rat`, `binZ_to_rat`,
 `compositionsZ_eq_compositions`, `G2Z_to_rat`, `qfrac_qmul`, `qfrac_qplus`,
 and `alphaZ_to_rat`, each one a small structural induction.
 
-`MaynardSpecBridge.v` is a leaf in the dependency DAG (`Cert.v` does not
-import it) and is independent of `MaynardVerify.v`'s load-bearing Z-level
-cross-check. Its purpose is to certify in the kernel that the rat-level
-paper-form spec (the documentation-shaped Part A a reviewer reads against
-the paper) and the Z-level computational spec (the Part B `vm_compute`
-consumes) encode the same closed forms.
+`MaynardSpecBridge.v` is imported by `Cert.v` so that
+`maynard_M105_certified` conjoins the Z-level bool match
+(`all_match_M{1,2}Z_true` from `MaynardVerify.v`) with the rat-level
+paper-form bridge (`M{1,2}_spec_rat_eq`) in a single `Print Assumptions`
+contract covering the full FLINT-matrix → Z-spec → rat-paper-form →
+eigenvalue chain. Its purpose is to certify in the kernel that the
+rat-level paper-form spec (the documentation-shaped Part A a reviewer
+reads against the paper) and the Z-level computational spec (the Part B
+`vm_compute` consumes) encode the same closed forms.
 
 ### The `K = 105` vs `K2 = 104` distinction
 
@@ -533,7 +536,9 @@ so that lifting back to `rat` gives `M2_entry` exactly.
 
 `theories/S1/MaynardBasis.v` defines `maynard_basis : list (nat * nat)` as
 an explicit 42-pair list (in Mathematica enumeration order to match
-`Witness.basis`), and proves three set-level facts:
+`Witness.basis`), and proves four facts — three set-level pins
+(`_size`, `_uniq`, `_spec`) plus a `vm_compute`-Qed match against the
+shipped witness ordering:
 
 ```rocq
 Lemma maynard_basis_size : length maynard_basis = 42.
@@ -594,13 +599,14 @@ in Maynard p. 23.
 
 ## 8. What is verified inside the Rocq kernel
 
-`MaynardVerify.v` cross-checks every entry of the shipped integer
-matrices against `MaynardSpec` via Z-level cross-multiplication:
+`MaynardVerify/Def.v` and `MaynardVerify.v` cross-check every entry of
+the shipped integer matrices against `MaynardSpec` via Z-level
+cross-multiplication:
 
 ```rocq
 Definition M1_entry_matchZ (i j : nat) : bool :=
-  Z.eqb (m1_num i j * D_M1)
-        (mat_get M1_int i j * m1_den i j).
+  Z.eqb (BinInt.Z.mul (m1_num i j) D_M1)
+        (BinInt.Z.mul (mat_get M1_int i j) (m1_den i j)).
 
 Definition all_match_M1Z : bool :=
   List.forallb
@@ -611,21 +617,39 @@ Lemma all_match_M1Z_true : all_match_M1Z = true.
 Proof. vm_compute. reflexivity. Qed.
 ```
 
-(and analogously for `M2`). Both `Lemma`s are `Qed` and close by a
-single `vm_compute`. `Print Assumptions` reports "Closed under the
-global context" — no axioms, not even Uint63 primitives, are involved
-(the proof is pure stdlib `Z` arithmetic).
+The `M2` analogue is split into six 7-row chunks (one Qed per chunk,
+files `MaynardVerify/M2_0.v` … `MaynardVerify/M2_5.v`) so no single
+`vm_compute` has to pay the full 42-row cost in one go; the final
+assembly in `MaynardVerify.v` glues them via `seq_split_42` and
+`M2_check_rows_app`:
+
+```rocq
+Lemma all_match_M2Z_true : all_match_M2Z = true.
+Proof.
+  unfold all_match_M2Z.
+  rewrite seq_split_42.
+  rewrite !M2_check_rows_app.
+  rewrite M2_check_rows_0_6 M2_check_rows_7_13 M2_check_rows_14_20
+          M2_check_rows_21_27 M2_check_rows_28_34 M2_check_rows_35_41.
+  reflexivity.
+Qed.
+```
+
+Both `all_match_M{1,2}Z_true` are `Qed`. `Print Assumptions` on each
+reports the standard `Uint63` / `PrimInt63` kernel primitives that
+`vm_compute` requires (the same footprint as any `vm_compute`-Qed in
+the project); no project-specific axioms.
 
 **Coverage:** `42 × 42 = 1764` entries per matrix, so 3528 per-entry
 checks total. The check is the standard rational identity
 `a/b = c/d ⟺ a · d = b · c` for positive `b, d`, applied to
 `(M_int[i][j], D_M_l)` and `(num_spec[i][j], den_spec[i][j])`.
 
-**Timing** (REPORT.md §3.8): ~90 s for `M1`, ~35 min for `M2`. The
-M2 cost dominates because each entry is a sum of up to `(c_i + 1)
-× (c_j + 1) ≤ 36` terms, each of which forms a full `G_{·,2}(104)`
-expansion — the per-term denominator grows to thousands of digits
-before `qplus` collapses it.
+**Timing** (REPORT.md §3.8): ~90 s for `M1`, ~35 min aggregate for the
+six `M2` chunks. The M2 cost dominates because each entry is a sum of
+up to `(c_i + 1) × (c_j + 1) ≤ 36` terms, each of which forms a full
+`G_{·,2}(104)` expansion — the per-term denominator grows to thousands
+of digits before `qplus` collapses it.
 
 ---
 
@@ -684,5 +708,7 @@ exactly the Maynard matrices.
 | `M2_entry` | `MaynardSpec.v` PART A | Lemma 8.2 (M2 part, per-coord `J_k^{(1)}`) |
 | `M1_spec_ij`, `M2_spec_ij` | `MaynardSpec.v` PART A | indexed via 42-basis |
 | `compositionsZ`, `cffZ`, `G2Z`, `m1_num_den`, `alphaZ`, `m2_num_den` | `MaynardSpec.v` PART B | Z-level twin of PART A; same closed forms as `(num, den) : Z × Z` pairs |
-| `maynard_basis` | `MaynardBasis.v` | p. 23, "for simplicity" |
-| `all_match_M1Z_true`, `all_match_M2Z_true` | `MaynardVerify.v` | 1764 cross-checks per matrix (Z-level), `vm_compute. reflexivity.` |
+| `M1_spec_rat_eq`, `M2_spec_rat_eq` | `MaynardSpecBridge.v` | rat-level bridge: `M{1,2}_spec_ij i j = qfrac (m{1,2}_num_den_at i j)`, `Qed`, *Closed under the global context* |
+| `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
+| `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` |
+| `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` |
