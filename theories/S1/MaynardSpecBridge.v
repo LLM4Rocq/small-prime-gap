@@ -216,16 +216,19 @@ Qed.
 (*  Layer 3: compositionsZ <-> compositions                         *)
 (* ============================================================== *)
 
+(* The following three identities are definitional: mathcomp's
+   `iota`, `flatten` and `[seq _ | _ <- _]` are conv-equal to
+   Stdlib's `List.seq`, `List.concat` and `List.map`. *)
 Lemma iota_seq_eq (m n : nat) : iota m n = List.seq m n.
-Proof. by elim: n m => [|n IH] m //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma flatten_concat T (s : seq (seq T)) :
   flatten s = List.concat s.
-Proof. by elim: s => [|x s IH] //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma seq_map_eq T1 T2 (f : T1 -> T2) (l : seq T1) :
   [seq f x | x <- l] = List.map f l.
-Proof. by elim: l => [|x l IH] //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma flat_map_concat_map T1 T2 (f : T1 -> list T2) (l : list T1) :
   List.flat_map f l = List.concat (List.map f l).
