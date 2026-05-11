@@ -30,16 +30,30 @@ algebraic claim inside the kernel.
 The end-to-end statement is
 \begin{verbatim}
 Theorem maynard_M105_certified :
-  MaynardVerify.all_match_M1Z = true /\
-  MaynardVerify.all_match_M2Z = true /\
+  all_match_M1Z = true /\
+  all_match_M2Z = true /\
+  (forall i j : nat,
+     MaynardSpec.M1_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
+  (forall i j : nat,
+     MaynardSpec.M2_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 \end{verbatim}
-proven in \texttt{theories/S1/Cert.v}. \texttt{Print Assumptions} on this
-theorem reports only Rocq's \texttt{PrimInt63} kernel primitives:
-the project itself contains zero \texttt{Axiom} declarations and zero
-\texttt{Admitted} lemmas.
+proven in \texttt{theories/S1/Cert.v}. The first two conjuncts are the
+$\Z$-level cross-multiplication checks linking the FLINT-shipped integer
+matrices $M_{1,2}^{\mathrm{int}}$ to the $\Z$-level closed form
+$\texttt{m\{1,2\}\_num\_den}$. The next two are the kernel-Qed bridge
+from the $\Z$-level closed form to the $\rat$-level paper-form spec
+$\texttt{M\{1,2\}\_spec\_ij}$, the readable transcription of Maynard's
+Lemma~8.2. Together they certify the full chain
+$\text{FLINT integer matrices} = \text{$\Z$-level closed form}
+ = \text{$\rat$-level paper-form spec} \Rightarrow \text{eigenvalue} > 4/105$
+under a single \texttt{Print Assumptions}, which reports only Rocq's
+\texttt{PrimInt63} kernel primitives: the project itself contains zero
+\texttt{Axiom} declarations and zero \texttt{Admitted} lemmas.
 
 \paragraph{Scope.}
 What this Rocq layer proves, kernel-checked, is the left-hand side of
@@ -60,10 +74,12 @@ snaps it to a small-denominator rational vector, and evaluates the
 Rayleigh quotient $k\cdot v^T M_2 v / v^T M_1 v$ in exact rational
 arithmetic. This is a true rigorous lower bound regardless of how~$v$
 is obtained. Our Rocq proof takes the \emph{characteristic-polynomial
-route}: a Brown--Traub Sturm chain on $\charpolysym_{\Arat}$ certifies
-the existence of an eigenvalue strictly above $4/105$ via 1-D root
-counting (intermediate value theorem). No eigenvector is constructed.
-Both routes are sound; together, they form an independent
+route}: the intermediate value theorem on $\charpolysym_{\Arat}$
+certifies the existence of an eigenvalue strictly above $4/105$ from
+just the sign of the polynomial at the lower endpoint (negative, by
+direct \vmcompute{}) and at MathComp's \texttt{cauchy\_bound} (positive,
+from the leading-coefficient sign). No eigenvector or Sturm chain is
+constructed. Both routes are sound; together, they form an independent
 double-check of Maynard's headline value $\Mk[105] \approx 4.0021$.
 
 \paragraph{How to read this blueprint.}
@@ -86,7 +102,9 @@ FLINT-shipped integer matrices to those closed forms, the kernel-Qed
 bridge between the rat-level paper-form spec and the Z-level
 computational spec, and the bridge into MathComp's $\Q$-level matrices.
 All material here lives inside the files \texttt{MaynardSpec.v},
-\texttt{MaynardBasis.v}, \texttt{MaynardFactQ.v}, \texttt{MaynardVerify.v},
+\texttt{MaynardBasis.v}, \texttt{MaynardFactQ.v}, the
+\texttt{MaynardVerify/} directory (\texttt{Def.v}, six parallel
+\texttt{M2\_0..5.v} chunks, and the assembly \texttt{MaynardVerify.v}),
 and \texttt{MaynardSpecBridge.v}. Throughout this chapter we follow the
 v3/Annals numbering of Maynard's paper: Lemma~8.1 / 8.2 / 8.3 (=
 Lemma~7.1 / 7.2 / 7.3 in v1).
@@ -325,7 +343,7 @@ canonical \texttt{gcd}-normalisation cost during \vmcompute.
 \section{Kernel cross-check: matrices match the spec}
 
 \begin{theorem}[$M_1$ entries match Maynard's closed form]\label{thm:M1_match}
-\rocq{PrimeGapS1.MaynardVerify.all_match_M1Z_true}
+\rocq{PrimeGapS1.MaynardVerify.Def.all_match_M1Z_true}
 \rocqok
 \uses{def:M1_entry}
 For every $(i, j) \in \{0, \ldots, 41\}^2$,
@@ -343,10 +361,8 @@ The $1764$ Boolean cross-multiplication checks
 \texttt{M1\_entry\_matchZ}~$i\,j$ are aggregated into
 \texttt{all\_match\_M1Z}~$=$~\texttt{forallb}~over $42 \times 42$, and
 the Lemma is closed by a single \vmcompute{}. The check costs
-${\sim}90$~s wall-clock. \texttt{Print Assumptions} on this Lemma
-reports \emph{Closed under the global context}: the proof lives entirely
-in stdlib $\Z$ arithmetic and does not depend on the \Uintsf\ kernel
-primitives.
+${\sim}90$~s wall-clock. \texttt{Print Assumptions} reports only the
+standard \Uintsf{} primitives.
 \end{proof}
 
 \begin{theorem}[$M_2$ entries match Maynard's closed form]\label{thm:M2_match}
@@ -360,11 +376,13 @@ for all $(i, j) \in \{0, \ldots, 41\}^2$.
 \end{theorem}
 \begin{proof}\rocqok
 Same shape as Theorem~\ref{thm:M1_match}, but the entries are double
-sums of up to 36 rational terms, so the \vmcompute{} cost is
-${\sim}35$ minutes. This is the dominant single-\Qed{} cost in the
-project after \texttt{fl\_crt\_bound} (Chapter~\ref{ch:crt}).
-\texttt{Print Assumptions}: \emph{Closed under the global context},
-no \Uintsf\ axioms.
+sums of up to 36 rational terms, so the per-row \vmcompute{} cost is
+significant. The check is split into six 7-row chunks
+(\texttt{MaynardVerify/M2\_0..5.v}) that \texttt{make -j} runs
+concurrently, and the assembly stitches them via \texttt{seq\_split\_42}
+plus \texttt{forallb\_app} — no per-entry recomputation in the
+\Qed{} of \texttt{all\_match\_M2Z\_true} itself.
+\texttt{Print Assumptions}: only the standard \Uintsf{} primitives.
 \end{proof}
 
 \begin{remark}
@@ -596,8 +614,10 @@ $|a - b| = 0$ from $(\prod p_i) \mid (a - b)$ via a verified bound. The
 same pattern handles the matrix identity $\Mtwo \cdot \Mone \cdot \Aint
 = \DMone \cdot \DA \cdot \Mtwo$ that links the cleared denominators.
 This chapter follows files \texttt{ModularArith.v}, \texttt{CRTBridge.v},
-\texttt{CharPolyAgree.v}, \texttt{CRTCheck.v}, \texttt{Fermat.v},
-\texttt{PrimeCheck.v} and \texttt{CRTLift.v}.
+the \texttt{CharPolyAgree/} directory (\texttt{Def.v} + six parallel
+\texttt{Chunk\_0..5.v} + the assembly \texttt{CharPolyAgree.v}),
+\texttt{CRTCheck.v}, \texttt{Fermat.v}, \texttt{PrimeCheck.v} and
+\texttt{CRTLift.v}.
 
 \section{Modular arithmetic in Uint63}
 
@@ -681,9 +701,8 @@ Via MathComp's \texttt{expf\_card} on the multiplicative group $\Fp^\ast$.
       PrimeGapS1.CharPolyAgree.crt_primes_extra}
 \rocqok
 A concatenated list \texttt{crt\_primes\_all} of $710$ distinct
-$\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The first $10$ are reused
-later for the Sturm-chain PRS cross-check; the remaining $700$ are CRT
-filler. The product $\prod_{i=1}^{710} p_i$ exceeds $2^{21300}$.
+$\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The product
+$\prod_{i=1}^{710} p_i$ exceeds $2^{21300}$.
 \end{definition}
 
 \begin{lemma}[All 710 candidates are prime]\label{lem:crt_primes_all_prime}
@@ -814,142 +833,41 @@ indispensable.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The Sturm-chain root extraction}\label{ch:sturm}
+\chapter{The IVT root extraction}\label{ch:sturm}
 
 This chapter constructs an explicit real algebraic root of
 $\texttt{charpoly\_int}$ above $4/105$. The strategy is the
 \emph{intermediate value theorem} on a real-closed field: we show
-$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from the
-shipped sign vectors, and let MathComp's \texttt{poly\_ivtoo} produce
-a root in the interval. The full Sturm count $V(4/105) - V(+\infty) = 1$
-is also verified for additional confidence but is not load-bearing
-for the headline. The material lives in \texttt{BrownTraub.v},
-\texttt{SignChain.v}, \texttt{CRTSigns.v}, \texttt{CRTCheck.v},
-\texttt{Smoke.v}, \texttt{Bridge.v} and \texttt{CertL1.v}.
+$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from two direct
+\vmcompute{} sign Qeds on $\texttt{charpoly\_int}$ itself, and let
+MathComp's \texttt{poly\_ivtoo} produce a root in the interval. The
+material lives in \texttt{SignChain.v}, \texttt{Bridge.v} and
+\texttt{CertL1.v}; no Sturm chain is shipped or consumed.
 
-\section{The Brown--Traub Sturm chain}
+\section{Endpoint signs of \texttt{charpoly\_int}}
 
-\begin{definition}[Modified Sturm chain]\label{def:sturm_chain}
-\rocq{PrimeGapS1.BrownTraub.sturm_chain,
-      PrimeGapS1.BrownTraub.next_mod}
+\begin{lemma}[Sign at $4/105$]\label{lem:signs_at_x0}
+\rocq{PrimeGapS1.CertL1.sign_at_rat_charpoly}
 \rocqok
-\uses{def:pol}
-For $p \in \texttt{pol}$, $\texttt{sturm\_chain}\,p$ is the list of
-polynomials produced by iterating $q \mapsto -\texttt{prem}(p_{i-1}, q)$
-starting from $(p, p')$, where \texttt{prem} is the integer
-pseudo-remainder (Brown--Traub PRS). This mirrors
-\texttt{mathcomp.real\_closed.qe\_rcf\_th.mods} up to sign.
-\end{definition}
-
-\begin{definition}[Sign-variation count]\label{def:variation}
-\rocq{PrimeGapS1.SignChain.variation,
-      PrimeGapS1.SignChain.sturm_count_in,
-      PrimeGapS1.SignChain.sturm_count_above}
-\rocqok
-\uses{def:sturm_chain}
-\texttt{variation} walks a list of $\{-1, 0, +1\}$ signs and counts
-sign changes (skipping zeros). \texttt{sturm\_count\_above}~$p\,a$
-returns $V(a) - V(+\infty)$, the standard Sturm-theorem count for the
-number of real roots of $p$ in $(a, +\infty)$.
-\end{definition}
-
-\section{Independent cross-check of the shipped chain}
-
-The $43$-polynomial Sturm chain shipped in \texttt{WitnessChain.v} is
-${\sim}14$~MB of data. Re-running Brown--Traub end-to-end on
-$\texttt{charpoly\_int}$ inside \vmcompute{} would be infeasible at
-the $\BigZ$ scale (intermediate coefficients reach ${\sim}200{,}000$
-bits). Instead, we verify the shipped chain via the per-step PRS
-identity modulo $10$ Uint63 primes.
-
-\begin{lemma}[Chain anchors to \texttt{charpoly\_int}]
-\label{lem:chain_0_matches}
-\rocq{PrimeGapS1.Smoke.chain_0_matches_charpoly}
-\rocqok
-\uses{def:sturm_chain}
-$\texttt{sturm\_chain}\,[0] = \texttt{charpoly\_int}$,
-i.e.\ the first entry of the shipped chain equals the cleared
-characteristic polynomial.
+$\texttt{sign\_at\_rat}\,\texttt{charpoly\_int}\,4\,105 = -1$.
+Equivalently, $\sgn(\texttt{charpoly\_int}(4/105)) = -1$, i.e.\
+$P(4/105) < 0$.
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} on a list of $43$ \BigZ\ coefficients.
+\vmcompute{} on the $43$-entry $\Z$-list \texttt{charpoly\_int}
+evaluated by \texttt{peval\_at\_rat} (clears the denominator and
+returns $105^{42}\cdot P(4/105)$, whose sign is $-1$).
 \end{proof}
 
-\begin{theorem}[PRS identity holds for every consecutive triple]
-\label{thm:full_prs}
-\rocq{PrimeGapS1.CRTCheck.full_prs_chain_verified,
-      PrimeGapS1.Smoke.sturm_chain_real_cross_check}
+\begin{lemma}[Sign at $+\infty$]\label{lem:signs_at_inf}
+\rocq{PrimeGapS1.CertL1.sign_at_pinf_charpoly}
 \rocqok
-\uses{def:sturm_chain, def:char_poly_mod, lem:fermat_mod}
-For every consecutive triple $(A, B, C)$ in the shipped Sturm chain,
-together with the shipped quotient $Q$ and pseudo-remainder leading
-factor $\beta$,
-\[
-\lcoeff(B)^{d} \cdot A
-   \;\equiv\; Q \cdot B + \beta \cdot C \pmod{p}
-\]
-holds for each of $10$ distinct primes $p \in [2^{30}, 2^{31})$
-(themselves verified prime via $\Uintsf$ trial division), where
-$d = \deg A - \deg B + 1$.
-\end{theorem}
-\begin{proof}\rocqok
-For each $(\text{triple}, p)$ pair, both sides are reduced to
-modular polynomials over $\Fp$, where $\Fp$-arithmetic is supplied by
-\texttt{ModularArith.v}. The aggregated $\texttt{forallb}$ over
-(triples) $\times$ ($10$ primes) is a single \vmcompute. False positive
-requires a residual divisible by all $10$ primes simultaneously,
-i.e.\ by a number exceeding $2^{300}$. Together with
-Lemma~\ref{lem:chain_0_matches} this anchors the entire shipped chain
-to $\texttt{charpoly\_int}$ through Rocq's own arithmetic; a wrong
-chain shipped by FLINT would fail this check with overwhelming
-probability.
-\end{proof}
-
-\begin{remark}[Off the critical path]
-This Theorem is \emph{not} consumed by
-\rocq{PrimeGapS1.Cert.maynard_eigenvalue_S1} or
-\rocq{PrimeGapS1.Cert.maynard_M105_certified}. The L1 IVT proof reads
-only $\texttt{signs\_at\_x0}[0]$ and $\texttt{signs\_at\_inf}[0]$,
-both of which reduce to direct evaluation of $\texttt{charpoly\_int}$
-via Lemma~\ref{lem:chain_0_matches} plus \texttt{fl\_eq\_flint}. The
-PRS cross-check is \emph{independent} FLINT-data assurance: it makes
-the shipped chain a real cross-check rather than just internally
-sign-consistent, but its absence would not weaken the headline trust
-contract. It is also the \emph{one place} in the project where a
-kernel-level identity is replaced by a probabilistic (modular)
-substitute; every other FLINT-shipped artefact is verified by a
-true $\Z$-level identity (matrix entries via
-\rocq{PrimeGapS1.MaynardVerify.all_match_M1Z_true} and
-\rocq{PrimeGapS1.MaynardVerify.all_match_M2Z_true}, char poly via
-\rocq{PrimeGapS1.CRTLift.fl_eq_flint}, etc.).
-\end{remark}
-
-\section{Sign vectors agree with the chain}
-
-\begin{lemma}[Shipped signs at $4/105$ are correct]\label{lem:signs_at_x0}
-\rocq{PrimeGapS1.CRTSigns.signs_at_x0_shipped}
-\rocqok
-\uses{def:sturm_chain}
-For every $i$, the $i$-th entry of \texttt{signs\_at\_x0} equals
-$\sgn(P_i(4/105))$, where $P_i$ is the $i$-th polynomial of the
-shipped Sturm chain. Verified by direct \BigZ\ evaluation.
+$\texttt{sign\_at\_pinf}\,\texttt{charpoly\_int} = +1$.
+Equivalently, $\sgn(\lcoeff(\texttt{charpoly\_int})) = +1$ (the
+leading coefficient is positive).
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} on the chain (${\sim}1$~s total): each polynomial of the
-chain has up to ${\sim}200{,}000$-bit coefficients, but \BigZ\ uses
-native word arrays under \vmcompute{}.
-\end{proof}
-
-\begin{lemma}[Shipped signs at $+\infty$ are correct]
-\label{lem:signs_at_inf}
-\rocq{PrimeGapS1.CRTSigns.signs_at_inf_shipped}
-\rocqok
-\uses{def:sturm_chain}
-The $i$-th entry of \texttt{signs\_at\_inf} equals
-$\sgn(\lcoeff(P_i))$, the sign of the leading coefficient.
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} on $43$ leading coefficients.
+\vmcompute{} reads the sign of \texttt{plead\,charpoly\_int}.
 \end{proof}
 
 \section{IVT: a root exists above \texorpdfstring{$4/105$}{4/105}}
@@ -957,8 +875,7 @@ $\sgn(\lcoeff(P_i))$, the sign of the leading coefficient.
 \begin{theorem}[L1: IVT root]\label{thm:maynard_L1}
 \rocq{PrimeGapS1.CertL1.maynard_L1_concrete}
 \rocqok
-\uses{def:sturm_chain, lem:signs_at_x0, lem:signs_at_inf,
-      thm:full_prs, lem:chain_0_matches}
+\uses{lem:signs_at_x0, lem:signs_at_inf}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda
@@ -971,30 +888,26 @@ The proof rests on MathComp's intermediate value theorem
 \texttt{poly\_ivtoo} on a real-closed field. We need two sign facts at
 the endpoints:
 
-\textbf{Lower endpoint.} The first entry of \texttt{signs\_at\_x0} is
-$-1$ (verified by \vmcompute{} on the $\Z$-list). By
-Lemma~\ref{lem:signs_at_x0}, this is $\sgn(P_0(4/105))$ where
-$P_0 = \texttt{charpoly\_int}$, hence $P_0(4/105) < 0$.
+\textbf{Lower endpoint.} Lemma~\ref{lem:signs_at_x0} gives
+$\sgn(P(4/105)) = -1$, hence $P(4/105) < 0$ (via the
+\texttt{sgn\_matches}-style bridges in \texttt{Bridge.v}).
 
-\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P_0)$,
-MathComp's explicit rational upper bound for all real roots of $P_0$
-derived from its coefficients. Two facts: $P_0 \ne 0$ (it has degree
-$42$) and the first entry of \texttt{signs\_at\_inf} is $+1$ (by
-Lemma~\ref{lem:signs_at_inf}, $\sgn(\lcoeff(P_0)) = +1$). Since $cb$
-is a strict upper bound for all roots, $\sgn(P_0(cb)) = \sgn(\lcoeff(P_0)) = +1$,
-hence $P_0(cb) > 0$.
+\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P)$,
+MathComp's explicit rational upper bound for all real roots of $P$
+derived from its coefficients. Two facts: $P \ne 0$ (its leading
+coefficient is nonzero by Lemma~\ref{lem:signs_at_inf}) and
+$\sgn(\lcoeff(P)) = +1$. Since $cb$ is a strict upper bound for all
+roots, $\sgn(P(cb)) = \sgn(\lcoeff(P)) = +1$, hence $P(cb) > 0$.
 
-\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P_0(x) = 0$.
-Since $P_0(4/105) < 0$ but $P_0(x) = 0$, $x \ne 4/105$, hence
+\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P(x) = 0$.
+Since $P(4/105) < 0$ but $P(x) = 0$, $x \ne 4/105$, hence
 $4/105 < x$. Setting $\lambda := x$ closes the existential.
 \end{proof}
 
 \begin{remark}
-This is \emph{IVT}, not the full Sturm theorem: we only need the
-existence of some root above the threshold, not the exact count. The
-Sturm count $V(4/105) - V(+\infty) = 1$ confirms uniqueness but is
-mathematically superfluous for $L_4$. The bridge from
-\texttt{list Z}-level signs to MathComp's
+This is \emph{IVT}, not a Sturm-count proof: we only need the
+existence of some root above the threshold, not any count. The
+bridge from \texttt{list Z}-level signs to MathComp's
 $\texttt{sgp\_pinfty}$ / polynomial-value signs is supplied by
 \texttt{Bridge.v} (\texttt{pol\_to\_polyralg}, the
 $\texttt{sgn\_matches}$-style lemmas, \texttt{cauchy\_bound}
@@ -1148,32 +1061,8 @@ $\texttt{pol\_to\_polyrat}\,\texttt{charpoly\_int}
    = \Dq \cdot \charpolysym(\Arat)$.
 Mapping through $\texttt{ratr}$ pulls the scalar out
 ($\texttt{map\_polyZ}$), and \texttt{rootZ} says a nonzero scalar does
-not kill roots. Nonzero-ness of $\Dq$ is discharged by Lemma~\ref{lem:Dq_pos}.
-\end{proof}
-
-\begin{lemma}[$\Dq$ is positive]\label{lem:Dq_pos}
-\rocq{PrimeGapS1.Cert.D_q_pos}
-\rocqok
-$0 < \Dq$ in $\Z$.
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} on a positive shipped constant. This rules out a
-sign-flip consistency attack: \texttt{charpoly\_root\_transfer} only
-needs $\Dq \ne 0$, but a negative $\Dq$ would also satisfy that and
-silently flip the polynomial. The strict positivity check pins the
-sign hygiene of the FLINT-shipped scalar.
-\end{proof}
-
-\begin{lemma}[L4: rescale $4 < 105 \lambda$]\label{lem:bridge_L4}
-\rocq{PrimeGapS1.Cert.maynard_bridge_L4}
-\rocqok
-For $\lambda \in \realalg$ with $\lambda > 0$,
-$4 < 105 \lambda \iff 4/105 < \lambda$.
-\end{lemma}
-\begin{proof}\rocqok
-A schoolbook \texttt{ltr\_pdivrMr} rewrite. Stated separately for
-narrative clarity; the headline Theorem~\ref{thm:headline} states the
-$4/105 < \lambda$ form directly.
+not kill roots. Nonzero-ness of $\Dq$ is checked inline by
+\vmcompute{} on the shipped constant.
 \end{proof}
 
 \begin{theorem}[Spectral headline: an eigenvalue exceeds $4/105$]
@@ -1182,7 +1071,7 @@ $4/105 < \lambda$ form directly.
       PrimeGapS1.Cert.sturm_count_correct}
 \rocqok
 \uses{thm:maynard_L1, lem:charpoly_root_transfer,
-      lem:eigenvalue_of_root, lem:Dq_pos}
+      lem:eigenvalue_of_root}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{eigenvalue}\,(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
@@ -1206,23 +1095,39 @@ existential.
 \begin{theorem}[End-to-end certification]\label{thm:M105}
 \rocq{PrimeGapS1.Cert.maynard_M105_certified}
 \rocqok
-\uses{thm:M1_match, thm:M2_match, thm:headline}
+\uses{thm:M1_match, thm:M2_match, thm:M1_spec_rat_eq,
+      thm:M2_spec_rat_eq, thm:headline}
 The conjunction
 \[
-\texttt{all\_match\_M1Z} = \texttt{true}
+\begin{aligned}
+&\texttt{all\_match\_M1Z} = \texttt{true}
 \;\wedge\;
-\texttt{all\_match\_M2Z} = \texttt{true}
-\;\wedge\;
+\texttt{all\_match\_M2Z} = \texttt{true}\\
+&\quad\wedge\;
+\bigl(\forall i\,j.\;
+  \texttt{M1\_spec\_ij}(i,j)
+    = \texttt{qfrac}(\texttt{m1\_num\_den\_at}(i,j))\bigr)\\
+&\quad\wedge\;
+\bigl(\forall i\,j.\;
+  \texttt{M2\_spec\_ij}(i,j)
+    = \texttt{qfrac}(\texttt{m2\_num\_den\_at}(i,j))\bigr)\\
+&\quad\wedge\;
 \bigl(\exists \lambda \in \realalg.\;
    \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
    \;\wedge\;
    \texttt{ratr}(4/105) < \lambda\bigr).
+\end{aligned}
 \]
 \end{theorem}
 \begin{proof}\rocqok
-Three-way \texttt{split} over the bool facts
-\texttt{all\_match\_M1Z\_true}, \texttt{all\_match\_M2Z\_true} and
-the spectral existence Theorem~\ref{thm:headline}. The combined
+A five-way \texttt{split} over the bool facts
+\texttt{all\_match\_M1Z\_true}, \texttt{all\_match\_M2Z\_true},
+the two paper-form $\leftrightarrow$ $\Z$-level bridges
+\texttt{MaynardSpecBridge.M1\_spec\_rat\_eq} and
+\texttt{MaynardSpecBridge.M2\_spec\_rat\_eq}, and the spectral
+existence Theorem~\ref{thm:headline}. The two bridge conjuncts close
+the trust chain from the FLINT-shipped integer matrices all the way to
+the $\rat$-level paper-form spec inside a single \Qed{}. The combined
 \texttt{Print Assumptions} reports only the standard Rocq
 \texttt{PrimInt63} kernel primitives (used by \vmcompute{} on the
 $\Uintsf$ CRT computations). No project-specific axioms.
@@ -1292,10 +1197,9 @@ of a slightly longer build (the dominant \texttt{fl\_crt\_bound}
 The FLINT pipeline (Python + \texttt{python-flint}) is the candidate
 generator for the certificate data and an independent cross-check, but
 the Rocq proof never invokes Python and never loads the JSON
-certificates directly. The autogenerated \texttt{Witness.v} and
-\texttt{WitnessChain.v} are ordinary Rocq files; if the FLINT layer
-shipped wrong data, one of the following \vmcompute{}-based checks
-would fail:
+certificate directly. The autogenerated \texttt{Witness.v} is an
+ordinary Rocq file; if the FLINT layer shipped wrong data, one of the
+following \vmcompute{}-based checks would fail:
 \begin{itemize}
 \item Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}: the
   $42 \times 42$ matrix entries match Maynard's closed form
@@ -1305,12 +1209,10 @@ would fail:
 \item \texttt{matrix\_identity\_710}: the shipped denominator-clearing
   matrix identity holds modulo each of $710$ primes.
 \item Lemmas~\ref{lem:signs_at_x0} and~\ref{lem:signs_at_inf}: the
-  shipped sign vectors agree with direct \BigZ\ evaluation on the
-  shipped Sturm chain.
-\item Theorem~\ref{thm:full_prs}: every consecutive triple of the
-  shipped chain satisfies the Brown--Traub PRS identity modulo $10$
-  primes (false-positive event $< 2^{-300}$).
-\item Lemma~\ref{lem:Dq_pos}: $\Dq$ shipped strictly positive.
+  signs of \texttt{charpoly\_int} at $4/105$ and at $+\infty$ are
+  $-1$ and $+1$ respectively, by direct \vmcompute{} on the integer
+  list. These two facts feed the endpoint signs into
+  \texttt{poly\_ivtoo}.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.
 
@@ -1330,8 +1232,9 @@ $2B < 2^{6500}$ needed for the CRT lift.
 
 \paragraph{Denominators.} $\DMone$ has ${\sim}221$ decimal digits,
 $\DMtwo$ ${\sim}227$, $\DA$ ${\sim}139$, $\Dq$ ${\sim}333$. All four
-are strictly positive (Lemma~\ref{lem:Dq_pos} for $\Dq$; the others
-follow from being products of factorials).
+are strictly positive (the others follow from being products of
+factorials; positivity of $\Dq$ is checked inline by \vmcompute{} in
+\texttt{charpoly\_root\_transfer}).
 
 \paragraph{Cauchy bound.} The IVT step uses MathComp's
 \texttt{cauchy\_bound} — an explicit rational upper bound on all real
@@ -1339,58 +1242,67 @@ roots derived from the polynomial coefficients. No custom bound is
 introduced.
 
 \paragraph{Build profile.}
-\texttt{make -j} on a multi-core box: ${\sim}37$~min wall-clock
-(${\sim}80$~min sequential). The dominant single-\Qed{} costs are:
+On a 16~GB / 6-thread machine: ${\sim}28$~min wall-clock with
+\texttt{make -j6}, ${\sim}62$~min wall-clock with \texttt{make -j2}
+(clean rebuild). The dominant single-\Qed{} costs are:
 \begin{itemize}
 \item \texttt{fl\_crt\_bound}: ${\sim}18$~min — the
   $2B + 2|c'| < \prod p_i$ comparison with ${\sim}10{,}000$-digit
   arithmetic.
 \item Theorem~\ref{thm:M2_match}
-  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min — $1764$ entries,
-  each up to $36$ rational summands with intermediate denominators
-  reaching $\sim 10^{7000}$ digits.
+  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially across
+  the six $7$-row chunks (\texttt{MaynardVerify/M2\_0..5.v}), reduced to
+  a per-chunk wall of a few minutes under \texttt{make -j} — $1764$
+  entries, each up to $36$ rational summands with intermediate
+  denominators reaching $\sim 10^{7000}$ digits.
 \item Lemma~\ref{lem:crt_primes_all_prime}
   (\texttt{crt\_primes\_710\_all\_prime}): ${\sim}7$~min — $710$
   pure-$\Z$ trial-division primality checks.
 \item \texttt{check\_charpoly\_710}, \texttt{matrix\_identity\_710}:
   ${\sim}5$--$10$~min each — $710 \times 42$-step modular FL.
 \item Theorem~\ref{thm:M1_match}: ${\sim}90$~s.
-\item \texttt{Witness.v}/\texttt{WitnessChain.v} parsing: ${\sim}1$~min
-  — \BigZ\ literal parser on ${\sim}20$~MB of shipped integers.
+\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal parser
+  on the shipped \texttt{charpoly\_of\_A\_int\_bigZ} integers.
 \end{itemize}
-With \texttt{make -j} the M2 \vmcompute{} runs concurrently with the
-CRT primality and 710-FL phases, so it does not strictly add
-$35$ minutes to the wall clock — but it dominates the tail.
+With \texttt{make -j6} the six M2 chunks, the CRT primality phase, and
+the $710$-FL phases all run concurrently, so the longest single chunk
+plus \texttt{fl\_crt\_bound} dominates the wall clock rather than the
+sequential sum.
 
-\paragraph{Project size.} $26$ \texttt{.v} files, ${\sim}19{,}200$
-lines total: ${\sim}7{,}500$ autogenerated certificate data
-(\texttt{Witness.v} + \texttt{WitnessChain.v}) and ${\sim}11{,}700$
-hand-written proof script.
+\paragraph{Project size.} $23$ top-level \texttt{.v} files plus $14$
+files in two parallel-chunk subdirectories (\texttt{MaynardVerify/} and
+\texttt{CharPolyAgree/}, each with a \texttt{Def.v} and six chunks),
+${\sim}13{,}000$ lines total under \texttt{theories/S1/};
+\texttt{Witness.v} alone is ${\sim}5{,}700$ lines of autogenerated
+certificate data.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
 
-The dependency graph has two independent backbones merging at
+The dependency graph has three independent backbones merging at
 \texttt{Cert.v}:
 
-\paragraph{Sturm-chain backbone.}
-\texttt{Witness} $\to$ \texttt{WitnessChain} $\to$
-\texttt{IntPoly} / \texttt{BrownTraub} / \texttt{SignChain} $\to$
-\texttt{CRTSigns} $\to$ \texttt{Bridge} $\to$ \texttt{CertL1}.
+\paragraph{IVT backbone.}
+\texttt{Witness} $\to$ \texttt{IntPoly} / \texttt{SignChain} $\to$
+\texttt{Bridge} $\to$ \texttt{CertL1}.
 Headline output: Theorem~\ref{thm:maynard_L1}.
 
 \paragraph{CharPoly backbone.}
 \texttt{Witness} $\to$ \texttt{IntMat} / \texttt{IntPoly} $\to$
 \texttt{CharPoly} $\to$ \texttt{ModularArith} $\to$
-\texttt{CharPolyAgree} + \texttt{CRTBridge} $\to$ \texttt{CRTLift}
+\texttt{CharPolyAgree/} (\texttt{Def.v} + \texttt{Chunk\_0..5.v} +
+assembly) + \texttt{CRTBridge} $\to$ \texttt{Fermat} +
+\texttt{PrimeCheck} + \texttt{CRTCheck} $\to$ \texttt{CRTLift}
 $\to$ \texttt{CharPolyScale} $\to$ \texttt{CertL2}.
 Headline output: Theorem~\ref{thm:charpoly_int_Dq}.
 
 \paragraph{Maynard-spec backbone.}
 \texttt{Witness} $\to$ \texttt{MaynardFactQ} $\to$
 \texttt{MaynardBasis} + \texttt{MaynardSpec} $\to$
-\texttt{MaynardVerify}. Headline output:
-Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}.
+\texttt{MaynardVerify/} (\texttt{Def.v} + \texttt{M2\_0..5.v} +
+assembly). Headline output: Theorems~\ref{thm:M1_match}
+and~\ref{thm:M2_match}. The leaf \texttt{MaynardSpecBridge.v} adds
+Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} on top.
 
 The three backbones merge at \texttt{Cert.v}, producing
 Theorems~\ref{thm:headline} and~\ref{thm:M105}. A single

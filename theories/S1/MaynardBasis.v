@@ -1,10 +1,12 @@
 (* ==================================================================
-   MaynardBasis.v — the 42-element basis matching Witness.basis.
+   MaynardBasis.v — the 42-element basis used by Maynard's spec.
 
    Order is the Mathematica xExponents[5]/yExponents[5] enumeration
-   (see python/flint_probe.py:xExponents_mma / yExponents_mma).  The bridge
-   lemma `maynard_basis_eq_witness` pins it to the shipped `basis`
-   list in `Witness.v` by `vm_compute`.
+   (see python/flint_probe.py:xExponents_mma / yExponents_mma).  The
+   bridge lemma `maynard_basis_eq_witness` pins the hand-listed
+   `maynard_basis` below to the FLINT-shipped `Witness.basis` ordering
+   by `vm_compute`, so an auditor never has to manually check the
+   42 (b, c) pairs against the FLINT enumeration.
    ================================================================== *)
 
 From Stdlib Require Import List Lia.
@@ -30,6 +32,10 @@ Definition maynard_basis : list (nat * nat) :=
 Lemma maynard_basis_size : length maynard_basis = 42.
 Proof. reflexivity. Qed.
 
+(* The hand-listed basis matches the FLINT-shipped row/column ordering
+   of M1_int / M2_int (kernel-checked).  Without this lemma an auditor
+   would have to manually verify the 42 (b, c) pairs against the FLINT
+   enumeration. *)
 Lemma maynard_basis_eq_witness : maynard_basis = Witness.basis.
 Proof. vm_compute. reflexivity. Qed.
 

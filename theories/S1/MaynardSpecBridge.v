@@ -94,7 +94,7 @@ Proof.
 Qed.
 
 (* `Z_to_int` of a strictly-positive Z is nonzero in int. *)
-Lemma Z_to_int_pos_nz (z : Z) : Z.lt 0 z -> Z_to_int z != 0.
+Lemma Z_to_int_pos_neq0 (z : Z) : Z.lt 0 z -> Z_to_int z != 0.
 Proof.
   case: z => [|p _|p H] //.
   rewrite Z_to_int_pos_pos eqz_nat -lt0n.
@@ -102,10 +102,10 @@ Proof.
 Qed.
 
 (* Lifted to rat: ((Z_to_int z)%:~R : rat) is nonzero when z > 0. *)
-Lemma Z_to_int_pos_rat_nz (z : Z) :
+Lemma Z_to_int_pos_rat_neq0 (z : Z) :
   Z.lt 0 z -> ((Z_to_int z)%:~R : rat) != 0.
 Proof.
-  by move=> /Z_to_int_pos_nz; rewrite intr_eq0.
+  by move=> /Z_to_int_pos_neq0; rewrite intr_eq0.
 Qed.
 
 (* Generic integer-division-is-exact bridge: when `b | a` and `b > 0`,
@@ -117,7 +117,7 @@ Lemma Z_to_int_div_exact (a b : Z) :
   = (Z_to_int a)%:~R / (Z_to_int b)%:~R.
 Proof.
   move=> Hbpos Hdvd.
-  have Hnz : ((Z_to_int b)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_nz.
+  have Hnz : ((Z_to_int b)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_neq0.
   apply: (canRL (mulfK Hnz)).
   rewrite -intrM -Z_to_int_mul Z.mul_comm.
   by rewrite -Zdivide_Zdiv_eq.
@@ -189,25 +189,30 @@ Lemma binQ_factQ (n k : nat) :
 Proof.
   move=> Hkn.
   have Hnz : factQ k * factQ (n - k)%nat != 0
-    by rewrite mulf_neq0 ?factQ_nz.
+    by rewrite mulf_neq0 ?factQ_neq0.
   apply: (canRL (mulfK Hnz)).
   rewrite /binQ /factQ -natrM -natrM.
   apply/eqP. rewrite Num.Theory.eqr_nat. apply/eqP.
   exact: bin_fact.
 Qed.
 
+(* Tiny reflection bridge between Stdlib's `Nat.leb` and mathcomp's
+   `<=%N`.  Used in `binZ_to_rat`, where `binZ` is defined with
+   `Nat.leb` (Stdlib bool) but the proof lives in mathcomp leq. *)
+Lemma Nat_leb_leqP k n : reflect (k <= n)%N (Nat.leb k n).
+Proof. by apply: (iffP idP) => [/Nat.leb_le/leP|/leP/Nat.leb_le]. Qed.
+
 Lemma binZ_to_rat (n k : nat) :
   ((Z_to_int (binZ n k))%:~R : rat) = binQ n k.
 Proof.
   rewrite /binZ.
-  case Hkn: (Nat.leb k n).
-  - move/Nat.leb_le/leP: Hkn => Hkn.
-    rewrite Z_to_int_div_exact;
+  case: Nat_leb_leqP => Hkn.
+  - rewrite Z_to_int_div_exact;
       [|exact: factZ_factZ_pos|exact: factZ_factZ_dvd Hkn].
     rewrite Z_to_int_mul intrM !factZ_to_rat.
     by rewrite -binQ_factQ.
   - rewrite Z_to_int_0 /=.
-    move/Nat.leb_nle/leP: Hkn; rewrite -ltnNge => Hkn.
+    have {}Hkn : (n < k)%N by rewrite ltnNge; apply/negP.
     rewrite /binQ (bin_small Hkn) /=.
     by rewrite mulr0n.
 Qed.
@@ -216,16 +221,19 @@ Qed.
 (*  Layer 3: compositionsZ <-> compositions                         *)
 (* ============================================================== *)
 
+(* The following three identities are definitional: mathcomp's
+   `iota`, `flatten` and `[seq _ | _ <- _]` are conv-equal to
+   Stdlib's `List.seq`, `List.concat` and `List.map`. *)
 Lemma iota_seq_eq (m n : nat) : iota m n = List.seq m n.
-Proof. by elim: n m => [|n IH] m //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma flatten_concat T (s : seq (seq T)) :
   flatten s = List.concat s.
-Proof. by elim: s => [|x s IH] //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma seq_map_eq T1 T2 (f : T1 -> T2) (l : seq T1) :
   [seq f x | x <- l] = List.map f l.
-Proof. by elim: l => [|x l IH] //=; rewrite IH. Qed.
+Proof. exact: erefl. Qed.
 
 Lemma flat_map_concat_map T1 T2 (f : T1 -> list T2) (l : list T1) :
   List.flat_map f l = List.concat (List.map f l).
@@ -355,10 +363,10 @@ Qed.
 (*  Layer 8: M2 spec bridge                                         *)
 (* ============================================================== *)
 
-Lemma Z_to_int_factZ_nz (n : nat) : Z_to_int (factZ n) != 0.
-Proof. apply: Z_to_int_pos_nz. exact: factZ_pos. Qed.
+Lemma Z_to_int_factZ_neq0 (n : nat) : Z_to_int (factZ n) != 0.
+Proof. apply: Z_to_int_pos_neq0. exact: factZ_pos. Qed.
 
-Lemma Z_to_int_qplus_den_nz (a b : Z * Z) :
+Lemma Z_to_int_qplus_den_neq0 (a b : Z * Z) :
   Z_to_int a.2 != 0 -> Z_to_int b.2 != 0 ->
   Z_to_int (qplus a b).2 != 0.
 Proof.
@@ -366,7 +374,7 @@ Proof.
   by rewrite Z_to_int_mul mulf_neq0.
 Qed.
 
-Lemma Z_to_int_qmul_den_nz (a b : Z * Z) :
+Lemma Z_to_int_qmul_den_neq0 (a b : Z * Z) :
   Z_to_int a.2 != 0 -> Z_to_int b.2 != 0 ->
   Z_to_int (qmul a b).2 != 0.
 Proof.
@@ -374,17 +382,17 @@ Proof.
   by rewrite Z_to_int_mul mulf_neq0.
 Qed.
 
-Lemma Z_to_int_alphaZ_den_nz (b c cp : nat) :
+Lemma Z_to_int_alphaZ_den_neq0 (b c cp : nat) :
   Z_to_int (alphaZ b c cp).2 != 0.
-Proof. by rewrite /alphaZ /=; exact: Z_to_int_factZ_nz. Qed.
+Proof. by rewrite /alphaZ /=; exact: Z_to_int_factZ_neq0. Qed.
 
-Lemma Z_to_int_m2_term_den_nz bi ci bj cj cp1 cp2 :
+Lemma Z_to_int_m2_term_den_neq0 bi ci bj cj cp1 cp2 :
   Z_to_int (m2_term_num_den bi ci bj cj cp1 cp2).2 != 0.
 Proof.
   rewrite /m2_term_num_den.
-  apply: Z_to_int_qmul_den_nz.
-  - apply: Z_to_int_qmul_den_nz; exact: Z_to_int_alphaZ_den_nz.
-  - exact: Z_to_int_factZ_nz.
+  apply: Z_to_int_qmul_den_neq0.
+  - apply: Z_to_int_qmul_den_neq0; exact: Z_to_int_alphaZ_den_neq0.
+  - exact: Z_to_int_factZ_neq0.
 Qed.
 
 (* Bridge for one m2 term. *)
@@ -421,18 +429,18 @@ Proof.
     rewrite IH.
     + rewrite qfrac_qplus //.
       by rewrite big_cons addrA.
-    + by apply: Z_to_int_qplus_den_nz.
+    + by apply: Z_to_int_qplus_den_neq0.
     + move=> t' Ht'. apply: Hl. by right.
 Qed.
 
-Lemma fold_left_qplus_den_nz (l : list (Z * Z)) (acc : Z * Z) :
+Lemma fold_left_qplus_den_neq0 (l : list (Z * Z)) (acc : Z * Z) :
   Z_to_int acc.2 != 0 ->
   (forall t, List.In t l -> Z_to_int t.2 != 0) ->
   Z_to_int (List.fold_left qplus l acc).2 != 0.
 Proof.
   elim: l acc => [|x l IH] acc Hacc Hl //=.
   apply: IH.
-  - apply: Z_to_int_qplus_den_nz => //. apply: Hl. by left.
+  - apply: Z_to_int_qplus_den_neq0 => //. apply: Hl. by left.
   - move=> t Ht. apply: Hl. by right.
 Qed.
 
@@ -482,14 +490,14 @@ Proof.
   - have Hin : forall t,
       List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) ->
       Z_to_int t.2 != 0.
-      move=> t /List.in_map_iff[cp2 [<- _]]. exact: Z_to_int_m2_term_den_nz.
+      move=> t /List.in_map_iff[cp2 [<- _]]. exact: Z_to_int_m2_term_den_neq0.
     have Hnext : Z_to_int (List.fold_left qplus
       (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) acc).2 != 0
-      by apply: fold_left_qplus_den_nz.
+      by apply: fold_left_qplus_den_neq0.
     have Hterm0 : Z_to_int (m2_term_num_den bi ci bj cj cp1 0).2 != 0
-      by exact: Z_to_int_m2_term_den_nz.
+      by exact: Z_to_int_m2_term_den_neq0.
     have Hacc' : Z_to_int (qplus acc (m2_term_num_den bi ci bj cj cp1 0)).2 != 0
-      by apply: Z_to_int_qplus_den_nz.
+      by apply: Z_to_int_qplus_den_neq0.
     have Hrest : forall t : Z * Z,
         List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 1 cj)) ->
         Z_to_int t.2 != 0.

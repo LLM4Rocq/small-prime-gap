@@ -14,24 +14,32 @@ Theorem maynard_eigenvalue_S1 :
 
 is `Qed` in `theories/S1/Cert.v`. A sibling theorem
 `maynard_M105_certified` in the same file conjoins this eigenvalue claim
-with the bool facts `MaynardVerify.all_match_M{1,2}Z = true`, so a single
-`Print Assumptions maynard_M105_certified` covers both the matrix
-cross-check against Maynard's closed form *and* the eigenvalue bound.
+with the bool facts `MaynardVerify.all_match_M{1,2}Z = true` *and* the
+two rat-level paper-form identities
+`MaynardSpecBridge.M{1,2}_spec_rat_eq`, so a single
+`Print Assumptions maynard_M105_certified` (which reports 51 standard
+`PrimInt63.*` / `Uint63Axioms.*` kernel primitives — no project-specific
+axioms) covers the full chain: the FLINT-shipped integer matrices match
+the Z-level closed form, the Z-level closed form equals the rat-level
+paper-form spec, and the eigenvalue bound holds.
 Either theorem exposes only the standard `PrimInt63` / `Uint63Axioms`
 kernel primitives shipped with Rocq 9.0/9.1 (native 63-bit integers, used
-by `vm_compute` on the CRT and Sturm-chain computations).
+by `vm_compute` on the CRT and char-poly computations).
 
 The repository contains zero `Axiom` declarations and zero `Admitted`
 lemmas anywhere — including the 42x42 input matrices `M1_int`, `M2_int`,
 which are themselves kernel-checked against Maynard's closed-form
-specification (Lemma 7.1 / eq. 7.8). The FLINT generator's transcription
+specification (Lemma 8.2 / eq. 7.8). The FLINT generator's transcription
 is therefore not part of the trust base; the Rocq kernel re-derives every
-algebraic claim from the integer data alone.
+algebraic claim from the integer data alone. The companion document
+`AUDITOR_CHECKLIST.md` at the repo root enumerates the load-bearing
+lemmas in audit order.
 
 The document is written for a reader who is reasonably comfortable with
-Rocq/Coq and with undergraduate algebra (characteristic polynomial, Sturm
-chain, CRT, Faddeev–LeVerrier). It aims to explain *how* each layer closes
-and, in particular, the four techniques that were essential to getting the
+Rocq/Coq and with undergraduate algebra (characteristic polynomial,
+intermediate value theorem on a real-closed field, CRT,
+Faddeev–LeVerrier). It aims to explain *how* each layer closes and, in
+particular, the four techniques that were essential to getting the
 proof past the kernel within a reasonable time budget.
 
 ## 1. The problem
@@ -82,8 +90,10 @@ But the computation is non-trivial:
   to ~220 decimal digits (`D_M1`, `D_M2` in `theories/S1/Witness.v`).
 - The characteristic polynomial of *A = M1^(-1)·M2* in cleared form has
   coefficients up to ~20 000 bits.
-- The Sturm chain of that polynomial has intermediate coefficients up to
-  ~200 000 bits (Brown–Traub subresultant PRS).
+- Running Faddeev–LeVerrier directly on the integer matrix `A_int`
+  inside the Rocq kernel would touch intermediate values with similar
+  magnitudes; the project instead does a 710-prime CRT cross-check
+  against a FLINT-shipped candidate polynomial (§3.6).
 
 In Maynard's original proof these computations are done inside a
 Mathematica notebook (`Computations.nb`), shipped with the arXiv
@@ -101,9 +111,9 @@ Two *independent* verification layers:
 
 1. A **Python + FLINT layer** (`python/build_certificate.py`,
    `python/flint_probe.py`) that rebuilds *M1, M2* from the closed-form
-   integrals, computes *A*, its characteristic polynomial and Sturm
-   chain over exact rationals (via `python-flint`, i.e. GMP/MPFR), and
-   emits a JSON certificate.
+   integrals, computes *A* and its characteristic polynomial over exact
+   rationals (via `python-flint`, i.e. GMP/MPFR), and emits a JSON
+   certificate.
 
 2. A **Rocq 9.0/9.1 layer** (`theories/S1/*.v`) that consumes the
    certificate as compile-time data, re-does *every* arithmetic step
@@ -111,18 +121,18 @@ Two *independent* verification layers:
    of MathComp's abstract `eigenvalue` predicate.
 
 The Rocq layer does not trust the Python layer. It only takes from it a
-list of integers (matrix entries, shipped char-poly coefficients, shipped
-Sturm chain, shipped sign vectors). Every algebraic claim about those
-integers is then verified by the kernel, either by `vm_compute` (on
-modular and BigZ data) or by ordinary `Qed` proofs (on MathComp algebra).
+list of integers (matrix entries and the shipped char-poly
+coefficients). Every algebraic claim about those integers is then
+verified by the kernel, either by `vm_compute` (on modular and BigZ
+data) or by ordinary `Qed` proofs (on MathComp algebra).
 
 The FLINT layer's role is threefold:
 
 - A **second independent implementation** of the same computation. A
   mismatch between FLINT and the Rocq kernel would catch transcription
   errors or a bug in either toolchain.
-- The **candidate data** (the shipped polynomial and sign vectors) that
-  the Rocq layer only has to check, not re-derive. Finding these objects
+- The **candidate data** (the shipped char-poly coefficients) that the
+  Rocq layer only has to check, not re-derive. Finding these objects
   from scratch inside the kernel would be infeasible.
 - A cross-check via Arb (256-bit interval arithmetic): top eigenvalue
   ≈ 0.038114950113695686, so 105·λ ≈ 4.002069761938047. This matches
@@ -153,11 +163,13 @@ other.
   prints `≈ 4.0021`.
 
 - **Our Rocq proof** uses the characteristic-polynomial route: the
-  Brown–Traub Sturm chain on `char_poly(M₁⁻¹M₂)` certifies the
+  intermediate value theorem on `char_poly(M₁⁻¹M₂)` certifies the
   *existence* of a real root (= eigenvalue) strictly above `4/105`,
-  via 1-D root counting. No eigenvector is ever constructed. The
-  argument bypasses the Rayleigh quotient entirely and works
-  purely on the polynomial side.
+  from the sign of the polynomial at `4/105` (negative, by direct
+  `vm_compute`) and at MathComp's `cauchy_bound` (positive, from the
+  leading coefficient). No eigenvector is ever constructed. The
+  argument bypasses the Rayleigh quotient entirely and works purely
+  on the polynomial side.
 
 Both strategies fit Maynard's §8 framework. Lemma 8.2 (the closed
 form for the matrix entries) is verified inside Rocq
@@ -165,7 +177,7 @@ form for the matrix entries) is verified inside Rocq
 identity that gives `M_k = k · λ_max`, plus its hypotheses
 `M_1 ≻ 0` and `M_2 = M_2ᵀ`) is *not* formalised here —
 its Maynard-style use in the notebook (eigenvector → Rayleigh
-quotient) and our Sturm-chain alternative both invoke its
+quotient) and our IVT-on-char-poly alternative both invoke its
 *conclusion* "max ratio = largest eigenvalue", which is needed in
 either strategy to bridge `λ > 4/k` to `M_k > 4`. The analytic content
 of Lemma 8.3 remains paper-side, by design of this project's scope
@@ -178,13 +190,13 @@ exactly the same as the notebook's.
 
 The project is two stages, not two co-equal verification layers.
 The FLINT layer (§2.1) is the **candidate generator**: it computes a
-JSON certificate (matrices, char poly, Sturm chain, sign vectors) and
-ships it as Rocq source. The Rocq layer (§2.2) is the **verification**:
-it consumes that certificate as untrusted input data and kernel-checks
-every entry against an independent Rocq-side derivation (entry-by-entry
-matrix match against Maynard's closed forms, 710-prime CRT against an
-in-Rocq Faddeev–LeVerrier on `A_int`, etc.). Only the Rocq layer's Qeds
-are in the trust base; the FLINT layer is auxiliary.
+JSON certificate (matrices, char poly) and ships it as Rocq source.
+The Rocq layer (§2.2) is the **verification**: it consumes that
+certificate as untrusted input data and kernel-checks every entry
+against an independent Rocq-side derivation (entry-by-entry matrix
+match against Maynard's closed forms, 710-prime CRT against an
+in-Rocq Faddeev–LeVerrier on `A_int`, etc.). Only the Rocq layer's
+Qeds are in the trust base; the FLINT layer is auxiliary.
 
 ### 2.1 The FLINT layer (candidate generator)
 
@@ -200,20 +212,13 @@ Run with `python python/build_certificate.py`. The script performs:
 4. Compute `charpoly_of_A_int` = clear-denominator form of
    `chi_A(x) = det(xI - A)`, with a separate scalar `D_q`: each
    coefficient of `D_q * chi_A` is an integer.
-5. Compute the Brown–Traub subresultant PRS chain of `(Q, Q')` where `Q`
-   is the cleared polynomial and `Q'` its derivative, capturing the
-   per-step audit data.
-6. Evaluate sign vectors at 4/105 and at +∞, verify
-   `V(4/105) - V(+inf) ≥ 1`.
-7. Cross-check *lambda_max* against an `arb_mat` computation at 256-bit
+5. Cross-check *lambda_max* against an `arb_mat` computation at 256-bit
    precision.
-8. Write `python/certificate.json` (~510 KB metadata) and
-   `python/certificate_chain.json` (~14 MB heavy Sturm-chain data).
+6. Write `python/certificate.json` (~510 KB metadata).
 
 The translator `python/json_to_v.py` converts the JSON into Rocq sources:
-`Witness.v` (matrix entries, char poly, sign vectors as `list Z` or `list
-BigZ`) and `WitnessChain.v` (full Sturm chain as `list (list BigZ)`).
-Both files are autogenerated and checked into the repository so that the
+`Witness.v` (matrix entries, char poly as `list Z` and `list BigZ`).
+The file is autogenerated and checked into the repository so that the
 Rocq build does not need Python.
 
 ### 2.2 The Rocq layer (verification)
@@ -225,72 +230,48 @@ The Rocq layer consumes:
 - `charpoly_int` (the cleared char-poly of *A* at the `D_q` level) and
   `charpoly_of_A_int` (char-poly of the integer matrix `A_int` directly
   — these are related by a known scaling factor).
-- The full Sturm chain (`WitnessChain.sturm_chain`) and the sign vectors
-  `signs_at_x0`, `signs_at_inf`.
 
 It verifies, in this order:
 
-1. The shipped Sturm chain is consistent (sign data agrees with direct
-   evaluation on the chain) **and is independently cross-checked
-   against the Brown–Traub PRS recurrence**: for each consecutive
-   triple `(A, B, C)` of chain entries together with the shipped
-   quotient `Q` and `beta`, the identity
-   `lc(B)^d · A ≡ Q·B + beta·C  (mod p)` is verified mod 10
-   distinct ~2³⁰ primes (themselves proved prime in Rocq via Uint63
-   trial division). This is exposed as `Smoke.sturm_chain_real_cross_check`
-   (a thin alias for `CRTCheck.full_prs_chain_verified`) and
-   anchors the entire chain to `charpoly_int` through Rocq's own
-   arithmetic. The chain is therefore no longer just self-consistent;
-   a wrong chain shipped by FLINT would fail this modular PRS
-   identity with overwhelming probability (false positive requires
-   a residual divisible by all 10 primes, i.e. a multiple of a
-   ~2³⁰⁰-bit number). Note that this Qed is **not** consumed by
-   `maynard_eigenvalue_S1` or `maynard_M105_certified`: the L1 IVT
-   proof reads only `signs_at_x0[0]` and `signs_at_inf[0]`, both
-   of which reduce to direct evaluation of `charpoly_int` via
-   `chain_0_matches_charpoly` plus `fl_eq_flint`. The PRS
-   cross-check is *independent* FLINT-data assurance, not part of
-   the headline trust contract.
-2. `V(4/105) - V(+∞) = 1`; hence, by an IVT step, there is a real
-   algebraic root of `charpoly_int` above `4/105`.
-3. `char_poly_int A_int = charpoly_of_A_int` as lists of `Z` (proved via
-   CRT over 710 Uint63 primes).
-4. `pol_to_polyrat charpoly_int = D_q *: char_poly A_rat` in `{poly rat}`,
-   where `A_rat : 'M[rat]_42` is the MathComp-level rational matrix.
-5. Therefore any root of `charpoly_int` is a root of `char_poly A_rat`
-   after clearing the nonzero scalar `D_q`; by `eigenvalue_root_char` +
-   `map_char_poly` that root is an eigenvalue of `A_rat` over `realalg`.
+1. There is a real algebraic root of `charpoly_int` above `4/105`,
+   established by `poly_ivtoo` from `P(4/105) < 0` (direct
+   `vm_compute` on `sign_at_rat charpoly_int 4 105`) and
+   `P(cauchy_bound) > 0` (from leading-coefficient positivity).
+2. `char_poly_int A_int = charpoly_of_A_int` as lists of `Z` (proved
+   via CRT over 710 Uint63 primes).
+3. `pol_to_polyrat charpoly_int = D_q *: char_poly A_rat` in
+   `{poly rat}`, where `A_rat : 'M[rat]_42` is the MathComp-level
+   rational matrix.
+4. Therefore any root of `charpoly_int` is a root of
+   `char_poly A_rat` after clearing the nonzero scalar `D_q`; by
+   `eigenvalue_root_char` + `map_char_poly` that root is an
+   eigenvalue of `A_rat` over `realalg`.
 
 ## 3. The Rocq tree, file by file
 
 The dependency order is exactly the order of `_CoqProject`. There are
-**26 `.v` files**, totaling **~19 200 lines**, of which ~7 500 are
-autogenerated certificate data (`Witness.v` + `WitnessChain.v`). The
-hand-written proof script is ~11 700 lines.
+**23 `.v` files** (plus 14 in two parallel-chunk subdirectories — a
+`Def.v` and six chunk files under each of `CharPolyAgree/` and
+`MaynardVerify/`), totaling ~13 000 lines under `theories/S1/`, of
+which Witness.v alone accounts for ~5 700 lines of autogenerated
+certificate data.
 
 ### 3.1 Scaffolding and certificate data
 
-**`Recompose.v`**. Defines `lift_bigZ : list BigZ.t_ -> list Z` and its
-2D version. Rocq's stdlib `Z` literal parser is superlinear; a 100 kbit
-literal takes ~0.4 s to elaborate as `bigZ` but several seconds as `Z`.
-The Brown–Traub chain has individual integers up to ~200 kbit, so we
-ship them as `bigZ` and convert to `Z` lazily via `BigZ.to_Z` only where
-a downstream proof really needs `Z`.
+**`Recompose.v`**. Defines `lift_bigZ : list BigZ.t_ -> list Z`. Rocq's
+stdlib `Z` literal parser is superlinear; a 20 kbit literal takes ~0.4 s
+to elaborate as `bigZ` but several seconds as `Z`. The shipped
+`charpoly_of_A_int` reaches ~20 kbit per coefficient, so we ship it as
+`bigZ` and convert to `Z` lazily via `BigZ.to_Z` only where a downstream
+proof really needs `Z`.
 
-**`Witness.v`** (autogenerated). The ground certificate: `dim := 42`,
-`k_param := 105`, `deg_max := 11`, the 42-element `basis`, the integer
-matrices `M1_int, M2_int, A_int`, their denominators `D_M1, D_M2, D_A`,
-the cleared-char-poly `charpoly_int` (43 coefficients), `charpoly_of_A_int`
-(43 coefficients, ~20 000 bits max), the scaling scalar `D_q`, plus
-`threshold_num := 4`, `threshold_den := 105` and the sign vectors
-`signs_at_x0`, `signs_at_inf`. All integers ≥ ~50 bits are written as
-`bigZ` to keep parser time manageable.
-
-**`WitnessChain.v`** (autogenerated). The full Brown–Traub Sturm chain
-of `charpoly_int`: 43 polynomials, total ~14 MB of data, all in `bigZ`.
-
-**`Smoke.v`**. Round-trip tests and trivial dimension checks reduced by
-`vm_compute`.
+**`Witness.v`** (autogenerated). The ground certificate: the 42-element
+`basis`, the integer matrices `M1_int, M2_int, A_int`, their
+denominators `D_M1, D_M2, D_A`, the cleared-char-poly `charpoly_int`
+(43 coefficients), `charpoly_of_A_int` (43 coefficients, ~20 000 bits
+max, shipped as `bigZ` and converted via `lift_bigZ`), and the scaling
+scalar `D_q`. Large integers are written as `bigZ` to keep parser time
+manageable.
 
 ### 3.2 Core computational libraries
 
@@ -308,23 +289,11 @@ The reason is that `'M[R]_42` does not reduce under `vm_compute` at the
 sizes we need, but nested `list (list Z)` does (a 42×42 matrix
 multiplication takes ~0.14 s by `vm_compute`).
 
-**`BrownTraub.v`**. The modified Sturm chain at the `list Z` level:
 
-```rocq
-Definition next_mod (p q : pol) : pol := pneg (prem p q).
-Fixpoint mods_int_loop (steps : nat) (p q : pol) : list pol := ...
-Definition sturm_chain (p : pol) : list pol := mods_int p (pderiv p).
-```
-
-This mirrors `mathcomp.real_closed.qe_rcf_th.mods` up to sign, using the
-integer pseudo-remainder from IntPoly (which already absorbs the
-`lc(q)^(deg p - deg q + 1)` scaling, so we only need one negation).
-
-**`SignChain.v`**. The sign-variation counter: `sgn_Z`, `sign_at_rat`,
-`sign_at_pinf`, `sign_at_minf`, `variation`, `variation_at_rat`,
-`sturm_count_in`, `sturm_count_above`. The variation function walks a
-list of signs, skipping zeros and incrementing the count at each nonzero
-disagreement. All pure-`list Z` arithmetic; vm-computable.
+**`SignChain.v`**. The sign primitives consumed by L1: `sgn_Z`,
+`sign_at_rat` (= `sgn_Z (peval_at_rat p num den)`), and
+`sign_at_pinf` (= `sgn_Z (plead p)`). Pure-`list Z` arithmetic;
+`vm`-computable.
 
 ### 3.3 Characteristic polynomial and its bridges
 
@@ -372,25 +341,16 @@ applies `det_map_mx` plus a direct coefficient computation
 `char_poly A_rat` to `char_poly (D_A *: A_rat)`, which is in turn equal
 to `char_poly (mat_int_to_rat A_int 1 42)` by `char_poly_int_correct`.
 
-### 3.4 The Sturm-chain → root bridge (L1)
+### 3.4 The IVT → root bridge (L1)
 
-**`Bridge.v`** (~2 000 lines). The mostly-technical bridge between the
-concrete `list Z`-level Sturm machinery (IntPoly/BrownTraub/SignChain)
-and the abstract MathComp `real_closed` machinery (`mods`,
-`changes_horner`, `rootsR`, `taq_itv`). Defines
+**`Bridge.v`** (~500 lines). The bridge between the concrete
+`list Z`-level sign machinery (IntPoly/SignChain) and the abstract
+MathComp `real_closed` machinery. Defines
 `pol_to_polyralg : pol -> {poly realalg}` as the composition of
 `pol_to_polyrat` with `map_poly ratr`. Provides `sgn_matches`-style
 lemmas that connect the integer sign functions to MathComp's
-`sgp_pinfty` / polynomial-value signs, plus `cauchy_bound` boilerplate
-for an explicit upper bound on all real roots.
-
-**`CRTSigns.v`**. Machine-verifies that the shipped `signs_at_x0` and
-`signs_at_inf` agree with signs computed from the shipped chain by
-direct BigZ evaluation of each polynomial at 4/105 (resp. reading
-leading coefficients). The chain's polynomials have ~200 kbit
-coefficients; evaluating with BigZ (which uses native word arrays under
-`vm_compute`) takes ~1 s total. The two `Qed` results are
-`signs_at_x0_shipped` and `signs_at_inf_shipped`.
+`sgp_pinfty` / polynomial-value signs, plus the wiring around
+`cauchy_bound` for an explicit upper bound on all real roots.
 
 **`CertL1.v`**. The **L1 layer**: produces an explicit `realalg` root of
 `charpoly_int` above 4/105.
@@ -398,11 +358,12 @@ coefficients; evaluating with BigZ (which uses native word arrays under
 The strategy uses MathComp's `poly_ivtoo` (intermediate value theorem on
 real-closed fields). We establish:
 
-- `P(4/105) < 0` from the first entry of `signs_at_x0` (which is -1, by
-  `vm_compute` on the Z list).
+- `P(4/105) < 0` from `sign_at_rat charpoly_int 4 105 = -1`, a direct
+  `vm_compute` Qed on the integer-list polynomial.
 - `P(cb) > 0` where `cb` is MathComp's `cauchy_bound` of *P*, because
   (i) *P ≠ 0*, (ii) `cb` is a strict upper bound for all roots of *P*,
-  so `sgr(P(cb)) = sgr(lc(P)) = 1`.
+  so `sgr(P(cb)) = sgr(lc(P)) = 1` (and the leading coefficient sign
+  comes from `sign_at_pinf charpoly_int = 1`, also a `vm_compute` Qed).
 
 Then `poly_ivtoo` gives *x ∈ [4/105, cb]* with *P(x) = 0*.
 
@@ -438,21 +399,32 @@ Technique (c) in §4.
 
 ### 3.6 CRT cross-validation of the shipped polynomial
 
-**`CharPolyAgree.v`** (~1 000 lines). The computational core of the CRT
-check. Beyond structural lemmas (dimensions, length, monic, etc.), it
-supplies:
+The computational core of the CRT check is split across the
+`CharPolyAgree/` directory:
 
-- `crt_primes_local : list int` (10 primes ≥ 2^30) and
-  `crt_primes_extra` (700 more), `crt_primes_all := local ++ extra`
-  (710 Uint63 primes, all ≥ 2^30).
-- `check_charpoly_one_prime_710 p := list_eqb63 (char_poly_mod p A_int)
-  (List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ)`.
-- `char_poly_int_agrees_710 : check_charpoly_710 = true` by
-  `vm_compute`.
-- `check_mat_identity_one_prime p`: verifies the
-  `D_M2 · (M1 · A) ≡ D_M1 · D_A · M2  (mod p)` identity.
-- `matrix_identity_710 : check_mat_identity_710 = true` by
-  `vm_compute`.
+- **`CharPolyAgree/Def.v`** (~870 lines). Beyond structural lemmas
+  (dimensions, length, monic, etc.):
+    - `crt_primes_local : list int` (10 primes ≥ 2^30) and
+      `crt_primes_extra` (700 more),
+      `crt_primes_all := local ++ extra` (710 Uint63 primes, all ≥ 2^30).
+    - `check_charpoly_one_prime_710 p := list_eqb63 (char_poly_mod p A_int)
+      (List.map (bigZ_to_mod63 p) charpoly_of_A_int_bigZ)`.
+    - `check_mat_identity_one_prime p`: verifies
+      `D_M2 · (M1 · A) ≡ D_M1 · D_A · M2  (mod p)`.
+    - `crt_chunk_0..5` and `crt_primes_all_split` decompose
+      `crt_primes_all` into six contiguous 119-prime sublists (the last
+      has 115).
+
+- **`CharPolyAgree/Chunk_0.v` … `Chunk_5.v`** (~12 lines each).
+  Each runs the per-prime char-poly and matrix-identity checks on its
+  119-prime chunk via `vm_compute`. Six files compile in parallel
+  under `make -j`.
+
+- **`CharPolyAgree.v`** (~170 lines). The assembly: imports `Def` and
+  the six chunks, and proves
+    - `char_poly_int_agrees_710 : check_charpoly_710 = true`
+    - `matrix_identity_710 : check_mat_identity_710 = true`
+  via `crt_primes_all_split` plus `forallb_app`. No new `vm_compute`.
 - `scaling_Z_from_check (k : nat)`: if *k < 43* then
   *c_k · D_A^(42-k) = D_q · c'_k* where *c_k* is the *k*-th coefficient
   of `charpoly_int` and *c'_k* of `charpoly_of_A_int`. Derived from a
@@ -552,7 +524,7 @@ giving the line-level reference from the Rocq spec back to the paper.
 
 **`MaynardFactQ.v`** (~30 lines). Tiny rat-level wrappers `factQ n
 := n`!%:R : rat`, `binQ n k := 'C(n, k)%:R : rat`, and a couple of
-helper lemmas (`factQ_nz`, `factQ_succ`).
+helper lemmas (`factQ_neq0`, `factQ_succ`).
 
 **`MaynardBasis.v`** (~75 lines). Rebuilds the 42-element basis
 `{(b, c) ∈ ℕ × ℕ : b + 2c ≤ 11}` in the Mathematica enumeration order
@@ -595,7 +567,8 @@ The file also provides Z-level twins `m1_num_den_at`, `m2_num_den_at
 (numerator, denominator) pair of integers, avoiding `rat`'s canonical
 `gcd`-normalisation cost during `vm_compute`.
 
-**`MaynardVerify.v`** (~140 lines). The kernel cross-check.
+**`MaynardVerify/Def.v`** (~75 lines). Definitions plus the fast M1
+cross-check:
 
 ```rocq
 Definition M1_entry_matchZ (i j : nat) : bool :=
@@ -609,9 +582,13 @@ Lemma all_match_M1Z_true : all_match_M1Z = true.
 Proof. vm_compute. reflexivity. Qed.
 ```
 
-Same shape for M2. `Print Assumptions` on each lemma reports
-`Closed under the global context` — not even Uint63 primitives are
-used (the proof is pure ℤ arithmetic).
+Same shape for M2's `M2_entry_matchZ` / `all_match_M2Z`, but the M2
+check is split into six row-range chunks
+(`MaynardVerify/M2_0.v` … `M2_5.v`, 7 rows each) so `make -j`
+runs them concurrently. **`MaynardVerify.v`** (~95 lines) is the
+assembly: it imports `Def` plus the six chunks and proves
+`all_match_M2Z_true` via `seq_split_42` + `forallb_app` from the
+six chunk Qeds — no new `vm_compute`.
 
 The cross-check is at the Z level (`num · D = M_int · den`) rather
 than the rat level (`M_int / D = num / den` in `'M[rat]_42`)
@@ -621,11 +598,13 @@ deliberately: closing the rat-level matrix equality at concrete dim
 Z cross-check is the load-bearing fact; rational cross-multiplication
 is one well-known identity away from the rat-level statement.
 
-**Timing**: `MaynardVerify.v` compiles in ~36 minutes — about 90 s
-for `M1` (one term per entry) and ~35 minutes for `M2` (~36 terms
-per entry, accumulator denominators reach ~10^7000 digits). This is
-a single-threaded `vm_compute` and dominates the project's total
-build time when `make -j` cannot find anything else to do near the end.
+**Timing**: M1 is a single ~90 s `vm_compute` Qed. M2 is split into
+six 7-row chunks (`MaynardVerify/M2_<k>.v`) so `make -j` runs them
+concurrently; on this machine each chunk finishes in ~6–18 minutes
+of CPU but the chunks overlap with the six 710-prime CRT chunks in
+`CharPolyAgree/`, putting the headline cold-build wall time at
+~28 minutes with `make -j6` (and ~62 minutes with `make -j2`) on a
+16 GB / 6-thread box.
 
 **`MaynardSpecBridge.v`** (~520 lines). Kernel-Qed bridge between Part
 A (rat-level, paper-shaped) and Part B (Z-level, `vm_compute`-shaped)
@@ -1003,22 +982,32 @@ Theorem maynard_eigenvalue_S1 :
 ```
 
 A combined sibling theorem in the same file, `maynard_M105_certified`,
-conjoins this with the matrix cross-check:
+conjoins this with the matrix cross-check *and* the rat-level
+paper-form spec identity:
 
 ```rocq
 Theorem maynard_M105_certified :
-  MaynardVerify.all_match_M1Z = true /\
-  MaynardVerify.all_match_M2Z = true /\
+  all_match_M1Z = true /\
+  all_match_M2Z = true /\
+  (forall i j, MaynardSpec.M1_spec_ij i j
+             = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
+  (forall i j, MaynardSpec.M2_spec_ij i j
+             = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-so that one `Print Assumptions` covers both the eigenvalue claim and
-the closed-form match between the FLINT-shipped `M1_int / M2_int` and
-Maynard's specification (`MaynardSpec.M1_entry`, `M2_entry`). The
-assembly is the trivial three-way `split` over the existing
-`all_match_M1Z_true`, `all_match_M2Z_true`, and `maynard_eigenvalue_S1`.
+so that one `Print Assumptions` covers (a) the closed-form match
+between the FLINT-shipped `M1_int / M2_int` and the Z-level closed
+form `m{1,2}_num_den_at`, (b) the rat-level identity between that
+Z-level closed form and the readable paper-form spec
+`MaynardSpec.M{1,2}_spec_ij` (which transcribes Maynard's Lemma 8.2
+character-for-character), and (c) the eigenvalue bound. The
+assembly is the trivial five-way `split` over the existing
+`all_match_M1Z_true`, `all_match_M2Z_true`,
+`MaynardSpecBridge.M1_spec_rat_eq`, `M2_spec_rat_eq`, and
+`maynard_eigenvalue_S1`.
 
 The assembly of `maynard_eigenvalue_S1` in `Cert.v` is a few lines of
 tactic:
@@ -1042,33 +1031,44 @@ m2_num(i, j) · D_M2  =  M2_int[i][j] · m2_den(i, j)    (in ℤ)
 ```
 
 where `m{1,2}_num`, `m{1,2}_den` are the closed-form numerator and
-denominator from Maynard's Lemma 7.1 / eq. 7.8 (transcribed in
-`MaynardSpec.v`). Verified by single `vm_compute`s. `Print
-Assumptions` reports `Closed under the global context` — the
-verification does not even depend on Uint63 primitives, since the
-bool scans live entirely in stdlib `Z` arithmetic. This eliminates
-the FLINT generator from the trust base.
+denominator from Maynard's Lemma 8.2 / eq. 7.8 (transcribed in
+`MaynardSpec.v` as `m{1,2}_num_den_at`). Verified by single
+`vm_compute`s. `Print Assumptions` reports `Closed under the global
+context` — the verification does not even depend on Uint63
+primitives, since the bool scans live entirely in stdlib `Z`
+arithmetic. This eliminates the FLINT generator from the trust base.
+
+A companion **L0'** step in `MaynardSpecBridge.v` closes the loop
+on the readable side: `M{1,2}_spec_rat_eq` are kernel-Qed proofs that
+the Z-level `m{1,2}_num_den_at` equals the rat-level paper-form
+specification `MaynardSpec.M{1,2}_spec_ij` — the form that
+transcribes Maynard's Lemma 8.2 character-for-character. Both are
+`Qed` with `Print Assumptions` reporting `Closed under the global
+context` (no axioms, not even Uint63), since they are purely
+rat-level algebraic identities. `maynard_M105_certified` conjoins
+L0 and L0' into a single headline.
 
 ### L1 — IVT root existence
 
-`sturm_count_correct : exists lambda, root charpoly_as_poly_realalg
+`Cert.sturm_count_correct : exists lambda, root charpoly_as_poly_realalg
 lambda /\ ratr (4/105) < lambda` is a thin wrapper around
-`maynard_L1_concrete`. The proof uses:
+`maynard_L1_concrete`. (The lemma name predates the cleanup to the
+IVT-only L1 layer; mathematically the proof now uses IVT, not a
+Sturm-variation count.) The proof uses:
 
-- Sign data: `sign_at_rat charpoly_int 4 105 = -1` (first entry of
-  `signs_at_x0`, `vm_compute`-verified to agree with the shipped chain
-  via `signs_at_x0_shipped`).
-- `sign_at_pinf charpoly_int = 1` (first entry of `signs_at_inf`,
-  similarly verified).
+- Sign at the lower endpoint: `sign_at_rat charpoly_int 4 105 = -1`,
+  a direct `vm_compute` Qed on the integer-list polynomial.
+- Sign at +∞: `sign_at_pinf charpoly_int = 1`, also `vm_compute`-Qed
+  (reads the sign of the leading coefficient via `plead`).
 - These yield *P(4/105) < 0* and *P(cb) > 0* at the realalg level (via
   `sgn_matches` bridges in Bridge.v).
 - MathComp's `poly_ivtoo` extracts a root *x ∈ [4/105, cb]*. Since
   *P(4/105) < 0* and *P(x) = 0*, *x ≠ 4/105*, hence *4/105 < x*.
 
-Fully `Qed`, zero project axioms. Note this is **IVT, not the full Sturm
-theorem**: we do not need the exact count, only the existence of some
-root above the threshold. The Sturm count *V(x0) - V(+inf) = 1* confirms
-there is exactly one, but mathematically this is superfluous for L4.
+Fully `Qed`, zero project axioms. Note this is **IVT, not a Sturm-count
+proof**: we do not need any count, only the existence of some root
+above the threshold; the two endpoint signs are all the chain-free
+proof requires.
 
 ### L2 — Root transfer to `char_poly A_rat`
 
@@ -1106,28 +1106,26 @@ by rewrite eigenvalue_root_char.
 for a ring morphism *f*; `eigenvalue_root_char` says an eigenvalue is
 exactly a root of the char poly.
 
-### L4 — Rescale to `M_{105} > 4`
-
-`maynard_bridge_L4` is the schoolbook rescaling *4 < 105λ ⟺ 4/105 < λ*,
-done as one `rewrite mulrC -ltr_pdivrMr`. Included for reference; the
-headline `Theorem maynard_eigenvalue_S1` states the *4/105 < λ* form
-directly.
-
 ## 6. Trust base
 
 The recommended canonical Print-Assumptions target is
-`maynard_M105_certified`: a single lemma whose assumptions cover both
-the matrix cross-check (`all_match_M1Z`, `all_match_M2Z`) and the
-eigenvalue bound. `maynard_eigenvalue_S1` is unchanged and still
-present, but it is strictly weaker for end-to-end audit because it
-does not surface the closed-form match.
+`maynard_M105_certified`: a single lemma whose assumptions cover (a)
+the Z-level matrix cross-check (`all_match_M1Z`, `all_match_M2Z`),
+(b) the rat-level paper-form identity
+(`MaynardSpecBridge.M{1,2}_spec_rat_eq`), and (c) the eigenvalue
+bound. `maynard_eigenvalue_S1` is unchanged and still present, but
+it is strictly weaker for end-to-end audit because it does not
+surface the closed-form match.
 
 `Print Assumptions maynard_M105_certified` (or
-`maynard_eigenvalue_S1`) after `coqc` of Cert.v prints only the
-standard `PrimInt63` primitives (and their `Z` / `Uint63`
-specifications) shipped with Rocq 9.0/9.1 and the `Bignums` library:
-things like `Uint63.add`, `Uint63.mul`, `Uint63.to_Z`,
-`BigN.succ_spec`.
+`maynard_eigenvalue_S1`) after `coqc` of Cert.v prints exactly **51
+standard kernel primitives** — `PrimInt63.*` (and their `Z` /
+`Uint63` specifications) shipped with Rocq 9.0/9.1 and the
+`Bignums` library: things like `Uint63.add`, `Uint63.mul`,
+`Uint63.to_Z`, `BigN.succ_spec`. No project-specific axioms appear.
+(`MaynardSpecBridge.M{1,2}_spec_rat_eq` themselves report `Closed
+under the global context` — they introduce no Uint63 primitives,
+since they are pure rat-level structural inductions.)
 
 These are not project-specific axioms; they are Rocq's declaration that
 the native-integer kernel primitives implement the claimed specifications.
@@ -1149,15 +1147,14 @@ specific 42×42 rational matrix `A_rat` strictly above 4/105, *together*
 with the closed-form match of that matrix to Maynard's specification.
 
 **The FLINT layer is outside the trust base.** The Rocq proof never
-invokes Python and never loads the JSON certificates directly; the
-autogenerated `Witness.v` and `WitnessChain.v` are ordinary Rocq files.
-If the FLINT layer shipped incorrect data, one of the following
-`vm_compute`-based checks would fail to reduce to `true` and the
-build would stop:
+invokes Python and never loads the JSON certificate directly; the
+autogenerated `Witness.v` is an ordinary Rocq file. If the FLINT
+layer shipped incorrect data, one of the following `vm_compute`-based
+checks would fail to reduce to `true` and the build would stop:
 
 - `MaynardVerify.all_match_M1Z = true`, `all_match_M2Z = true` —
-  the 42x42 input matrices match Maynard's closed form (Lemma 7.1 /
-  eq. 7.8). This closes the trust gap on the matrix entries
+  the 42x42 input matrices match Maynard's closed form (Lemma 8.1 /
+  eq. 8.4). This closes the trust gap on the matrix entries
   themselves, not just downstream derivations. The companion doc
   `SPEC_TO_PAPER.md` at the repo root maps every `MaynardSpec`
   definition to the corresponding line of arXiv:1311.4600 v3 §8.
@@ -1165,38 +1162,11 @@ build would stop:
   `charpoly_of_A_int` is the char poly of `A_int`, mod 710 primes.
 - `CharPolyAgree.matrix_identity_710 = true` — the shipped
   `M1·A = (D_M1·D_A/D_M2)·M2` identity holds, mod 710 primes.
-- `CRTSigns.signs_at_x0_shipped`, `CRTSigns.signs_at_inf_shipped` —
-  the shipped sign vectors agree with direct BigZ evaluation on the
-  shipped Sturm chain.
-- `Smoke.sturm_chain_real_cross_check = true` (a thin alias for
-  `CRTCheck.full_prs_chain_verified`) — every consecutive triple
-  of shipped chain entries satisfies the Brown–Traub PRS identity
-  `lc(B)^d·A ≡ Q·B + beta·C` mod each of 10 distinct ~2³⁰ primes
-  (themselves verified prime via Uint63 trial division). **Unlike
-  the four entries above, this is a probabilistic check, not a
-  Z-level identity.** A wrong chain shipped by FLINT would fail this
-  with overwhelming probability — the false-positive event requires
-  a residual divisible by all 10 primes simultaneously, i.e. by a
-  number exceeding 2³⁰⁰ — but a sufficiently determined adversary
-  who reads the source could in principle craft a chain whose
-  residuals are all such multiples and slip past the check.
-  Note: this Qed is **not** on the critical path of the headline
-  theorem `maynard_M105_certified`. The L1 IVT proof reads only
-  `signs_at_x0[0]` and `signs_at_inf[0]`, both of which reduce to
-  direct evaluation of `charpoly_int` via `chain_0_matches_charpoly`
-  plus `fl_eq_flint` — those are the load-bearing chain facts. The
-  PRS cross-check is *independent* FLINT-data assurance: it makes
-  the shipped chain a real cross-check rather than just internally
-  sign-consistent, but its absence would not weaken the headline
-  trust contract.
-
-**Additional sanity Qeds.**
-
-- `Cert.D_q_pos : Z.lt 0 D_q` (`vm_compute. reflexivity.`) — the
-  FLINT-shipped char-poly denominator is strictly positive. This
-  rules out a sign-flip consistency attack: `charpoly_root_transfer`
-  only needs `D_q != 0`, which a negative `D_q` would also satisfy.
-  Closes audit finding M-5.
+- `CertL1.sign_at_rat_charpoly`, `sign_at_pinf_charpoly` —
+  `vm_compute` reflexivity on `sign_at_rat charpoly_int 4 105 = -1`
+  and `sign_at_pinf charpoly_int = 1`. These two reductions
+  (together with the `sgn_matches`-style bridges in `Bridge.v`)
+  feed the endpoint signs into `poly_ivtoo`.
 
 Each of these is `Qed` and reduces in pure kernel arithmetic. The
 repository has zero `Axiom` declarations and zero `Admitted` lemmas
@@ -1205,9 +1175,9 @@ anywhere.
 ## 7. Numerical highlights
 
 - **Matrix dimension.** 42×42. Maynard's *M_{105}* construction uses 42
-  basis polynomials {*x^b · y^c : b + 2c ≤ 11*}. `Witness.v`: `dim :=
-  42`, `deg_max := 11`. Also hard-wired into CRTLift.v and
-  CharPolyAgree.v via `A_int_dim = 42`.
+  basis polynomials {*x^b · y^c : b + 2c ≤ 11*}. The 42-element
+  `Witness.basis` enumerates them; the dimension 42 is hard-wired into
+  CRTLift.v and CharPolyAgree.v via `A_int_dim = 42`.
 - **Charpoly degree.** 42 (43 coefficients), coefficients up to
   ~20 000 bits.
 - **CRT primes.** 710 Uint63 primes, all in [2^30, 2^31), listed in
@@ -1219,36 +1189,47 @@ anywhere.
 - **Cauchy bound.** The IVT step uses MathComp's `cauchy_bound` — an
   explicit rational upper bound on all real roots of the polynomial,
   derived from the coefficients. No custom bound is needed.
-- **Build time.** `make -j` completes in ~37 min on a multi-core
-  machine (measured: 36 min 49 s on this box), ~80 min sequential.
+- **Build time.** A clean rebuild on a 16 GB / 6-thread machine takes
+  **~28 min wall with `make -j6`** and **~62 min wall with `make -j2`**.
+  The two heaviest phases (CharPolyAgree's 710-prime CRT check and
+  MaynardVerify's M2 row scan) each split into six parallel chunks
+  under `CharPolyAgree/Chunk_0..5.v` and `MaynardVerify/M2_0..5.v`,
+  which is what gives `make -j` headroom.
   The dominant costs are:
-  - `MaynardVerify.all_match_M2Z_true`: ~35 min (single-threaded
-    `vm_compute` over 1764 entries each summing up to 36 rational
-    terms with ~10^7000-digit accumulator denominators).
+  - `MaynardVerify.all_match_M2Z_true`: ~35 min CPU total (six
+    `M2_0..5.v` chunks at ~6–18 min CPU each, `vm_compute` over
+    1764 entries each summing up to 36 rational terms with
+    ~10^7000-digit accumulator denominators). Under `make -j6`
+    the six chunks run concurrently, so this contributes ~18 min
+    to the wall clock rather than 35.
   - `crt_primes_710_all_prime`: ~7 min (710 Z-level primality checks
     by trial division).
   - `check_charpoly_710`, `matrix_identity_710`: ~5–10 min each
-    (710 × 42-step FL in Uint63, plus matrix multiplication).
+    (710 × 42-step FL in Uint63, plus matrix multiplication), split
+    across `CharPolyAgree/Chunk_0..5.v`.
   - `fl_crt_bound`, `matrix_crt_bound_sufficient`: ~18 min for
     `fl_crt_bound` (`vm_compute` on a ~10 000-digit arithmetic
     comparison), a few minutes for `matrix_crt_bound_sufficient`.
     The project has no `native_compute` invocations: the single
     earlier use here was replaced with `vm_compute` to keep the
     trust-base enumeration in §6 minimal. `fl_crt_bound` is now the
-    single dominant step in the build wall clock; the in-source
-    comment estimating "~2 min" predates a strengthening of the
-    bound and is stale.
+    single dominant sequential step in the build wall clock; the
+    in-source comment estimating "~2 min" predates a strengthening
+    of the bound and is stale.
   - `MaynardVerify.all_match_M1Z_true`: ~90 s.
   - CertL2.v: ~10 s post-refactor (MathComp canonical structures
     tamed by §4d techniques).
-  - `Witness.v` / `WitnessChain.v` parsing: ~1 min (`bigZ` literal
-    parser on ~20 MB of shipped integers).
-  Note: with `make -j` on a 4-core machine, the M2 vm_compute runs
-  concurrently with the CRT primality / 710-FL phases, so it does
-  not strictly add 35 minutes to the wall clock — but it dominates
-  the tail of the build once those finish.
-- **Total Rocq proof size.** 26 `.v` files, ~19 200 lines; ~7 500
-  autogenerated certificate data; ~11 700 hand-written.
+  - `Witness.v` parsing: ~30 s (`bigZ` literal parser on the shipped
+    `charpoly_of_A_int_bigZ` integers).
+  Note: under `make -j6`, the six M2 chunks run concurrently with
+  the six CRT chunks and with the primality / FL-bound phases, so
+  M2 does not strictly add 35 minutes to the wall clock — but it
+  dominates the tail of the build once those finish.
+- **Total Rocq proof size.** 23 `.v` files plus 14 in two
+  parallel-chunk subdirectories (a `Def.v` and six chunks each under
+  `CharPolyAgree/` and `MaynardVerify/`), ~13 000 lines under
+  `theories/S1/`; Witness.v alone is ~5 700 lines of autogenerated
+  certificate data.
 
 ## 8. Map of key lemmas and files
 
@@ -1266,8 +1247,8 @@ L0' (rat-level paper-form spec matches Z-level computational spec)
 L1 (IVT root existence)
   CertL1.v   maynard_L1_concrete
     + Bridge.v bridges int-level sign data to realalg
-    + CRTSigns.v: signs_at_x0_shipped, signs_at_inf_shipped (vm_compute)
-    + WitnessChain.v provides the chain
+    + CertL1.v: sign_at_rat_charpoly, sign_at_pinf_charpoly (vm_compute)
+    + Witness.v provides charpoly_int
 
 L2 (root → char_poly A_rat)
   CertL2.v   charpoly_int_Dq_scaled
@@ -1282,27 +1263,20 @@ L3 (char_poly root → eigenvalue)
   Cert.v   eigenvalue_of_root_realalg
     + MathComp: map_char_poly, eigenvalue_root_char
 
-L4 (ltr_pdivrMr rescale)
-  Cert.v   maynard_bridge_L4
-
 Headline (canonical, end-to-end):
   Cert.v   maynard_M105_certified
-    = all_match_M1Z_true /\ all_match_M2Z_true /\ maynard_eigenvalue_S1
+    = all_match_M1Z_true /\ all_match_M2Z_true
+      /\ M1_spec_rat_eq /\ M2_spec_rat_eq
+      /\ maynard_eigenvalue_S1
 
 Headline (eigenvalue-only sibling, kept for backward compatibility):
   Cert.v   maynard_eigenvalue_S1
-
-Sanity Qeds (§6):
-  Cert.v       D_q_pos                       (M-5)
-  Smoke.v      sturm_chain_real_cross_check  (M-3)
-  CRTCheck.v   full_prs_chain_verified       (load-bearing PRS check)
 ```
 
 The dependency graph has roughly two independent backbones that merge at
 Cert.v:
 
-- **Sturm-chain backbone**: Witness → WitnessChain → IntPoly /
-  BrownTraub / SignChain → CRTSigns → Bridge → CertL1.
+- **IVT backbone**: Witness → IntPoly / SignChain → Bridge → CertL1.
 - **CharPoly backbone**: Witness → IntMat / IntPoly → CharPoly →
   ModularArith → CharPolyAgree + CRTBridge → CRTLift → CharPolyScale →
   CertL2.

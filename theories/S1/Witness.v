@@ -10,59 +10,23 @@ Import ListNotations.
 From PrimeGapS1 Require Import Recompose.
 Open Scope Z_scope.
 
-Definition dim : nat := 42.
-Definition k_param : nat := 105.
-Definition deg_max : nat := 11.
-
-Definition threshold_num : Z := 4%Z.
-Definition threshold_den : Z := 105%Z.
-
-  (* The 42 basis monomials (b, c) with b + 2c <= 11. *)
-  Definition basis : list (nat * nat) :=
-    [
-      (0%nat, 0%nat) ;
-(1%nat, 0%nat) ;
-(0%nat, 1%nat) ;
-(2%nat, 0%nat) ;
-(1%nat, 1%nat) ;
-(3%nat, 0%nat) ;
-(0%nat, 2%nat) ;
-(2%nat, 1%nat) ;
-(4%nat, 0%nat) ;
-(1%nat, 2%nat) ;
-(3%nat, 1%nat) ;
-(5%nat, 0%nat) ;
-(0%nat, 3%nat) ;
-(2%nat, 2%nat) ;
-(4%nat, 1%nat) ;
-(6%nat, 0%nat) ;
-(1%nat, 3%nat) ;
-(3%nat, 2%nat) ;
-(5%nat, 1%nat) ;
-(7%nat, 0%nat) ;
-(0%nat, 4%nat) ;
-(2%nat, 3%nat) ;
-(4%nat, 2%nat) ;
-(6%nat, 1%nat) ;
-(8%nat, 0%nat) ;
-(1%nat, 4%nat) ;
-(3%nat, 3%nat) ;
-(5%nat, 2%nat) ;
-(7%nat, 1%nat) ;
-(9%nat, 0%nat) ;
-(0%nat, 5%nat) ;
-(2%nat, 4%nat) ;
-(4%nat, 3%nat) ;
-(6%nat, 2%nat) ;
-(8%nat, 1%nat) ;
-(10%nat, 0%nat) ;
-(1%nat, 5%nat) ;
-(3%nat, 4%nat) ;
-(5%nat, 3%nat) ;
-(7%nat, 2%nat) ;
-(9%nat, 1%nat) ;
-(11%nat, 0%nat)
-    ].
+(* The 42 basis monomials (b, c) with b + 2c <= 11, in the order used by
+   FLINT to lay out the M1_int / M2_int rows and columns.  Pinned to the
+   hand-listed `MaynardBasis.maynard_basis` by `maynard_basis_eq_witness`
+   so an auditor never has to manually check the 42 (b, c) pairs against
+   the FLINT enumeration. *)
+Definition basis : list (nat * nat) :=
+  [ (0%nat, 0%nat); (1%nat, 0%nat); (0%nat, 1%nat); (2%nat, 0%nat)
+  ; (1%nat, 1%nat); (3%nat, 0%nat); (0%nat, 2%nat); (2%nat, 1%nat)
+  ; (4%nat, 0%nat); (1%nat, 2%nat); (3%nat, 1%nat); (5%nat, 0%nat)
+  ; (0%nat, 3%nat); (2%nat, 2%nat); (4%nat, 1%nat); (6%nat, 0%nat)
+  ; (1%nat, 3%nat); (3%nat, 2%nat); (5%nat, 1%nat); (7%nat, 0%nat)
+  ; (0%nat, 4%nat); (2%nat, 3%nat); (4%nat, 2%nat); (6%nat, 1%nat)
+  ; (8%nat, 0%nat); (1%nat, 4%nat); (3%nat, 3%nat); (5%nat, 2%nat)
+  ; (7%nat, 1%nat); (9%nat, 0%nat); (0%nat, 5%nat); (2%nat, 4%nat)
+  ; (4%nat, 3%nat); (6%nat, 2%nat); (8%nat, 1%nat); (10%nat, 0%nat)
+  ; (1%nat, 5%nat); (3%nat, 4%nat); (5%nat, 3%nat); (7%nat, 2%nat)
+  ; (9%nat, 1%nat); (11%nat, 0%nat) ].
 
 (* M1[i,j] = M1_int[i][j] / D_M1.  Symmetric, positive definite over Q. *)
 Definition D_M1 : Z := 308857268757354722981071348762547160366309450679454185367644461515697994870656196471123363056046190863367713133901668592148625627226398911869086360030375176344316428167833190400000000000000000000000000000%Z.
@@ -5734,102 +5698,6 @@ Definition charpoly_int : list Z :=
    (-183593339317139850254247166203055311716793061373600669326862948373668300416304361843016739996929140303406116287109212745295255035435351691911686636538162934952461143098359384034243707786062971487126491995203998195557048343099038553492067107882672758051238712367485945200884153185261583994341629627490841951785413224850334809003687071024734714213854407271071798952307290164753794670104980468750000000000000000)%Z ;
    279761641743115554754320427707178763498087754726910510266226102754562220842649329038852345659497595868793458104567168300951959216053144301056740859094345879535614416260742418464462736162273181844163057170569377106784119612365663103503268248643489420085673474929038114383051219615751821206295200211471290682779938897878574272696695125483756132215586041471780296924407593905925750732421875000000000000000000000%Z
   ].
-
-Definition signs_at_x0  : list Z := [
-   (-1)%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z
-  ].
-
-Definition signs_at_inf : list Z := [
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z ;
-   (-1)%Z ;
-   1%Z ;
-   1%Z ;
-   (-1)%Z
-  ].
-
-Definition V_x0  : nat := 22%nat.
-Definition V_inf : nat := 21%nat.
-Definition roots_in_x0_inf : nat := 1%nat.
 
 (* Independent Arb 256-bit cross-check (advisory; not part of the proof):
      top eigenvalue of A          = 0.038114950113695686
