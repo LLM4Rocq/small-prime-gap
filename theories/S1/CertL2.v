@@ -59,7 +59,7 @@ Opaque Z_to_int.
 
 Lemma pol_to_polyrat_coef0 (l : list Z) :
   l <> @nil Z -> (pol_to_polyrat l)`_0 = (Z_to_int (head Z0 l))%:~R :> rat.
-Proof. destruct l as [|z l']; [tauto | ]. move=> _. rewrite /pol_to_polyrat coef_Poly /=. reflexivity. Qed.
+Proof. by case: l => [//|z l'] _; rewrite /pol_to_polyrat coef_Poly. Qed.
 
 Lemma intr_rat_eq0 (D : BinInt.Z) : (Z_to_int D)%:~R = 0 :> rat -> D = Z0.
 Proof. Transparent Z_to_int. move/eqP. rewrite intr_eq0 => /eqP H.
@@ -95,17 +95,9 @@ Proof. move=> HD; apply/eqP => Hz. apply HD.
 (*  M1 invertibility                                                   *)
 (* ================================================================ *)
 
-(* Z-level primality checker for ~10^9 primes (0.6s via vm_compute) *)
-Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
-  match fuel with
-  | O => true
-  | S f => negb (Z.eqb (Z.modulo p d) 0) && check_no_divisor p (d + 1) f
-  end.
-Definition check_prime_Z (p : Z) : bool :=
-  (1 <? p)%Z && check_no_divisor p 2 (Z.to_nat (Z.sqrt p - 1)).
-(* check_prime_Z_mc from PrimeCheck.v: fully proved, 0 axioms *)
+(* check_no_divisor / check_prime_Z / check_prime_Z_mc imported from PrimeCheck.v *)
 
-Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
+Lemma M1_charpoly_hd_neq0 : head Z0 (char_poly_int M1_int) <> Z0.
 Proof.
   set p := List.hd 0%uint63 crt_primes_all.
   (* 1. valid_prime p *)
@@ -157,7 +149,7 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  apply M1_charpoly_hd_nz; apply: intr_rat_eq0.
+  apply M1_charpoly_hd_neq0; apply: intr_rat_eq0.
   rewrite -(pol_to_polyrat_coef0 _ Hne) Hcpi.
   by rewrite char_poly_det Hdet0 mulr0.
 Qed.
