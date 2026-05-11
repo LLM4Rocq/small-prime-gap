@@ -18,7 +18,7 @@ From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import realalg.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness CertL1 CertL2.
+From PrimeGapS1 Require Import CharPoly Witness CertL1 CertL2.
 From PrimeGapS1 Require Import MaynardVerify MaynardSpec MaynardSpecBridge.
 
 (* Re-open ring_scope AFTER Witness.v (which opens Z_scope). Every
