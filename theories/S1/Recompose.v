@@ -21,6 +21,3 @@ Open Scope Z_scope.
 (* Lift a `list bigZ` to a `list Z`.  Reduces under vm_compute. *)
 Definition lift_bigZ (xs : list BigZ.t_) : list Z :=
   List.map BigZ.to_Z xs.
-
-Definition lift_bigZ2 (xss : list (list BigZ.t_)) : list (list Z) :=
-  List.map lift_bigZ xss.
