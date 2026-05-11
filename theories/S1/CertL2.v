@@ -23,16 +23,14 @@ Open Scope ring_scope.
 
 Lemma A_int_dim' : mat_dim A_int = 42%nat. Proof. exact A_int_dim. Qed.
 Lemma A_int_wf' : forall i, (i < length A_int)%coq_nat -> length (List.nth i A_int []) = 42%nat.
-Proof. intros i Hi. have Hcheck := A_int_rows_42. rewrite List.forallb_forall in Hcheck.
-  have Hin : In (List.nth i A_int []) A_int by (apply List.nth_In; exact Hi).
-  have := Hcheck _ Hin. move/Nat.eqb_eq. done. Qed.
+Proof. by move=> i Hi; move: A_int_rows_42; rewrite List.forallb_forall =>
+  /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
 Lemma M1_int_dim' : mat_dim M1_int = 42%nat. Proof. vm_compute. reflexivity. Qed.
 Lemma M1_int_rows_42 : forallb (fun row => Nat.eqb (List.length row) 42) M1_int = true.
 Proof. vm_compute. reflexivity. Qed.
 Lemma M1_int_wf' : all_rows_len 42 M1_int.
-Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall in Hcheck.
-  have Hin : In (List.nth i M1_int []) M1_int by (apply List.nth_In; exact Hi).
-  have := Hcheck _ Hin. move/Nat.eqb_eq. done. Qed.
+Proof. by move=> i Hi; move: M1_int_rows_42; rewrite List.forallb_forall =>
+  /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
 
 (* ================================================================ *)
 (*  CRT lift helpers                                                   *)
@@ -59,13 +57,25 @@ Opaque Z_to_int.
 
 Lemma pol_to_polyrat_coef0 (l : list Z) :
   l <> @nil Z -> (pol_to_polyrat l)`_0 = (Z_to_int (head Z0 l))%:~R :> rat.
-Proof. destruct l as [|z l']; [tauto | ]. move=> _. rewrite /pol_to_polyrat coef_Poly /=. reflexivity. Qed.
+Proof. by case: l => [//|z l'] _; rewrite /pol_to_polyrat coef_Poly. Qed.
+
+Lemma Z_to_int_neq0' (D : BinInt.Z) : D <> BinInt.Z0 -> Z_to_int D != 0 :> int.
+Proof. move=> HD; apply/eqP => Hz. apply HD.
+  destruct D as [|p|p]; [reflexivity|exfalso|exfalso];
+  (revert Hz; change (Z_to_int _) with (Posz (Pos.to_nat p)) ||
+              change (Z_to_int _) with (Negz (Pos.to_nat p - 1)); intro Hz).
+  - injection Hz => Hz'. have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
+  - discriminate Hz. Qed.
 
 Lemma intr_rat_eq0 (D : BinInt.Z) : (Z_to_int D)%:~R = 0 :> rat -> D = Z0.
-Proof. Transparent Z_to_int. move/eqP. rewrite intr_eq0 => /eqP H.
-  destruct D as [|p|p]; [reflexivity|exfalso|exfalso].
-  - simpl Z_to_int in H. injection H => H'. have := Pos2Nat.is_pos p; rewrite H'; exact (Nat.lt_irrefl 0).
-  - discriminate H. Opaque Z_to_int. Qed.
+Proof.
+  case Hd: (Z.eqb D BinInt.Z0); first by move=> _; apply Z.eqb_eq, Hd.
+  move=> Hzr; exfalso.
+  have HD : D <> BinInt.Z0 by apply Z.eqb_neq, Hd.
+  have Hne := Z_to_int_neq0' D HD.
+  move: Hne; rewrite -(@intr_eq0 rat) Hzr eqxx.
+  by [].
+Qed.
 
 Lemma ListDef_nth_eq (T : Type) (d : T) (l : list T) (n : nat) :
   ListDef.nth n l d = nth d l n.
@@ -83,29 +93,14 @@ Lemma mat_int_to_rat_scale_inv' (M : list (list BinInt.Z)) (D : BinInt.Z) (n : n
   mat_int_to_rat M D n = (Z_to_int D)%:~R^-1 *: mat_int_to_rat M 1 n.
 Proof. apply/matrixP => i j. rewrite /mat_int_to_rat !mxE GRing.mulr1. by rewrite GRing.mulrC. Qed.
 
-Lemma Z_to_int_neq0' (D : BinInt.Z) : D <> BinInt.Z0 -> Z_to_int D != 0 :> int.
-Proof. move=> HD; apply/eqP => Hz. apply HD.
-  destruct D as [|p|p]; [reflexivity|exfalso|exfalso];
-  (revert Hz; change (Z_to_int _) with (Posz (Pos.to_nat p)) ||
-              change (Z_to_int _) with (Negz (Pos.to_nat p - 1)); intro Hz).
-  - injection Hz => Hz'. have := Pos2Nat.is_pos p; rewrite Hz'; exact (Nat.lt_irrefl 0).
-  - discriminate Hz. Qed.
-
 (* ================================================================ *)
 (*  M1 invertibility                                                   *)
 (* ================================================================ *)
 
-(* Z-level primality checker for ~10^9 primes (0.6s via vm_compute) *)
-Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
-  match fuel with
-  | O => true
-  | S f => negb (Z.eqb (Z.modulo p d) 0) && check_no_divisor p (d + 1) f
-  end.
-Definition check_prime_Z (p : Z) : bool :=
-  (1 <? p)%Z && check_no_divisor p 2 (Z.to_nat (Z.sqrt p - 1)).
-(* check_prime_Z_mc from PrimeCheck.v: fully proved, 0 axioms *)
+(* check_prime_Z / check_no_divisor / check_prime_Z_mc are imported from
+   PrimeCheck.v above; fully proved, 0 axioms. *)
 
-Lemma M1_charpoly_hd_nz : head Z0 (char_poly_int M1_int) <> Z0.
+Lemma M1_charpoly_hd_neq0 : head Z0 (char_poly_int M1_int) <> Z0.
 Proof.
   set p := List.hd 0%uint63 crt_primes_all.
   (* 1. valid_prime p *)
@@ -157,7 +152,7 @@ Proof.
   { unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. }
   rewrite unitmxE GRing.unitfE.
   apply/negP => /eqP Hdet0.
-  apply M1_charpoly_hd_nz; apply: intr_rat_eq0.
+  apply M1_charpoly_hd_neq0; apply: intr_rat_eq0.
   rewrite -(pol_to_polyrat_coef0 _ Hne) Hcpi.
   by rewrite char_poly_det Hdet0 mulr0.
 Qed.
@@ -190,9 +185,7 @@ Proof.
   have Hmmul : mat_int_to_rat (mmul M1_int A_int) 1 42 =
     mat_int_to_rat M1_int 1 42 *m mat_int_to_rat A_int 1 42.
   { exact (mat_int_to_rat_mmul M1_int A_int 42 M1_int_dim' A_int_dim' M1_int_wf' A_int_wf'). }
-  exact (eq_ind _ (fun x => x = _) (eq_ind _ (fun x => _ = x)
-    (f_equal (fun M => mat_int_to_rat M 1 42) HZ) _ HRHS) _
-    (eq_trans HLHS (f_equal (fun x => _ *: x) Hmmul))).
+  by rewrite -Hmmul -HLHS -HRHS HZ.
 Qed.
 
 (* [mat_A_scale_eq_Arat]: the structural equality `A_1_int = D_A *: A_rat`.
