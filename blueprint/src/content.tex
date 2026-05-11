@@ -30,16 +30,30 @@ algebraic claim inside the kernel.
 The end-to-end statement is
 \begin{verbatim}
 Theorem maynard_M105_certified :
-  MaynardVerify.all_match_M1Z = true /\
-  MaynardVerify.all_match_M2Z = true /\
+  all_match_M1Z = true /\
+  all_match_M2Z = true /\
+  (forall i j : nat,
+     MaynardSpec.M1_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
+  (forall i j : nat,
+     MaynardSpec.M2_spec_ij i j
+     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 \end{verbatim}
-proven in \texttt{theories/S1/Cert.v}. \texttt{Print Assumptions} on this
-theorem reports only Rocq's \texttt{PrimInt63} kernel primitives:
-the project itself contains zero \texttt{Axiom} declarations and zero
-\texttt{Admitted} lemmas.
+proven in \texttt{theories/S1/Cert.v}. The first two conjuncts are the
+$\Z$-level cross-multiplication checks linking the FLINT-shipped integer
+matrices $M_{1,2}^{\mathrm{int}}$ to the $\Z$-level closed form
+$\texttt{m\{1,2\}\_num\_den}$. The next two are the kernel-Qed bridge
+from the $\Z$-level closed form to the $\rat$-level paper-form spec
+$\texttt{M\{1,2\}\_spec\_ij}$, the readable transcription of Maynard's
+Lemma~8.2. Together they certify the full chain
+$\text{FLINT integer matrices} = \text{$\Z$-level closed form}
+ = \text{$\rat$-level paper-form spec} \Rightarrow \text{eigenvalue} > 4/105$
+under a single \texttt{Print Assumptions}, which reports only Rocq's
+\texttt{PrimInt63} kernel primitives: the project itself contains zero
+\texttt{Axiom} declarations and zero \texttt{Admitted} lemmas.
 
 \paragraph{Scope.}
 What this Rocq layer proves, kernel-checked, is the left-hand side of
@@ -1081,23 +1095,39 @@ existential.
 \begin{theorem}[End-to-end certification]\label{thm:M105}
 \rocq{PrimeGapS1.Cert.maynard_M105_certified}
 \rocqok
-\uses{thm:M1_match, thm:M2_match, thm:headline}
+\uses{thm:M1_match, thm:M2_match, thm:M1_spec_rat_eq,
+      thm:M2_spec_rat_eq, thm:headline}
 The conjunction
 \[
-\texttt{all\_match\_M1Z} = \texttt{true}
+\begin{aligned}
+&\texttt{all\_match\_M1Z} = \texttt{true}
 \;\wedge\;
-\texttt{all\_match\_M2Z} = \texttt{true}
-\;\wedge\;
+\texttt{all\_match\_M2Z} = \texttt{true}\\
+&\quad\wedge\;
+\bigl(\forall i\,j.\;
+  \texttt{M1\_spec\_ij}(i,j)
+    = \texttt{qfrac}(\texttt{m1\_num\_den\_at}(i,j))\bigr)\\
+&\quad\wedge\;
+\bigl(\forall i\,j.\;
+  \texttt{M2\_spec\_ij}(i,j)
+    = \texttt{qfrac}(\texttt{m2\_num\_den\_at}(i,j))\bigr)\\
+&\quad\wedge\;
 \bigl(\exists \lambda \in \realalg.\;
    \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
    \;\wedge\;
    \texttt{ratr}(4/105) < \lambda\bigr).
+\end{aligned}
 \]
 \end{theorem}
 \begin{proof}\rocqok
-Three-way \texttt{split} over the bool facts
-\texttt{all\_match\_M1Z\_true}, \texttt{all\_match\_M2Z\_true} and
-the spectral existence Theorem~\ref{thm:headline}. The combined
+A five-way \texttt{split} over the bool facts
+\texttt{all\_match\_M1Z\_true}, \texttt{all\_match\_M2Z\_true},
+the two paper-form $\leftrightarrow$ $\Z$-level bridges
+\texttt{MaynardSpecBridge.M1\_spec\_rat\_eq} and
+\texttt{MaynardSpecBridge.M2\_spec\_rat\_eq}, and the spectral
+existence Theorem~\ref{thm:headline}. The two bridge conjuncts close
+the trust chain from the FLINT-shipped integer matrices all the way to
+the $\rat$-level paper-form spec inside a single \Qed{}. The combined
 \texttt{Print Assumptions} reports only the standard Rocq
 \texttt{PrimInt63} kernel primitives (used by \vmcompute{} on the
 $\Uintsf$ CRT computations). No project-specific axioms.
@@ -1212,16 +1242,19 @@ roots derived from the polynomial coefficients. No custom bound is
 introduced.
 
 \paragraph{Build profile.}
-\texttt{make -j} on a multi-core box: ${\sim}37$~min wall-clock
-(${\sim}80$~min sequential). The dominant single-\Qed{} costs are:
+On a 16~GB / 6-thread machine: ${\sim}28$~min wall-clock with
+\texttt{make -j6}, ${\sim}62$~min wall-clock with \texttt{make -j2}
+(clean rebuild). The dominant single-\Qed{} costs are:
 \begin{itemize}
 \item \texttt{fl\_crt\_bound}: ${\sim}18$~min — the
   $2B + 2|c'| < \prod p_i$ comparison with ${\sim}10{,}000$-digit
   arithmetic.
 \item Theorem~\ref{thm:M2_match}
-  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min — $1764$ entries,
-  each up to $36$ rational summands with intermediate denominators
-  reaching $\sim 10^{7000}$ digits.
+  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially across
+  the six $7$-row chunks (\texttt{MaynardVerify/M2\_0..5.v}), reduced to
+  a per-chunk wall of a few minutes under \texttt{make -j} — $1764$
+  entries, each up to $36$ rational summands with intermediate
+  denominators reaching $\sim 10^{7000}$ digits.
 \item Lemma~\ref{lem:crt_primes_all_prime}
   (\texttt{crt\_primes\_710\_all\_prime}): ${\sim}7$~min — $710$
   pure-$\Z$ trial-division primality checks.
@@ -1231,19 +1264,22 @@ introduced.
 \item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal parser
   on the shipped \texttt{charpoly\_of\_A\_int\_bigZ} integers.
 \end{itemize}
-With \texttt{make -j} the M2 \vmcompute{} runs concurrently with the
-CRT primality and 710-FL phases, so it does not strictly add
-$35$ minutes to the wall clock — but it dominates the tail.
+With \texttt{make -j6} the six M2 chunks, the CRT primality phase, and
+the $710$-FL phases all run concurrently, so the longest single chunk
+plus \texttt{fl\_crt\_bound} dominates the wall clock rather than the
+sequential sum.
 
-\paragraph{Project size.} $22$ \texttt{.v} files plus $12$ in two
-parallel-chunk subdirectories, ${\sim}13{,}000$ lines total under
-\texttt{theories/S1/}; \texttt{Witness.v} alone is ${\sim}5{,}700$
-lines of autogenerated certificate data.
+\paragraph{Project size.} $23$ top-level \texttt{.v} files plus $14$
+files in two parallel-chunk subdirectories (\texttt{MaynardVerify/} and
+\texttt{CharPolyAgree/}, each with a \texttt{Def.v} and six chunks),
+${\sim}13{,}000$ lines total under \texttt{theories/S1/};
+\texttt{Witness.v} alone is ${\sim}5{,}700$ lines of autogenerated
+certificate data.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
 
-The dependency graph has two independent backbones merging at
+The dependency graph has three independent backbones merging at
 \texttt{Cert.v}:
 
 \paragraph{IVT backbone.}
@@ -1254,15 +1290,19 @@ Headline output: Theorem~\ref{thm:maynard_L1}.
 \paragraph{CharPoly backbone.}
 \texttt{Witness} $\to$ \texttt{IntMat} / \texttt{IntPoly} $\to$
 \texttt{CharPoly} $\to$ \texttt{ModularArith} $\to$
-\texttt{CharPolyAgree} + \texttt{CRTBridge} $\to$ \texttt{CRTLift}
+\texttt{CharPolyAgree/} (\texttt{Def.v} + \texttt{Chunk\_0..5.v} +
+assembly) + \texttt{CRTBridge} $\to$ \texttt{Fermat} +
+\texttt{PrimeCheck} + \texttt{CRTCheck} $\to$ \texttt{CRTLift}
 $\to$ \texttt{CharPolyScale} $\to$ \texttt{CertL2}.
 Headline output: Theorem~\ref{thm:charpoly_int_Dq}.
 
 \paragraph{Maynard-spec backbone.}
 \texttt{Witness} $\to$ \texttt{MaynardFactQ} $\to$
 \texttt{MaynardBasis} + \texttt{MaynardSpec} $\to$
-\texttt{MaynardVerify}. Headline output:
-Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}.
+\texttt{MaynardVerify/} (\texttt{Def.v} + \texttt{M2\_0..5.v} +
+assembly). Headline output: Theorems~\ref{thm:M1_match}
+and~\ref{thm:M2_match}. The leaf \texttt{MaynardSpecBridge.v} adds
+Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} on top.
 
 The three backbones merge at \texttt{Cert.v}, producing
 Theorems~\ref{thm:headline} and~\ref{thm:M105}. A single
