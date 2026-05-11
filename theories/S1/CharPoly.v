@@ -47,7 +47,7 @@ Open Scope Z_scope.
 
 From mathcomp Require Import all_boot all_algebra.
 From mathcomp.algebra_tactics Require Import ring lra.
-Import GRing.Theory.
+Import GRing.Theory Num.Theory.
 
 From PrimeGapS1 Require Import IntPoly IntMat.
 
@@ -205,20 +205,14 @@ Proof. reflexivity. Qed.
 
 (* mat_get (mzero n) i j = 0 when both indices are in range. *)
 Lemma nth_Z_zrow (n i : nat) : nth_Z (zrow n) i = Z0.
-Proof.
-  revert i. induction n as [|k IH]; intros [|i]; simpl; try reflexivity.
-  apply IH.
-Qed.
+Proof. by elim: n i => [|k IH] [|i] //=; apply: IH. Qed.
 
 Lemma nth_mzero_aux_is_zrow (rows cols : nat) (i : nat) (d : list Z) :
   (i < rows)%coq_nat ->
   List.nth i (mzero_aux rows cols) d = zrow cols.
 Proof.
-  revert i. induction rows as [|k IH]; intros [|i] H; simpl.
-  - exfalso; lia.
-  - exfalso; lia.
-  - reflexivity.
-  - apply IH. lia.
+  elim: rows i => [|k IH] [|i] /= H //; try by exfalso; lia.
+  by apply: IH; lia.
 Qed.
 
 Lemma mat_get_mzero (n i j : nat) :
@@ -250,22 +244,18 @@ Qed.
 Lemma nth_Z_vscale (c : Z) (xs : list Z) (j : nat) :
   nth_Z (vscale c xs) j = BinInt.Z.mul c (nth_Z xs j).
 Proof.
-  revert j. induction xs as [|x xs IH]; intros [|j]; simpl.
-  - unfold nth_Z; simpl. rewrite BinInt.Z.mul_0_r. reflexivity.
-  - unfold nth_Z; simpl. rewrite BinInt.Z.mul_0_r. reflexivity.
-  - reflexivity.
-  - apply IH.
+  elim: xs j => [|x xs IH] [|j] //=.
+  - by unfold nth_Z; rewrite /= BinInt.Z.mul_0_r.
+  - by unfold nth_Z; rewrite /= BinInt.Z.mul_0_r.
+  - exact: IH.
 Qed.
 
 Lemma nth_map_vscale (c : Z) (A : mat) (i : nat) (d : list Z) :
   (i < length A)%coq_nat ->
   List.nth i (List.map (vscale c) A) d = vscale c (List.nth i A d).
 Proof.
-  revert i. induction A as [|a A IH]; intros [|i] H; simpl.
-  - exfalso; simpl in H; lia.
-  - exfalso; simpl in H; lia.
-  - reflexivity.
-  - apply IH. simpl in H; lia.
+  elim: A i => [|a A IH] [|i] /= H //; try by exfalso; lia.
+  by apply: IH; lia.
 Qed.
 
 Lemma mat_get_mscale (c : Z) (A : mat) (i j : nat) :
@@ -376,38 +366,34 @@ Lemma nth_eye_row_eq (n i : nat) :
   (i < n)%coq_nat ->
   nth_Z (eye_row n i) i = BinInt.Zpos xH.
 Proof.
-  revert i. induction n as [|k IH]; intros [|i] H; simpl.
-  - exfalso; lia.
-  - exfalso; lia.
-  - reflexivity.
-  - apply IH. lia.
+  elim: n i => [|k IH] [|i] /= H //; try by exfalso; lia.
+  by apply: IH; lia.
 Qed.
 
 Lemma nth_eye_row_neq (n i j : nat) :
   i <> j ->
   nth_Z (eye_row n i) j = Z0.
 Proof.
-  revert i j. induction n as [|k IH]; intros i j H; simpl.
-  - unfold nth_Z. destruct j; reflexivity.
+  elim: n i j => [|k IH] i j /= H.
+  - by unfold nth_Z; destruct j.
   - destruct i as [|i]; destruct j as [|j]; simpl.
-    + exfalso; apply H; reflexivity.
-    + apply nth_Z_zrow.
-    + reflexivity.
-    + apply IH. intros E; apply H. f_equal. exact E.
+    + by exfalso; apply H.
+    + exact: nth_Z_zrow.
+    + by [].
+    + by apply: IH => E; apply: H; f_equal.
 Qed.
 
 Lemma nth_meye_aux (n i k : nat) (d : list Z) :
   (i < k)%coq_nat -> (k <= n)%coq_nat ->
   List.nth i (meye_aux n k) d = eye_row n i.
 Proof.
-  revert i. induction k as [|k IH]; intros i H Hk; simpl.
-  - exfalso; lia.
-  - destruct (Nat.eq_dec i k) as [->|Hne].
-    + rewrite List.app_nth2; rewrite meye_aux_len; [| lia].
-      rewrite Nat.sub_diag. reflexivity.
-    + assert (Hik : (i < k)%coq_nat) by lia.
-      rewrite List.app_nth1; rewrite ?meye_aux_len; [| lia].
-      apply IH; lia.
+  elim: k i => [|k IH] i /= H Hk; first by exfalso; lia.
+  destruct (Nat.eq_dec i k) as [->|Hne].
+  - rewrite List.app_nth2; rewrite meye_aux_len; [| lia].
+    by rewrite Nat.sub_diag.
+  - have Hik : (i < k)%coq_nat by lia.
+    rewrite List.app_nth1; rewrite ?meye_aux_len; [| lia].
+    by apply: IH; lia.
 Qed.
 
 Lemma mat_get_meye_eq (n i : nat) :
@@ -454,24 +440,24 @@ Lemma nth_Z_vadd (xs ys : list Z) (j : nat) :
   List.length xs = List.length ys ->
   nth_Z (vadd xs ys) j = BinInt.Z.add (nth_Z xs j) (nth_Z ys j).
 Proof.
-  revert ys j. induction xs as [|x xs IH]; intros [|y ys] j Hlen;
-    simpl in Hlen; try discriminate; simpl.
-  - unfold nth_Z; destruct j; simpl; reflexivity.
+  elim: xs ys j => [|x xs IH] [|y ys] j /= Hlen; try discriminate.
+  - by unfold nth_Z; destruct j.
   - destruct j; simpl; [reflexivity|].
-    assert (Hlen' : List.length xs = List.length ys) by (inversion Hlen; reflexivity).
-    specialize (IH ys j Hlen'). exact IH.
+    have Hlen' : List.length xs = List.length ys
+      by (inversion Hlen; reflexivity).
+    exact: (IH ys j Hlen').
 Qed.
 
 Lemma nth_madd (A B : mat) (i : nat) :
   List.length A = List.length B ->
   List.nth i (madd A B) nil = vadd (List.nth i A nil) (List.nth i B nil).
 Proof.
-  revert B i. induction A as [|a A IH]; intros [|b B] i Hlen;
-    simpl in Hlen; try discriminate; simpl.
-  - destruct i; simpl; reflexivity.
+  elim: A B i => [|a A IH] [|b B] i /= Hlen; try discriminate.
+  - by destruct i.
   - destruct i; simpl; [reflexivity|].
-    assert (Hlen' : List.length A = List.length B) by (inversion Hlen; reflexivity).
-    specialize (IH B i Hlen'). exact IH.
+    have Hlen' : List.length A = List.length B
+      by (inversion Hlen; reflexivity).
+    exact: (IH B i Hlen').
 Qed.
 
 Definition all_rows_len (n : nat) (A : mat) : Prop :=
@@ -517,7 +503,7 @@ Lemma mtrace_aux_diag_sum (A : mat) (k : nat) :
   Z_to_int (mtrace_aux k A)
   = (\sum_(i < length A) Z_to_int (mat_get A i (k + i)%coq_nat))%R.
 Proof.
-  revert k. induction A as [|row rest IH]; intros k; simpl.
+  elim: A k => [|row rest IH] k /=.
   - by rewrite big_ord0.
   - rewrite Z_to_int_add. rewrite big_ord_recl.
     rewrite Nat.add_0_r.
@@ -561,23 +547,17 @@ Qed.
 Lemma nth_tails (m : mat) (k : nat) :
   List.nth k (tails m) nil = List.tl (List.nth k m nil).
 Proof.
-  revert k. induction m as [|row rest IH]; intros k; simpl.
-  - destruct k; simpl; reflexivity.
-  - destruct row as [|x xs]; destruct k as [|k']; simpl.
-    + reflexivity.
-    + apply IH.
-    + reflexivity.
-    + apply IH.
+  elim: m k => [|row rest IH] k /=.
+  - by destruct k.
+  - by destruct row as [|x xs]; destruct k as [|k']; simpl; try apply: IH.
 Qed.
 
 Lemma nth_heads (m : mat) (k : nat) :
   List.nth k (heads m) Z0 = nth_Z (List.nth k m nil) 0.
 Proof.
-  revert k. induction m as [|row rest IH]; intros k; simpl.
-  - destruct k; reflexivity.
-  - destruct row as [|x xs]; destruct k as [|k']; simpl; try reflexivity.
-    + apply IH.
-    + apply IH.
+  elim: m k => [|row rest IH] k /=.
+  - by destruct k.
+  - by destruct row as [|x xs]; destruct k as [|k']; simpl; try apply: IH.
 Qed.
 
 Lemma length_heads (m : mat) : List.length (heads m) = List.length m.
@@ -615,32 +595,30 @@ Lemma length_mtrans_fuel_exact (f : nat) (m : mat) :
   m <> nil -> all_rows_at_least f m ->
   List.length (mtrans_fuel f m) = f.
 Proof.
-  revert m. induction f as [|f IH]; intros m Hne Hall; simpl.
-  - reflexivity.
-  - rewrite (all_empty_false_of_Sk f m Hne Hall). simpl.
-    f_equal. apply IH.
-    + destruct m as [|r rest]; [exfalso; apply Hne; reflexivity|].
-      simpl. destruct r as [|x r']; simpl.
-      * destruct Hall as [Hr _]. simpl in Hr. lia.
-      * intros E; discriminate.
-    + apply all_rows_at_least_tails. exact Hall.
+  elim: f m => [|f IH] m /= Hne Hall; first by [].
+  rewrite (all_empty_false_of_Sk f m Hne Hall). simpl.
+  f_equal. apply: IH.
+  - destruct m as [|r rest]; [exfalso; apply: Hne; reflexivity|].
+    simpl. destruct r as [|x r']; simpl.
+    + destruct Hall as [Hr _]. simpl in Hr. lia.
+    + intros E; discriminate.
+  - exact: all_rows_at_least_tails.
 Qed.
 
 Lemma length_nth_mtrans_fuel (f : nat) (m : mat) (j : nat) :
   (j < f)%coq_nat -> all_rows_at_least f m ->
   List.length (List.nth j (mtrans_fuel f m) nil) = List.length m.
 Proof.
-  revert m j. induction f as [|f IH]; intros m j Hj Hall; simpl.
-  - lia.
-  - destruct m as [|r rest] eqn:Em.
-    + simpl. destruct j; reflexivity.
-    + have Hne: (r :: rest) <> nil by intros E; discriminate.
-      rewrite <- Em in *.
-      rewrite (all_empty_false_of_Sk f m Hne Hall).
-      destruct j as [|j']; simpl.
-      * apply length_heads.
-      * rewrite IH; [| lia | apply all_rows_at_least_tails; exact Hall].
-        apply length_tails.
+  elim: f m j => [|f IH] m j /= Hj Hall; first by lia.
+  destruct m as [|r rest] eqn:Em.
+  - by destruct j.
+  - have Hne: (r :: rest) <> nil by intros E; discriminate.
+    rewrite <- Em in *.
+    rewrite (all_empty_false_of_Sk f m Hne Hall).
+    destruct j as [|j']; simpl.
+    + exact: length_heads.
+    + rewrite IH; [| lia | apply: all_rows_at_least_tails; exact Hall].
+      exact: length_tails.
 Qed.
 
 Lemma nth_nth_mtrans_fuel (f : nat) (m : mat) (j k : nat) :
@@ -648,22 +626,19 @@ Lemma nth_nth_mtrans_fuel (f : nat) (m : mat) (j k : nat) :
   List.nth k (List.nth j (mtrans_fuel f m) nil) Z0
   = nth_Z (List.nth k m nil) j.
 Proof.
-  revert m j k. induction f as [|f IH]; intros m j k Hj Hall.
-  - lia.
-  - simpl.
-    destruct m as [|r rest] eqn:Em.
-    + simpl. unfold nth_Z. destruct j; destruct k; simpl; reflexivity.
-    + have Hne : (r :: rest) <> nil by intros E; discriminate.
-      rewrite <- Em in *.
-      rewrite (all_empty_false_of_Sk f m Hne Hall).
-      destruct j as [|j']; simpl.
-      * rewrite nth_heads. reflexivity.
-      * rewrite IH; [| lia | apply all_rows_at_least_tails; exact Hall].
-        rewrite nth_tails.
-        unfold nth_Z.
-        destruct (List.nth k m nil) as [|x xs]; simpl.
-        -- destruct j'; reflexivity.
-        -- reflexivity.
+  elim: f m j k => [|f IH] m j k Hj Hall; first by lia.
+  simpl.
+  destruct m as [|r rest] eqn:Em.
+  - by unfold nth_Z; destruct j; destruct k.
+  - have Hne : (r :: rest) <> nil by intros E; discriminate.
+    rewrite <- Em in *.
+    rewrite (all_empty_false_of_Sk f m Hne Hall).
+    destruct j as [|j']; simpl.
+    + by rewrite nth_heads.
+    + rewrite IH; [| lia | apply: all_rows_at_least_tails; exact Hall].
+      rewrite nth_tails.
+      unfold nth_Z.
+      by destruct (List.nth k m nil) as [|x xs]; simpl; [destruct j'|].
 Qed.
 
 Lemma all_rows_len_to_at_least (n : nat) (m : mat) :
@@ -736,7 +711,7 @@ Lemma Z_to_int_dot_int_sum (xs ys : list Z) (n : nat) :
   = (\sum_(k < n)
        ((Z_to_int (nth_Z xs k))%:~R * (Z_to_int (nth_Z ys k))%:~R))%R.
 Proof.
-  revert ys n. induction xs as [|x xs IH]; intros ys n Hlen; simpl.
+  elim: xs ys n => [|x xs IH] ys n /= Hlen.
   - rewrite /=.
     change (Z_to_int Z0) with (0%R : int).
     rewrite /=.
@@ -915,7 +890,7 @@ Proof.
       destruct (Pos.to_nat pd) as [|m] eqn:E.
       { exfalso; exact (Nat.lt_irrefl 0 Hpos). }
       clear Hpos E. move=> H.
-      have Hgt0 : (0 < (m.+1%:R : rat))%R by apply/Num.Theory.ltr0Sn.
+      have Hgt0 : (0 < (m.+1%:R : rat))%R by apply/ltr0Sn.
       rewrite H in Hgt0. discriminate Hgt0.
     + rewrite Z_to_int_neg_pos /= in Habs. revert Habs. rewrite rmorphN /= /intmul /=.
       have Hpos := Pos2Nat.is_pos pd.
@@ -924,7 +899,7 @@ Proof.
       clear Hpos E.
       move=> H. have : (- (m.+1%:R : rat) = 0)%R by exact H.
       move/eqP. rewrite oppr_eq0 => /eqP H2.
-      have Hgt0 : (0 < (m.+1%:R : rat))%R by apply/Num.Theory.ltr0Sn.
+      have Hgt0 : (0 < (m.+1%:R : rat))%R by apply/ltr0Sn.
       rewrite H2 in Hgt0. discriminate Hgt0.
 Qed.
 
@@ -1274,7 +1249,7 @@ Proof.
   rewrite mulrC -mulrA.
   rewrite mulVf; last first.
   { apply/eqP => Habs.
-    have := @Num.Theory.ltr0Sn _ k'.
+    have := @ltr0Sn _ k'.
     move=> /(_ rat). rewrite Habs. by move=> []. }
   rewrite mulr1.
   congr (- _)%R.
@@ -1325,7 +1300,7 @@ Proof.
       - exact (ltnW (leq_trans (ltn_ord j) Hk'le)). }
     have Hkne0 : (k'.+1%:R : rat) != 0%R.
     { apply/eqP => Habs.
-      have := @Num.Theory.ltr0Sn _ k'.
+      have := @ltr0Sn _ k'.
       move=> /(_ rat). rewrite Habs. by move=> []. }
     apply (mulfI Hkne0).
     rewrite Hfl Hsums_eq Hnewton subSS opprK. reflexivity.
@@ -1390,10 +1365,10 @@ Lemma length_vadd (xs ys : list Z) :
   List.length xs = List.length ys ->
   List.length (vadd xs ys) = List.length xs.
 Proof.
-  revert ys; induction xs as [|x xs' IH]; intros ys Hlen; simpl.
-  - destruct ys; simpl in Hlen; [reflexivity | discriminate].
+  elim: xs ys => [|x xs' IH] ys /= Hlen.
+  - by destruct ys; simpl in Hlen; [|discriminate].
   - destruct ys as [|y ys']; simpl in Hlen; [discriminate |].
-    simpl. f_equal. apply IH. lia.
+    by simpl; f_equal; apply: IH; lia.
 Qed.
 
 Lemma mat_dim_mscale_eq (c : Z) (A : mat) : mat_dim (mscale c A) = mat_dim A.
@@ -1406,10 +1381,11 @@ Lemma mat_dim_madd_eq (A B : mat) :
   mat_dim A = mat_dim B ->
   mat_dim (madd A B) = mat_dim A.
 Proof.
-  unfold mat_dim. revert B; induction A as [|a A' IH]; intros B Hlen; simpl.
-  - destruct B; simpl in Hlen; [reflexivity | discriminate].
+  unfold mat_dim.
+  elim: A B => [|a A' IH] B /= Hlen.
+  - by destruct B; simpl in Hlen; [|discriminate].
   - destruct B as [|b B']; [discriminate |].
-    simpl. f_equal. apply IH. simpl in Hlen. lia.
+    by simpl; f_equal; apply: IH; simpl in Hlen; lia.
 Qed.
 
 Lemma all_rows_len_mscale (n : nat) (c : Z) (A : mat) :
@@ -1427,7 +1403,7 @@ Lemma all_rows_len_madd (n : nat) (A B : mat) :
   all_rows_len n (madd A B).
 Proof.
   unfold all_rows_len, mat_dim.
-  revert B; induction A as [|a A' IH]; intros B Hlen HA HB i Hi.
+  elim: A B => [|a A' IH] B Hlen HA HB i Hi.
   - destruct B; simpl in *; lia.
   - destruct B as [|b B']; [discriminate |].
     simpl in Hi |- *. destruct i as [|i'].
@@ -1435,8 +1411,8 @@ Proof.
       * exact (HA 0%nat ltac:(simpl; lia)).
       * have Ha : length a = n := HA 0%nat ltac:(simpl; lia).
         have Hb : length b = n := HB 0%nat ltac:(simpl; lia).
-        rewrite Ha Hb. reflexivity.
-    + apply (IH B' ltac:(simpl in Hlen; lia)
+        by rewrite Ha Hb.
+    + apply: (IH B' ltac:(simpl in Hlen; lia)
                (fun j Hj => HA (S j) ltac:(simpl; lia))
                (fun j Hj => HB (S j) ltac:(simpl; lia))).
       lia.
@@ -1457,11 +1433,10 @@ Proof. exact: all_rows_len_mzero_aux. Qed.
 
 Lemma length_eye_row (n i : nat) : List.length (eye_row n i) = n.
 Proof.
-  revert i; induction n as [|k IH]; intros i; simpl.
-  - reflexivity.
-  - destruct i; simpl; f_equal.
-    + apply length_zrow.
-    + apply IH.
+  elim: n i => [|k IH] i //=.
+  destruct i; simpl; f_equal.
+  - exact: length_zrow.
+  - exact: IH.
 Qed.
 
 Lemma all_rows_len_meye_aux (n i : nat) :
@@ -1687,7 +1662,7 @@ Proof.
         rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
         rewrite mulrC -mulrA mulVf; last first.
         { apply/eqP => Habs.
-          have := @Num.Theory.ltr0Sn _ k.
+          have := @ltr0Sn _ k.
           move=> /(_ rat). rewrite Habs. by move=> []. }
         by rewrite mulr1. }
       have Htrace_rat :
@@ -1752,14 +1727,13 @@ Lemma fl_loop_eq_fl_state (A : mat) (steps j : nat) (acc : list Z) :
           (fl_M_int_k A j) (fl_c_int_k A j) acc
   = rev (map (fl_c_int_k A) (iota (S j) steps)) ++ acc.
 Proof.
-  revert j acc. induction steps as [|s IH] => j acc.
-  - simpl. reflexivity.
-  - simpl fl_loop.
-    rewrite -(fl_M_int_k_step A j).
-    rewrite -(fl_c_int_k_step A j).
-    replace (Z.pos (PosDef.Pos.of_succ_nat j + 1)) with (Z.of_nat j.+2) by lia.
-    rewrite /= rev_cons -cats1 -catA /=.
-    exact (IH j.+1 (fl_c_int_k A j.+1 :: acc)).
+  elim: steps j acc => [|s IH] j acc //=.
+  simpl fl_loop.
+  rewrite -(fl_M_int_k_step A j).
+  rewrite -(fl_c_int_k_step A j).
+  replace (Z.pos (PosDef.Pos.of_succ_nat j + 1)) with (Z.of_nat j.+2) by lia.
+  rewrite /= rev_cons -cats1 -catA /=.
+  exact: (IH j.+1 (fl_c_int_k A j.+1 :: acc)).
 Qed.
 
 (* ------------------------------------------------------------------
