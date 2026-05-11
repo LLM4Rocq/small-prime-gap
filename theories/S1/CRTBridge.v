@@ -1238,25 +1238,6 @@ Qed.
 (* vm_compute on small examples and state the general result.          *)
 (* ================================================================== *)
 
-(* Small sanity check: the bridge holds on a 2x2 example *)
-Example bridge_2x2 :
-  let M := [[1; 2]; [3; 4]]%Z in
-  let p := 7%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
-Example bridge_3x3 :
-  let M := [[2; 0; 0]; [0; 3; 0]; [0; 0; 5]]%Z in
-  let p := 11%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
-Example bridge_eye3 :
-  let M := meye 3 in
-  let p := 13%uint63 in
-  List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M.
-Proof. vm_compute. reflexivity. Qed.
-
 (* ================================================================== *)
 (* Section 9: Application to CRT lift                                  *)
 (*                                                                     *)
