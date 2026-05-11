@@ -28,15 +28,19 @@ Open Scope ring_scope.
 (* A_rat is defined in CertL2.v; imported via Require above. *)
 
 (* ------------------------------------------------------------------
-   L1 — Sturm count of the chain shipped in WitnessChain.v equals
-   the number of real roots of charpoly_int strictly above 4/105.
-   For the skeleton we only state the consequence we need: the
-   existence of a realalg root of (the lift of) charpoly_int strictly
-   above ratr (4/105).
+   L1 — an IVT (intermediate value theorem) argument on charpoly_int
+   produces a realalg root strictly above ratr (4/105). The proof
+   reads two vm_compute sign Qeds on charpoly_int directly
+   (sign_at_rat 4 105 = -1, sign_at_pinf = 1) and feeds them to
+   mathcomp-real-closed's `poly_ivtoo`.
 
    `charpoly_as_poly_realalg` is concretely defined as the lift of
    the FLINT-shipped `charpoly_int` to {poly realalg} via the
    `pol_to_polyrat` bridge from CharPoly.v followed by `map_poly ratr`.
+
+   The lemma below is kept under the legacy name `sturm_count_correct`
+   for downstream callers; its statement is purely "there exists a
+   root > 4/105", and the proof is the IVT-based `maynard_L1_concrete`.
    ------------------------------------------------------------------ *)
 Definition charpoly_as_poly_realalg : {poly realalg} :=
   map_poly (ratr : rat -> realalg) (pol_to_polyrat charpoly_int).
