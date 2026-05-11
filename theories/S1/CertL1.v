@@ -100,13 +100,13 @@ have Hlc : (0 < lead_coef P)%R := charpoly_lc_pos.
 have Hpb : ~~ root P b.
 { apply/negP => Hroot.
   have Hin : b \in `[b, +oo[
-    by rewrite in_itv /= preorder.Order.PreorderTheory.lexx.
+    by rewrite in_itv /= lexx.
   by have := ge_cauchy_bound HP Hin; rewrite Hroot. }
 (* sgr(P(b)) = sgr(lc(P)) because b is above all roots *)
 have Hsgn : Num.sg P.[b] = sgp_pinfty P.
 { have := sgp_pinftyP (ge_cauchy_bound HP).
   move/(_ b).
-  rewrite in_itv /= preorder.Order.PreorderTheory.lexx //.
+  rewrite in_itv /= lexx //.
   by move=> /(_ isT). }
 rewrite -sgr_gt0 Hsgn /sgp_pinfty sgr_gt0 //.
 Qed.
