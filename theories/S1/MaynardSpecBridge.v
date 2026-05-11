@@ -196,18 +196,23 @@ Proof.
   exact: bin_fact.
 Qed.
 
+(* Tiny reflection bridge between Stdlib's `Nat.leb` and mathcomp's
+   `<=%N`.  Used in `binZ_to_rat`, where `binZ` is defined with
+   `Nat.leb` (Stdlib bool) but the proof lives in mathcomp leq. *)
+Lemma Nat_leb_leqP k n : reflect (k <= n)%N (Nat.leb k n).
+Proof. by apply: (iffP idP) => [/Nat.leb_le/leP|/leP/Nat.leb_le]. Qed.
+
 Lemma binZ_to_rat (n k : nat) :
   ((Z_to_int (binZ n k))%:~R : rat) = binQ n k.
 Proof.
   rewrite /binZ.
-  case Hkn: (Nat.leb k n).
-  - move/Nat.leb_le/leP: Hkn => Hkn.
-    rewrite Z_to_int_div_exact;
+  case: Nat_leb_leqP => Hkn.
+  - rewrite Z_to_int_div_exact;
       [|exact: factZ_factZ_pos|exact: factZ_factZ_dvd Hkn].
     rewrite Z_to_int_mul intrM !factZ_to_rat.
     by rewrite -binQ_factQ.
   - rewrite Z_to_int_0 /=.
-    move/Nat.leb_nle/leP: Hkn; rewrite -ltnNge => Hkn.
+    have {}Hkn : (n < k)%N by rewrite ltnNge; apply/negP.
     rewrite /binQ (bin_small Hkn) /=.
     by rewrite mulr0n.
 Qed.
