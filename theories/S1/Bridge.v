@@ -266,9 +266,7 @@ case: z => [|p|p]; [by left|right; left|right; right].
   by rewrite subn1 /=.
 Qed.
 
-Lemma Z_to_int_of_nat (n : nat) :
-  Z_to_int (BinInt.Z.of_nat n) = Posz n.
-Proof. case: n => [//|n]; by rewrite /Z_to_int /= SuccNat2Pos.id_succ. Qed.
+(* Z_to_int_of_nat, Z_to_int_mul, Z_to_int_add come from CharPoly.v. *)
 
 Lemma Z_to_int_opp_of_nat (n : nat) :
   Z_to_int (BinInt.Z.opp (BinInt.Z.of_nat n)) = (- Posz n)%R.
@@ -276,65 +274,6 @@ Proof.
 case: n => [|n] /=; first by rewrite /Z_to_int /= oppr0.
 rewrite /Z_to_int /= NegzE SuccNat2Pos.id_succ.
 by rewrite subn1 /=.
-Qed.
-
-Lemma Z_to_int_mul (a b : Z) :
-  Z_to_int (BinInt.Z.mul a b) = (Z_to_int a * Z_to_int b)%R.
-Proof.
-have [->|[[na [_ [-> ->]]]|[na [_ [-> ->]]]]] := Z_to_int_case a.
-- by rewrite /= mul0r.
-- have [->|[[nb [_ [-> ->]]]|[nb [_ [-> ->]]]]] := Z_to_int_case b.
-  + by rewrite BinInt.Z.mul_0_r mulr0 /=.
-  + by rewrite -Nat2Z.inj_mul Z_to_int_of_nat -PoszM.
-  + rewrite BinInt.Z.mul_opp_r -Nat2Z.inj_mul Z_to_int_opp_of_nat.
-    by rewrite mulrN -PoszM.
-- have [->|[[nb [_ [-> ->]]]|[nb [_ [-> ->]]]]] := Z_to_int_case b.
-  + by rewrite BinInt.Z.mul_0_r mulr0 /=.
-  + rewrite BinInt.Z.mul_opp_l -Nat2Z.inj_mul Z_to_int_opp_of_nat.
-    by rewrite mulNr -PoszM.
-  + rewrite BinInt.Z.mul_opp_opp -Nat2Z.inj_mul Z_to_int_of_nat.
-    by rewrite mulrNN -PoszM.
-Qed.
-
-Lemma nat_sub_Posz (n m : nat) :
-  ((Posz n - Posz m)%R : int) =
-  Z_to_int (BinInt.Z.sub (BinInt.Z.of_nat n) (BinInt.Z.of_nat m)).
-Proof.
-case Hcmp : (n <= m)%N.
-- have -> : BinInt.Z.sub (BinInt.Z.of_nat n) (BinInt.Z.of_nat m)
-          = BinInt.Z.opp (BinInt.Z.of_nat (m - n)).
-  { rewrite Nat2Z.inj_sub; [lia|apply/leP; exact: Hcmp]. }
-  rewrite Z_to_int_opp_of_nat.
-  rewrite -(subzn Hcmp).
-  by rewrite opprB.
-- move/negbT: Hcmp; rewrite -ltnNge => Hlt.
-  have Hle : (m <= n)%N := ltnW Hlt.
-  have -> : BinInt.Z.sub (BinInt.Z.of_nat n) (BinInt.Z.of_nat m)
-          = BinInt.Z.of_nat (n - m).
-  { rewrite Nat2Z.inj_sub; [lia|apply/leP; exact: Hle]. }
-  by rewrite Z_to_int_of_nat -(subzn Hle).
-Qed.
-
-Lemma Z_to_int_add (a b : Z) :
-  Z_to_int (BinInt.Z.add a b) = (Z_to_int a + Z_to_int b)%R.
-Proof.
-have [->|[[na [_ [-> ->]]]|[na [_ [-> ->]]]]] := Z_to_int_case a.
-- by rewrite BinInt.Z.add_0_l add0r.
-- have [->|[[nb [_ [-> ->]]]|[nb [_ [-> ->]]]]] := Z_to_int_case b.
-  + by rewrite BinInt.Z.add_0_r addr0 Z_to_int_of_nat.
-  + by rewrite -Nat2Z.inj_add Z_to_int_of_nat -PoszD.
-  + have -> : BinInt.Z.add (BinInt.Z.of_nat na) (BinInt.Z.opp (BinInt.Z.of_nat nb))
-            = BinInt.Z.sub (BinInt.Z.of_nat na) (BinInt.Z.of_nat nb)
-      by rewrite /BinInt.Z.sub.
-    by rewrite -nat_sub_Posz.
-- have [->|[[nb [_ [-> ->]]]|[nb [_ [-> ->]]]]] := Z_to_int_case b.
-  + by rewrite BinInt.Z.add_0_r addr0 Z_to_int_opp_of_nat.
-  + have -> : BinInt.Z.add (BinInt.Z.opp (BinInt.Z.of_nat na)) (BinInt.Z.of_nat nb)
-            = BinInt.Z.sub (BinInt.Z.of_nat nb) (BinInt.Z.of_nat na)
-      by rewrite /BinInt.Z.sub BinInt.Z.add_comm.
-    by rewrite -nat_sub_Posz addrC.
-  + rewrite -BinInt.Z.opp_add_distr -Nat2Z.inj_add Z_to_int_opp_of_nat.
-    by rewrite -opprD PoszD.
 Qed.
 
 (* Lift to the realalg level. *)
