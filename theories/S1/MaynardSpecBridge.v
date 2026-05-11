@@ -189,7 +189,7 @@ Lemma binQ_factQ (n k : nat) :
 Proof.
   move=> Hkn.
   have Hnz : factQ k * factQ (n - k)%nat != 0
-    by rewrite mulf_neq0 ?factQ_nz.
+    by rewrite mulf_neq0 ?factQ_neq0.
   apply: (canRL (mulfK Hnz)).
   rewrite /binQ /factQ -natrM -natrM.
   apply/eqP. rewrite Num.Theory.eqr_nat. apply/eqP.
