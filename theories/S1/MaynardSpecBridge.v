@@ -536,3 +536,81 @@ Proof.
   rewrite /M2_spec_ij /m2_num_den_at.
   by rewrite m2_num_den_to_rat.
 Qed.
+
+(* ============================================================== *)
+(*  Layer 9: denominator positivity of the Z-pair forms             *)
+(* ============================================================== *)
+
+Lemma m1_num_den_den_pos bi ci bj cj :
+  Z.lt 0 (m1_num_den bi ci bj cj).2.
+Proof. exact: factZ_pos. Qed.
+
+Lemma m1_num_den_at_den_pos i j : Z.lt 0 (m1_num_den_at i j).2.
+Proof. exact: m1_num_den_den_pos. Qed.
+
+Lemma qplus_den_pos (a b : Z * Z) :
+  Z.lt 0 a.2 -> Z.lt 0 b.2 -> Z.lt 0 (qplus a b).2.
+Proof.
+  case: a => [na da]; case: b => [nb db] /= Ha Hb.
+  exact: Z.mul_pos_pos.
+Qed.
+
+Lemma fold_left_qplus_den_pos {T : Type} (l : list T)
+      (g : T -> Z * Z) (acc : Z * Z) :
+  Z.lt 0 acc.2 ->
+  (forall x, Z.lt 0 (g x).2) ->
+  Z.lt 0 (List.fold_left (fun a x => qplus a (g x)) l acc).2.
+Proof.
+  elim: l acc => [//|x xs IH] acc Hacc Hg.
+  apply: IH; [|exact: Hg].
+  exact: qplus_den_pos Hacc (Hg x).
+Qed.
+
+Lemma m2_term_num_den_den_pos bi ci bj cj cp1 cp2 :
+  Z.lt 0 (m2_term_num_den bi ci bj cj cp1 cp2).2.
+Proof.
+  apply: Z.mul_pos_pos; last exact: factZ_pos.
+  apply: Z.mul_pos_pos; exact: factZ_pos.
+Qed.
+
+Lemma m2_num_den_den_pos bi ci bj cj :
+  Z.lt 0 (m2_num_den bi ci bj cj).2.
+Proof.
+  rewrite /m2_num_den.
+  have Hloop : forall (l : list nat) (acc : Z * Z),
+    Z.lt 0 acc.2 ->
+    Z.lt 0 (List.fold_left
+            (fun a cp1 => List.fold_left
+                            (fun b cp2 => qplus b
+                              (m2_term_num_den bi ci bj cj cp1 cp2))
+                            (List.seq 0 (S cj)) a)
+            l acc).2.
+  { elim => [//|cp1 cp1_rest IH] acc Hacc.
+    apply: IH.
+    apply: fold_left_qplus_den_pos => // cp2.
+    exact: m2_term_num_den_den_pos. }
+  by apply: Hloop.
+Qed.
+
+Lemma m2_num_den_at_den_pos i j : Z.lt 0 (m2_num_den_at i j).2.
+Proof. exact: m2_num_den_den_pos. Qed.
+
+(* ============================================================== *)
+(*  Layer 10: cross-multiplication in Z lifts to rat equality       *)
+(* ============================================================== *)
+
+(* Z embedded into rat via Z_to_int. *)
+Definition Z2rat (z : Z) : rat := (Z_to_int z)%:~R.
+
+Lemma qfrac_eq_div (a b c d : Z) :
+  Z.lt 0 b -> Z.lt 0 d ->
+  BinInt.Z.mul a d = BinInt.Z.mul c b ->
+  qfrac (a, b) = Z2rat c / Z2rat d.
+Proof.
+  move=> Hb Hd Heq.
+  rewrite /qfrac /Z2rat /=.
+  have Hbz : ((Z_to_int b)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_neq0.
+  have Hdz : ((Z_to_int d)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_neq0.
+  apply/eqP; rewrite eqr_div //.
+  by rewrite -!intrM -!Z_to_int_mul Heq.
+Qed.

@@ -522,8 +522,8 @@ The five files `MaynardFactQ.v`, `MaynardBasis.v`, `MaynardSpec.v`,
 (both feed the composed rat-level identity inside
 `maynard_M105_certified`: the Z-level cross-multiplication bool facts
 `all_match_M{1,2}Z_true` plus the rat↔Z bridges `M{1,2}_spec_rat_eq`
-are lifted to a single rat equality `M{1,2}_spec_ij = zrat (mat_get
-M{1,2}_int i j) / zrat D_M{1,2}` by a `qfrac_eq_div` helper local to
+are lifted to a single rat equality `M{1,2}_spec_ij = Z2rat (mat_get
+M{1,2}_int i j) / Z2rat D_M{1,2}` by a `qfrac_eq_div` helper local to
 `Cert.v`). The Z-level checks and the Z↔rat bridges remain available
 as standalone Qeds for auditors who want to trace the chain step-by-step.
 
@@ -999,15 +999,15 @@ denominator:
 ```rocq
 Theorem maynard_M105_certified :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
+     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-where `zrat (z : Z) : rat := (Z_to_int z)%:~R` embeds Z into rat. One
+where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R` embeds Z into rat. One
 `Print Assumptions` covers (a) the closed-form match between the
 FLINT-shipped `M1_int / M2_int` and the readable paper-form spec
 `MaynardSpec.M{1,2}_spec_ij` (which transcribes Maynard's Lemma 8.2
@@ -1072,7 +1072,7 @@ transcribes Maynard's Lemma 8.2 character-for-character. Both are
 context` (no axioms, not even Uint63), since they are purely
 rat-level algebraic identities. `maynard_M105_certified` composes L0
 and L0' into a single rat-level identity (per (i,j) ∈ [0,42)²,
-`M{1,2}_spec_ij i j = zrat (mat_get M{1,2}_int i j) / zrat D_M{1,2}`)
+`M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}`)
 that is surfaced directly in the headline; the Z-level booleans and
 rat↔Z bridges move into the proof body.
 
@@ -1299,8 +1299,8 @@ L3 (char_poly root → eigenvalue)
 
 Headline (canonical, end-to-end):
   Cert.v   maynard_M105_certified
-    = (forall i j, M1_spec_ij i j = zrat M1_int[i,j] / zrat D_M1)
-      /\ (forall i j, M2_spec_ij i j = zrat M2_int[i,j] / zrat D_M2)
+    = (forall i j, M1_spec_ij i j = Z2rat M1_int[i,j] / Z2rat D_M1)
+      /\ (forall i j, M2_spec_ij i j = Z2rat M2_int[i,j] / Z2rat D_M2)
       /\ maynard_eigenvalue_S1
     (the two rat-level identities are composed internally from
      all_match_M{1,2}Z_true and M{1,2}_spec_rat_eq)

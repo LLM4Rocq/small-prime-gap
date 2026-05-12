@@ -41,16 +41,16 @@ Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as def
 ```rocq
 Theorem maynard_M105_certified :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
+     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* M{1,2}_spec_match_FLINT + maynard_eigenvalue_S1 *) Qed.
+Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1 *) Qed.
 ```
 
-Here `zrat (z : Z) : rat := (Z_to_int z)%:~R` is a thin helper defined in `Cert.v` that injects a `Z` integer into `rat`. The Z-level boolean checks `all_match_M{1,2}Z = true` and the rat<->Z bridges `M{1,2}_spec_rat_eq` are now implementation details of the proof rather than part of the audit-surface contract; they remain available as standalone Qeds in `MaynardVerify.v` and `MaynardSpecBridge.v` for anyone who wants to re-verify the chain step-by-step.
+Here `Z2rat (z : Z) : rat := (Z_to_int z)%:~R` is a thin helper defined in `Cert.v` that injects a `Z` integer into `rat`. The Z-level boolean checks `all_match_M{1,2}Z = true` and the rat<->Z bridges `M{1,2}_spec_rat_eq` are now implementation details of the proof rather than part of the audit-surface contract; they remain available as standalone Qeds in `MaynardVerify.v` and `MaynardSpecBridge.v` for anyone who wants to re-verify the chain step-by-step.
 
 The audit pipeline this exposes is straightforward: a reader reads `MaynardSpec.M{1,2}_spec_ij` against Maynard's Lemma 8.2 (paper), then trusts the headline that says it matches the FLINT-shipped `M{1,2}_int` rationalised over `D_M{1,2}`.
 

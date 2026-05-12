@@ -72,3 +72,60 @@ Definition all_match_M2Z : bool := M2_check_rows (List.seq 0 42).
 
 Lemma all_match_M1Z_true : all_match_M1Z = true.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ------------------------------------------------------------------
+   Eta-style unfold lemmas, proved BEFORE making the per-entry
+   booleans opaque.  Downstream uses `rewrite M{1,2}_entry_matchZ_E`
+   to expose the Z.eqb form without touching the Definition (which
+   `Opaque` blocks below).
+   ------------------------------------------------------------------ *)
+
+Lemma M1_entry_matchZ_E i j :
+  M1_entry_matchZ i j
+  = (m1_num i j * D_M1 =? mat_get M1_int i j * m1_den i j)%Z.
+Proof. by []. Qed.
+
+Lemma M2_entry_matchZ_E i j :
+  M2_entry_matchZ i j
+  = (m2_num i j * D_M2 =? mat_get M2_int i j * m2_den i j)%Z.
+Proof. by []. Qed.
+
+(* ------------------------------------------------------------------
+   Mark the per-entry booleans Opaque: prevents the unifier from
+   eagerly delta-reducing them into `mat_get M{1,2}_int` and
+   expanding the 1764-cell FLINT matrix during downstream
+   typechecking.  Cert.v rewrites via `M{1,2}_entry_matchZ_E` above.
+   ------------------------------------------------------------------ *)
+
+Opaque M1_entry_matchZ M2_entry_matchZ.
+
+(* ------------------------------------------------------------------
+   Generic: extract a per-element bool from a 42-grid forallb.
+   ------------------------------------------------------------------ *)
+
+Lemma forallb_seq_in {n} {f : nat -> bool} {i} :
+  List.forallb f (List.seq 0 n) = true ->
+  (i < n)%nat -> f i = true.
+Proof.
+  move=> H Hi.
+  rewrite -> List.forallb_forall in H.
+  apply: H; apply: (proj2 (List.in_seq n 0 i)).
+  by split; [apply: Nat.le_0_l | apply/ltP; exact: Hi].
+Qed.
+
+(* ------------------------------------------------------------------
+   Per-entry corollary of `all_match_M1Z_true`.  M2 sibling lives in
+   MaynardVerify.v next to the chunk-assembled `all_match_M2Z_true`.
+   ------------------------------------------------------------------ *)
+
+Lemma M1_entry_match_in_grid {i j} :
+  (i < 42)%nat -> (j < 42)%nat ->
+  M1_entry_matchZ i j = true.
+Proof.
+  move=> Hi Hj.
+  have HM := all_match_M1Z_true.
+  rewrite /all_match_M1Z in HM.
+  have Hrow : forallb (M1_entry_matchZ i) (List.seq 0 42) = true
+    := forallb_seq_in HM Hi.
+  exact: forallb_seq_in Hrow Hj.
+Qed.
