@@ -23,16 +23,14 @@ Open Scope ring_scope.
 
 Lemma A_int_dim' : mat_dim A_int = 42%nat. Proof. exact A_int_dim. Qed.
 Lemma A_int_wf' : forall i, (i < length A_int)%coq_nat -> length (List.nth i A_int []) = 42%nat.
-Proof. intros i Hi. have Hcheck := A_int_rows_42. rewrite List.forallb_forall in Hcheck.
-  have Hin : In (List.nth i A_int []) A_int by (apply List.nth_In; exact Hi).
-  have := Hcheck _ Hin. move/Nat.eqb_eq. done. Qed.
+Proof. by move=> i Hi; move: A_int_rows_42; rewrite List.forallb_forall =>
+  /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
 Lemma M1_int_dim' : mat_dim M1_int = 42%nat. Proof. vm_compute. reflexivity. Qed.
 Lemma M1_int_rows_42 : forallb (fun row => Nat.eqb (List.length row) 42) M1_int = true.
 Proof. vm_compute. reflexivity. Qed.
 Lemma M1_int_wf' : all_rows_len 42 M1_int.
-Proof. intros i Hi. have Hcheck := M1_int_rows_42. rewrite List.forallb_forall in Hcheck.
-  have Hin : In (List.nth i M1_int []) M1_int by (apply List.nth_In; exact Hi).
-  have := Hcheck _ Hin. move/Nat.eqb_eq. done. Qed.
+Proof. by move=> i Hi; move: M1_int_rows_42; rewrite List.forallb_forall =>
+  /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
 
 (* ================================================================ *)
 (*  CRT lift helpers                                                   *)
