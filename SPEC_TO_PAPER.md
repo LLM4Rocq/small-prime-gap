@@ -110,15 +110,28 @@ through `factZ_to_rat`, `dblratZ_to_rat`, `binZ_to_rat`,
 `compositionsZ_eq_compositions`, `G2Z_to_rat`, `qfrac_qmul`, `qfrac_qplus`,
 and `alphaZ_to_rat`, each one a small structural induction.
 
-`MaynardSpecBridge.v` is imported by `Cert.v` so that
-`maynard_M105_certified` conjoins the Z-level bool match
-(`all_match_M{1,2}Z_true` from `MaynardVerify.v`) with the rat-level
-paper-form bridge (`M{1,2}_spec_rat_eq`) in a single `Print Assumptions`
-contract covering the full FLINT-matrix → Z-spec → rat-paper-form →
-eigenvalue chain. Its purpose is to certify in the kernel that the
-rat-level paper-form spec (the documentation-shaped Part A a reviewer
-reads against the paper) and the Z-level computational spec (the Part B
-`vm_compute` consumes) encode the same closed forms.
+`MaynardSpecBridge.v` is imported by `Cert.v` and used (together with
+the Z-level bool match `all_match_M{1,2}Z_true` from `MaynardVerify.v`)
+to discharge a *composed* paper-form ↔ FLINT identity in the headline:
+
+```rocq
+Lemma M{1,2}_spec_match_FLINT i j :
+  (i < 42)%nat -> (j < 42)%nat ->
+  M{1,2}_spec_ij i j = zrat (mat_get M{1,2}_int i j) / zrat D_M{1,2}.
+```
+
+where `zrat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
+`maynard_M105_certified` exposes this composed identity directly (one
+conjunct per matrix), not the Z-level bool match and the rat<->Z bridge
+as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
+and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
+`Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
+individually `Print Assumptions`-able — they just no longer appear as
+top-level conjuncts of the headline. Their purpose remains to certify
+in the kernel that the rat-level paper-form spec (the documentation-
+shaped Part A a reviewer reads against the paper) and the Z-level
+computational spec (the Part B `vm_compute` consumes) encode the same
+closed forms.
 
 ### The `K = 105` vs `K2 = 104` distinction
 
@@ -708,7 +721,9 @@ exactly the Maynard matrices.
 | `M2_entry` | `MaynardSpec.v` PART A | Lemma 8.2 (M2 part, per-coord `J_k^{(1)}`) |
 | `M1_spec_ij`, `M2_spec_ij` | `MaynardSpec.v` PART A | indexed via 42-basis |
 | `compositionsZ`, `cffZ`, `G2Z`, `m1_num_den`, `alphaZ`, `m2_num_den` | `MaynardSpec.v` PART B | Z-level twin of PART A; same closed forms as `(num, den) : Z × Z` pairs |
-| `M1_spec_rat_eq`, `M2_spec_rat_eq` | `MaynardSpecBridge.v` | rat-level bridge: `M{1,2}_spec_ij i j = qfrac (m{1,2}_num_den_at i j)`, `Qed`, *Closed under the global context* |
+| `M1_spec_rat_eq`, `M2_spec_rat_eq` | `MaynardSpecBridge.v` | rat-level bridge: `M{1,2}_spec_ij i j = qfrac (m{1,2}_num_den_at i j)`, `Qed`, *Closed under the global context* (standalone, used inside `M{1,2}_spec_match_FLINT`) |
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
-| `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` |
-| `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` |
+| `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_match_FLINT`) |
+| `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_match_FLINT`) |
+| `M1_spec_match_FLINT`, `M2_spec_match_FLINT` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = zrat (mat_get M{1,2}_int i j) / zrat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified` |
+| `maynard_M105_certified` | `Cert.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |

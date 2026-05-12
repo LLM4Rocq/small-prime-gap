@@ -20,9 +20,15 @@ Annals **181** (2015), 383–413).
 | 7 | There exists a real-algebraic eigenvalue `λ > 4/105` of `A_rat = M₁⁻¹·M₂` | Proposition 4.3 / eq. 8.15 (the project's headline claim) | `Cert.maynard_eigenvalue_S1` — IVT on `char_poly_int` (= `char_poly` of `A_int` after sign hygiene), using mathcomp-real-closed's `poly_ivtoo` |
 | 8 | `M_{105} = 105 · λ_max > 4` follows from the eigenvalue bound | **Lemma 8.3** (`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`) | **paper-side** — refereed in the Annals paper, not formalised |
 
-The headline `Cert.maynard_M105_certified` conjoins items (4), (5),
-and (7) into a single Qed; items (1)–(3) and (6) are separate Qeds
-that an auditor reads alongside.
+The headline `Cert.maynard_M105_certified` conjoins a *composed* form
+of items (4) + (5) — the merged "paper-form `M_{i,j}` equals
+`zrat(FLINT entry) / zrat(D)`" identity, factored through the helper
+lemmas `Cert.M1_spec_match_FLINT` / `Cert.M2_spec_match_FLINT` (which
+chain `MaynardSpecBridge.M{1,2}_spec_rat_eq` with
+`MaynardVerify.all_match_M{1,2}Z_true` via a `qfrac_eq_div` lifting
+helper) — together with item (7), into a single Qed. Items (1)–(3),
+(6), and the standalone (4) / (5) Qeds remain separately verifiable
+and are read by an auditor alongside the headline.
 
 For (3) — the only paper-conformance step that is read rather than
 machine-checked — the line-level map in `SPEC_TO_PAPER.md` reduces
