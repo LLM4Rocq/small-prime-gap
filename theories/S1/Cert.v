@@ -131,192 +131,72 @@ Qed.
    proceeds.
    ================================================================== *)
 
-(* Z embedded into rat via Z_to_int. *)
-Definition zrat (z : Z) : rat := (Z_to_int z)%:~R.
-
 (* ------------------------------------------------------------------
-   Step 1 — denominator positivity.  D_M{1,2} are concrete positive
-   Z; m{1,2}_num_den_at denominators are products of factorials.
+   Per-matrix rat-level identity: paper-form spec entry equals FLINT
+   integer entry over the common denominator.
+
+   Composes:
+     - MaynardSpecBridge.M{1,2}_spec_rat_eq  (rat = qfrac of Z-pair)
+     - MaynardVerify.M{1,2}_entry_match_in_grid  (per-entry from grid)
+     - MaynardSpecBridge.qfrac_eq_div  (Z cross-mult -> rat division)
+     - MaynardSpecBridge.{D_M{1,2}_pos, m{1,2}_num_den_at_den_pos}
    ------------------------------------------------------------------ *)
 
-Lemma D_M1_pos : Z.lt 0 D_M1. Proof. vm_compute. reflexivity. Qed.
-Lemma D_M2_pos : Z.lt 0 D_M2. Proof. vm_compute. reflexivity. Qed.
+Lemma D_M1_pos : Z.lt 0 D_M1. Proof. by vm_compute. Qed.
+Lemma D_M2_pos : Z.lt 0 D_M2. Proof. by vm_compute. Qed.
 
-Lemma m1_num_den_den_pos bi ci bj cj :
-  Z.lt 0 (m1_num_den bi ci bj cj).2.
-Proof. exact: factZ_pos. Qed.
-
-Lemma m1_num_den_at_den_pos i j : Z.lt 0 (m1_num_den_at i j).2.
-Proof. exact: m1_num_den_den_pos. Qed.
-
-Lemma qplus_den_pos (a b : Z * Z) :
-  Z.lt 0 a.2 -> Z.lt 0 b.2 -> Z.lt 0 (qplus a b).2.
-Proof.
-  case: a => [na da]; case: b => [nb db] /= Ha Hb.
-  exact: Z.mul_pos_pos.
-Qed.
-
-Lemma fold_left_qplus_den_pos {T : Type} (l : list T)
-      (g : T -> Z * Z) (acc : Z * Z) :
-  Z.lt 0 acc.2 ->
-  (forall x, Z.lt 0 (g x).2) ->
-  Z.lt 0 (List.fold_left (fun a x => qplus a (g x)) l acc).2.
-Proof.
-  elim: l acc => [//|x xs IH] acc Hacc Hg.
-  apply: IH; [|exact: Hg].
-  exact: qplus_den_pos Hacc (Hg x).
-Qed.
-
-Lemma m2_term_num_den_den_pos bi ci bj cj cp1 cp2 :
-  Z.lt 0 (m2_term_num_den bi ci bj cj cp1 cp2).2.
-Proof.
-  apply: Z.mul_pos_pos; last exact: factZ_pos.
-  apply: Z.mul_pos_pos; exact: factZ_pos.
-Qed.
-
-Lemma m2_num_den_den_pos bi ci bj cj :
-  Z.lt 0 (m2_num_den bi ci bj cj).2.
-Proof.
-  rewrite /m2_num_den.
-  have Hloop : forall (l : list nat) (acc : Z * Z),
-    Z.lt 0 acc.2 ->
-    Z.lt 0 (List.fold_left
-            (fun a cp1 => List.fold_left
-                            (fun b cp2 => qplus b
-                              (m2_term_num_den bi ci bj cj cp1 cp2))
-                            (List.seq 0 (S cj)) a)
-            l acc).2.
-  { elim => [//|cp1 cp1_rest IH] acc Hacc.
-    apply: IH.
-    apply: fold_left_qplus_den_pos => // cp2.
-    exact: m2_term_num_den_den_pos. }
-  apply: Hloop. by [].
-Qed.
-
-Lemma m2_num_den_at_den_pos i j : Z.lt 0 (m2_num_den_at i j).2.
-Proof. exact: m2_num_den_den_pos. Qed.
-
-(* ------------------------------------------------------------------
-   Step 2 — extract a per-entry boolean from the 42x42-grid forallb.
-
-   `Opaque M1_entry_matchZ M2_entry_matchZ` is necessary: the unifier
-   would otherwise try to delta-reduce the per-entry boolean into the
-   underlying `mat_get M1_int` call, expanding the 1764-cell FLINT
-   matrix and exhausting memory.
-   ------------------------------------------------------------------ *)
-
-Lemma forallb_seq_in (n : nat) (f : nat -> bool) (i : nat) :
-  List.forallb f (List.seq 0 n) = true ->
-  (i < n)%nat -> f i = true.
-Proof.
-  move=> H Hi.
-  rewrite -> List.forallb_forall in H.
-  apply: H.
-  apply: (proj2 (List.in_seq n 0 i)).
-  split; [apply: Nat.le_0_l | apply/ltP; exact: Hi].
-Qed.
-
+(* `Opaque` is re-declared here (does not propagate via Require) so
+   the unifier doesn't expand `mat_get M{1,2}_int` during proofs that
+   touch the per-entry booleans. *)
 Opaque M1_entry_matchZ M2_entry_matchZ.
 
-Lemma M1_entry_match_in_grid i j :
+Lemma M1_spec_eq_int {i j} :
   (i < 42)%nat -> (j < 42)%nat ->
-  M1_entry_matchZ i j = true.
+  M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1.
 Proof.
   move=> Hi Hj.
-  have HM := all_match_M1Z_true.
-  rewrite /all_match_M1Z in HM.
-  have H1 : forallb (M1_entry_matchZ i) (List.seq 0 42) = true.
-  { exact: (@forallb_seq_in 42 _ i HM Hi). }
-  exact: (@forallb_seq_in 42 _ j H1 Hj).
-Qed.
-
-Lemma M2_entry_match_in_grid i j :
-  (i < 42)%nat -> (j < 42)%nat ->
-  M2_entry_matchZ i j = true.
-Proof.
-  move=> Hi Hj.
-  have HM := all_match_M2Z_true.
-  rewrite /all_match_M2Z /M2_check_rows in HM.
-  have H1 : forallb (M2_entry_matchZ i) (List.seq 0 42) = true.
-  { exact: (@forallb_seq_in 42 _ i HM Hi). }
-  exact: (@forallb_seq_in 42 _ j H1 Hj).
-Qed.
-
-(* ------------------------------------------------------------------
-   Step 3 — cross-multiplication identity in Z lifts to rat equality
-   between qfrac (a, b) and c / d.
-   ------------------------------------------------------------------ *)
-
-Lemma qfrac_eq_div (a b c d : Z) :
-  Z.lt 0 b -> Z.lt 0 d ->
-  BinInt.Z.mul a d = BinInt.Z.mul c b ->
-  qfrac (a, b) = zrat c / zrat d.
-Proof.
-  move=> Hb Hd Heq.
-  rewrite /qfrac /zrat /=.
-  have Hbz : ((Z_to_int b)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_neq0.
-  have Hdz : ((Z_to_int d)%:~R : rat) != 0 by exact: Z_to_int_pos_rat_neq0.
-  apply/eqP. rewrite eqr_div //.
-  by rewrite -!intrM -!Z_to_int_mul Heq.
-Qed.
-
-(* ------------------------------------------------------------------
-   Step 4 — the per-matrix rat-level identity.
-   ------------------------------------------------------------------ *)
-
-Lemma M1_spec_match_FLINT i j :
-  (i < 42)%nat -> (j < 42)%nat ->
-  M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1.
-Proof.
-  move=> Hi Hj.
-  rewrite (M1_spec_rat_eq i j).
-  have Hentry := M1_entry_match_in_grid i j Hi Hj.
-  Transparent M1_entry_matchZ.
-  rewrite /M1_entry_matchZ in Hentry.
-  Opaque M1_entry_matchZ.
-  move/Z.eqb_eq: Hentry => Hcross.
+  rewrite M1_spec_rat_eq.
+  have Hmatch : M1_entry_matchZ i j = true := M1_entry_match_in_grid Hi Hj.
+  rewrite M1_entry_matchZ_E in Hmatch.
+  move/Z.eqb_eq: Hmatch => Hcross.
   rewrite [m1_num_den_at i j]surjective_pairing.
-  apply: qfrac_eq_div.
-  - exact: m1_num_den_at_den_pos.
-  - exact: D_M1_pos.
-  - exact: Hcross.
+  by apply: qfrac_eq_div;
+    [exact: m1_num_den_at_den_pos | exact: D_M1_pos | exact: Hcross].
 Qed.
 
-Lemma M2_spec_match_FLINT i j :
+Lemma M2_spec_eq_int {i j} :
   (i < 42)%nat -> (j < 42)%nat ->
-  M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2.
+  M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2.
 Proof.
   move=> Hi Hj.
-  rewrite (M2_spec_rat_eq i j).
-  have Hentry := M2_entry_match_in_grid i j Hi Hj.
-  Transparent M2_entry_matchZ.
-  rewrite /M2_entry_matchZ in Hentry.
-  Opaque M2_entry_matchZ.
-  move/Z.eqb_eq: Hentry => Hcross.
+  rewrite M2_spec_rat_eq.
+  have Hmatch : M2_entry_matchZ i j = true := M2_entry_match_in_grid Hi Hj.
+  rewrite M2_entry_matchZ_E in Hmatch.
+  move/Z.eqb_eq: Hmatch => Hcross.
   rewrite [m2_num_den_at i j]surjective_pairing.
-  apply: qfrac_eq_div.
-  - exact: m2_num_den_at_den_pos.
-  - exact: D_M2_pos.
-  - exact: Hcross.
+  by apply: qfrac_eq_div;
+    [exact: m2_num_den_at_den_pos | exact: D_M2_pos | exact: Hcross].
 Qed.
 
 (* ------------------------------------------------------------------
-   The headline theorem.  Two readable identities (paper-form spec =
+   The headline theorem: two readable identities (paper-form spec =
    FLINT integer entry / common denominator) plus the eigenvalue
-   bound.  The Z-level boolean check `all_match_M{1,2}Z = true` and
-   the rat<->Z bridge `M{1,2}_spec_rat_eq` move into the proof body;
-   they remain available as standalone Qeds.
+   bound.  The Z-level boolean checks `all_match_M{1,2}Z = true` and
+   the rat<->Z bridges `M{1,2}_spec_rat_eq` are implementation
+   details of the proof; they remain available as standalone Qeds in
+   MaynardVerify and MaynardSpecBridge for auditors who want to
+   trace the chain step-by-step.
    ------------------------------------------------------------------ *)
 Theorem maynard_M105_certified :
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
+  (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
+  (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 Proof.
-  split; first exact: M1_spec_match_FLINT.
-  split; first exact: M2_spec_match_FLINT.
+  split; first by move=> i j Hi Hj; apply: M1_spec_eq_int.
+  split; first by move=> i j Hi Hj; apply: M2_spec_eq_int.
   exact: maynard_eigenvalue_S1.
 Qed.

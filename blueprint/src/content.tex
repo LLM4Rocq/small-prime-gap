@@ -31,15 +31,15 @@ The end-to-end statement is
 \begin{verbatim}
 Theorem maynard_M105_certified :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
+     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 \end{verbatim}
 proven in \texttt{theories/S1/Cert.v}, where
-$\texttt{zrat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
+$\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin embedding of $\Z$ into $\rat$. The first two conjuncts are
 each a single composed identity per matrix: the $\rat$-level paper-form
 spec $\texttt{M\{1,2\}\_spec\_ij}$ (the readable transcription of
@@ -1101,17 +1101,17 @@ existential.
 \begin{theorem}[End-to-end certification]\label{thm:M105}
 \rocq{PrimeGapS1.Cert.maynard_M105_certified}
 \rocqok
-\uses{lem:M1_spec_match_FLINT, lem:M2_spec_match_FLINT, thm:headline}
+\uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:headline}
 The conjunction
 \[
 \begin{aligned}
 &\bigl(\forall i, j < 42.\;
   \texttt{M1\_spec\_ij}(i,j)
-    = \texttt{zrat}(M_1^{\mathrm{int}}[i][j]) \,/\, \texttt{zrat}(\DMone)\bigr)\\
+    = \texttt{Z2rat}(M_1^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMone)\bigr)\\
 &\quad\wedge\;
 \bigl(\forall i, j < 42.\;
   \texttt{M2\_spec\_ij}(i,j)
-    = \texttt{zrat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{zrat}(\DMtwo)\bigr)\\
+    = \texttt{Z2rat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMtwo)\bigr)\\
 &\quad\wedge\;
 \bigl(\exists \lambda \in \realalg.\;
    \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
@@ -1119,13 +1119,13 @@ The conjunction
    \texttt{ratr}(4/105) < \lambda\bigr),
 \end{aligned}
 \]
-where $\texttt{zrat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
+where $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin $\Z \to \rat$ embedding.
 \end{theorem}
 \begin{proof}\rocqok
 A three-way \texttt{split}: the two composed per-matrix identities are
-discharged by Lemmas~\ref{lem:M1_spec_match_FLINT}
-and~\ref{lem:M2_spec_match_FLINT} (each one identity per matrix,
+discharged by Lemmas~\ref{lem:M1_spec_eq_int}
+and~\ref{lem:M2_spec_eq_int} (each one identity per matrix,
 paper-form spec entry $=$ FLINT integer entry over the common
 denominator), and the eigenvalue existential by the spectral
 Theorem~\ref{thm:headline}. The two composed identities each fold
@@ -1143,15 +1143,15 @@ only the standard Rocq \texttt{PrimInt63} kernel primitives (used by
 axioms.
 \end{proof}
 
-\begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_match_FLINT}
-\rocq{PrimeGapS1.Cert.M1_spec_match_FLINT}
+\begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_eq_int}
+\rocq{PrimeGapS1.Cert.M1_spec_eq_int}
 \rocqok
 \uses{thm:M1_match, thm:M1_spec_rat_eq}
 For every $(i, j) \in \{0, \ldots, 41\}^2$,
 \[
   \texttt{M1\_spec\_ij}(i, j)
-    \;=\; \texttt{zrat}\bigl(M_1^{\mathrm{int}}[i][j]\bigr) \,/\,
-          \texttt{zrat}(\DMone) \quad\text{in } \rat.
+    \;=\; \texttt{Z2rat}\bigl(M_1^{\mathrm{int}}[i][j]\bigr) \,/\,
+          \texttt{Z2rat}(\DMone) \quad\text{in } \rat.
 \]
 \end{lemma}
 \begin{proof}\rocqok
@@ -1161,23 +1161,23 @@ with the $\Z$-level cross-multiplication from
 Theorem~\ref{thm:M1_match} (extracted per-entry from the $42 \times 42$
 \texttt{forallb}) via the helper
 \texttt{qfrac\_eq\_div}: in $\Z$, $a\cdot d = c\cdot b$ with $b, d > 0$
-implies $\texttt{qfrac}(a, b) = \texttt{zrat}(c)/\texttt{zrat}(d)$ in
+implies $\texttt{qfrac}(a, b) = \texttt{Z2rat}(c)/\texttt{Z2rat}(d)$ in
 $\rat$. Denominator positivity is provided by
 \texttt{m1\_num\_den\_at\_den\_pos} (product of factorials) and
 \texttt{D\_M1\_pos} (\vmcompute).
 \end{proof}
 
-\begin{lemma}[$\Mtwo$ paper-form spec equals FLINT entry over $\DMtwo$]\label{lem:M2_spec_match_FLINT}
-\rocq{PrimeGapS1.Cert.M2_spec_match_FLINT}
+\begin{lemma}[$\Mtwo$ paper-form spec equals FLINT entry over $\DMtwo$]\label{lem:M2_spec_eq_int}
+\rocq{PrimeGapS1.Cert.M2_spec_eq_int}
 \rocqok
 \uses{thm:M2_match, thm:M2_spec_rat_eq}
 The analogous identity holds for $\Mtwo$:
 $\texttt{M2\_spec\_ij}(i, j)
-  = \texttt{zrat}(M_2^{\mathrm{int}}[i][j]) / \texttt{zrat}(\DMtwo)$
+  = \texttt{Z2rat}(M_2^{\mathrm{int}}[i][j]) / \texttt{Z2rat}(\DMtwo)$
 for all $(i, j) \in \{0, \ldots, 41\}^2$.
 \end{lemma}
 \begin{proof}\rocqok
-Same shape as Lemma~\ref{lem:M1_spec_match_FLINT}, with
+Same shape as Lemma~\ref{lem:M1_spec_eq_int}, with
 Theorem~\ref{thm:M2_spec_rat_eq} and Theorem~\ref{thm:M2_match} in
 place of their $\Mone$ counterparts. Denominator positivity follows
 from \texttt{m2\_num\_den\_at\_den\_pos} (an inductive product of

@@ -22,8 +22,8 @@ Annals **181** (2015), 383–413).
 
 The headline `Cert.maynard_M105_certified` conjoins a *composed* form
 of items (4) + (5) — the merged "paper-form `M_{i,j}` equals
-`zrat(FLINT entry) / zrat(D)`" identity, factored through the helper
-lemmas `Cert.M1_spec_match_FLINT` / `Cert.M2_spec_match_FLINT` (which
+`Z2rat(FLINT entry) / Z2rat(D)`" identity, factored through the helper
+lemmas `Cert.M1_spec_eq_int` / `Cert.M2_spec_eq_int` (which
 chain `MaynardSpecBridge.M{1,2}_spec_rat_eq` with
 `MaynardVerify.all_match_M{1,2}Z_true` via a `qfrac_eq_div` lifting
 helper) — together with item (7), into a single Qed. Items (1)–(3),

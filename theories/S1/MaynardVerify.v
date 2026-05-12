@@ -86,3 +86,21 @@ Proof.
           M2_check_rows_21_27 M2_check_rows_28_34 M2_check_rows_35_41.
   reflexivity.
 Qed.
+
+(* Per-entry corollary of all_match_M2Z_true.
+   `Opaque` is re-declared here (does not propagate via Require) so
+   the unifier doesn't expand `mat_get M2_int` during `forallb_seq_in`
+   unification — same reason as in MaynardVerify/Def.v. *)
+Opaque M1_entry_matchZ M2_entry_matchZ.
+
+Lemma M2_entry_match_in_grid {i j} :
+  (i < 42)%nat -> (j < 42)%nat ->
+  M2_entry_matchZ i j = true.
+Proof.
+  move=> Hi Hj.
+  have HM := all_match_M2Z_true.
+  rewrite /all_match_M2Z /M2_check_rows in HM.
+  have Hrow : forallb (M2_entry_matchZ i) (List.seq 0 42) = true
+    := forallb_seq_in HM Hi.
+  exact: forallb_seq_in Hrow Hj.
+Qed.
