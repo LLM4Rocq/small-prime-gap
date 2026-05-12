@@ -34,29 +34,27 @@ Theorem maynard_eigenvalue_S1 :
 Proof. (* L1 + L2 + L3 *) Qed.
 ```
 
-The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). This last step consists in checking that the computation-friendly version of each matrix agrees with its deduction-friendly version, which in turn essentially consists in changing the datastructure respectively used for integers and for matrices.
+The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). For each of the two 42x42 matrices, this match is now stated as a single composed identity: the paper-form spec entry equals the FLINT-shipped integer entry rationalised over a common denominator.
 
 Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as definitions for the coefficients of matrices `M1` and `M2` :
 
 ```rocq
 Theorem maynard_M105_certified :
-  MaynardVerify.all_match_M1Z = true /\
-  MaynardVerify.all_match_M2Z = true /\
-  (forall i j : nat,
-     MaynardSpec.M1_spec_ij i j
-     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
-  (forall i j : nat,
-     MaynardSpec.M2_spec_ij i j
-     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* MaynardVerify.all_match_M{1,2}Z_true
-        + MaynardSpecBridge.M{1,2}_spec_rat_eq
-        + maynard_eigenvalue_S1 *) Qed.
+Proof. (* M{1,2}_spec_match_FLINT + maynard_eigenvalue_S1 *) Qed.
 ```
 
-A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
+Here `zrat (z : Z) : rat := (Z_to_int z)%:~R` is a thin helper defined in `Cert.v` that injects a `Z` integer into `rat`. The Z-level boolean checks `all_match_M{1,2}Z = true` and the rat<->Z bridges `M{1,2}_spec_rat_eq` are now implementation details of the proof rather than part of the audit-surface contract; they remain available as standalone Qeds in `MaynardVerify.v` and `MaynardSpecBridge.v` for anyone who wants to re-verify the chain step-by-step.
+
+The audit pipeline this exposes is straightforward: a reader reads `MaynardSpec.M{1,2}_spec_ij` against Maynard's Lemma 8.2 (paper), then trusts the headline that says it matches the FLINT-shipped `M{1,2}_int` rationalised over `D_M{1,2}`.
+
+A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound. It reports 51 axioms, all `PrimInt63 / Uint63Axioms` standard primitives; no project-specific axioms have been added or removed.
 
 ## Relation to Maynard's notebook
 

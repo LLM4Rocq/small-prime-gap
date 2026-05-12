@@ -14,14 +14,19 @@ Theorem maynard_eigenvalue_S1 :
 
 is `Qed` in `theories/S1/Cert.v`. A sibling theorem
 `maynard_M105_certified` in the same file conjoins this eigenvalue claim
-with the bool facts `MaynardVerify.all_match_M{1,2}Z = true` *and* the
-two rat-level paper-form identities
-`MaynardSpecBridge.M{1,2}_spec_rat_eq`, so a single
+with two readable rat-level identities stating that the paper-form spec
+`MaynardSpec.M{1,2}_spec_ij` equals the FLINT integer entry over the
+common denominator `D_M{1,2}`, so a single
 `Print Assumptions maynard_M105_certified` (which reports 51 standard
 `PrimInt63.*` / `Uint63Axioms.*` kernel primitives — no project-specific
 axioms) covers the full chain: the FLINT-shipped integer matrices match
-the Z-level closed form, the Z-level closed form equals the rat-level
-paper-form spec, and the eigenvalue bound holds.
+the rat-level paper-form spec entry-by-entry over a common denominator,
+and the eigenvalue bound holds. The Z-level cross-multiplication checks
+and the rat↔Z bridge are now proof-internal implementation details;
+they remain available as standalone Qeds
+(`MaynardVerify.all_match_M{1,2}Z_true` and
+`MaynardSpecBridge.M{1,2}_spec_rat_eq`) for auditors who want to trace
+the closed-form match step-by-step.
 Either theorem exposes only the standard `PrimInt63` / `Uint63Axioms`
 kernel primitives shipped with Rocq 9.0/9.1 (native 63-bit integers, used
 by `vm_compute` on the CRT and char-poly computations).
@@ -513,9 +518,14 @@ The proof pattern is the same for both:
 The five files `MaynardFactQ.v`, `MaynardBasis.v`, `MaynardSpec.v`,
 `MaynardVerify.v`, `MaynardSpecBridge.v` close the trust loop on the
 42x42 input matrices. They sit downstream of `Witness.v` and
-`CharPoly.v`. `Cert.v` imports `MaynardVerify` (for the `all_match_*`
-bool facts inside `maynard_M105_certified`); the others are leaves in
-the dependency DAG and are pulled in only transitively.
+`CharPoly.v`. `Cert.v` imports `MaynardVerify` and `MaynardSpecBridge`
+(both feed the composed rat-level identity inside
+`maynard_M105_certified`: the Z-level cross-multiplication bool facts
+`all_match_M{1,2}Z_true` plus the rat↔Z bridges `M{1,2}_spec_rat_eq`
+are lifted to a single rat equality `M{1,2}_spec_ij = zrat (mat_get
+M{1,2}_int i j) / zrat D_M{1,2}` by a `qfrac_eq_div` helper local to
+`Cert.v`). The Z-level checks and the Z↔rat bridges remain available
+as standalone Qeds for auditors who want to trace the chain step-by-step.
 
 A companion document `SPEC_TO_PAPER.md` at the repo root maps every
 definition in `MaynardSpec.v` (`compositions`, `cff`, `G_2`, `alpha`,
@@ -982,32 +992,47 @@ Theorem maynard_eigenvalue_S1 :
 ```
 
 A combined sibling theorem in the same file, `maynard_M105_certified`,
-conjoins this with the matrix cross-check *and* the rat-level
-paper-form spec identity:
+conjoins this with two readable rat-level identities stating that the
+paper-form spec equals the FLINT integer entry over the common
+denominator:
 
 ```rocq
 Theorem maynard_M105_certified :
-  all_match_M1Z = true /\
-  all_match_M2Z = true /\
-  (forall i j, MaynardSpec.M1_spec_ij i j
-             = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
-  (forall i j, MaynardSpec.M2_spec_ij i j
-             = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 ```
 
-so that one `Print Assumptions` covers (a) the closed-form match
-between the FLINT-shipped `M1_int / M2_int` and the Z-level closed
-form `m{1,2}_num_den_at`, (b) the rat-level identity between that
-Z-level closed form and the readable paper-form spec
+where `zrat (z : Z) : rat := (Z_to_int z)%:~R` embeds Z into rat. One
+`Print Assumptions` covers (a) the closed-form match between the
+FLINT-shipped `M1_int / M2_int` and the readable paper-form spec
 `MaynardSpec.M{1,2}_spec_ij` (which transcribes Maynard's Lemma 8.2
-character-for-character), and (c) the eigenvalue bound. The
-assembly is the trivial five-way `split` over the existing
-`all_match_M1Z_true`, `all_match_M2Z_true`,
-`MaynardSpecBridge.M1_spec_rat_eq`, `M2_spec_rat_eq`, and
-`maynard_eigenvalue_S1`.
+character-for-character), and (b) the eigenvalue bound. The audit
+chain still factors through "FLINT integer matrices = Z-level closed
+form = rat-level paper-form spec", but only the *composed* identity
+is surfaced in the headline.
+
+The Z-level cross-multiplication checks `all_match_M{1,2}Z = true`
+and the rat↔Z bridges `MaynardSpecBridge.M{1,2}_spec_rat_eq` are now
+proof-internal implementation steps of `maynard_M105_certified`. The
+assembly composes:
+
+- `M{1,2}_spec_rat_eq` (rat = `qfrac` of a Z-pair, from
+  `MaynardSpecBridge`),
+- per-entry extraction of the Z-level cross-multiplication from
+  `all_match_M{1,2}Z_true` over the 42×42 grid,
+- a `qfrac_eq_div` helper that lifts the Z cross-multiplication to a
+  rat-level equality,
+- per-entry denominator positivity (`m{1,2}_num_den_at_den_pos`,
+  `D_M{1,2}_pos`) needed to invoke `eqr_div`.
+
+Both `all_match_M{1,2}Z_true` and `M{1,2}_spec_rat_eq` remain
+standalone Qeds in `MaynardVerify` and `MaynardSpecBridge` for any
+auditor who wants to inspect the chain step-by-step.
 
 The assembly of `maynard_eigenvalue_S1` in `Cert.v` is a few lines of
 tactic:
@@ -1045,8 +1070,11 @@ specification `MaynardSpec.M{1,2}_spec_ij` — the form that
 transcribes Maynard's Lemma 8.2 character-for-character. Both are
 `Qed` with `Print Assumptions` reporting `Closed under the global
 context` (no axioms, not even Uint63), since they are purely
-rat-level algebraic identities. `maynard_M105_certified` conjoins
-L0 and L0' into a single headline.
+rat-level algebraic identities. `maynard_M105_certified` composes L0
+and L0' into a single rat-level identity (per (i,j) ∈ [0,42)²,
+`M{1,2}_spec_ij i j = zrat (mat_get M{1,2}_int i j) / zrat D_M{1,2}`)
+that is surfaced directly in the headline; the Z-level booleans and
+rat↔Z bridges move into the proof body.
 
 ### L1 — IVT root existence
 
@@ -1109,13 +1137,19 @@ exactly a root of the char poly.
 ## 6. Trust base
 
 The recommended canonical Print-Assumptions target is
-`maynard_M105_certified`: a single lemma whose assumptions cover (a)
-the Z-level matrix cross-check (`all_match_M1Z`, `all_match_M2Z`),
-(b) the rat-level paper-form identity
-(`MaynardSpecBridge.M{1,2}_spec_rat_eq`), and (c) the eigenvalue
+`maynard_M105_certified`: a single lemma whose assumptions cover
+(a) the rat-level identity stating that the paper-form spec
+`MaynardSpec.M{1,2}_spec_ij` equals the FLINT integer entry over the
+common denominator (composed internally from the Z-level matrix
+cross-check `all_match_M{1,2}Z = true` and the rat↔Z bridges
+`MaynardSpecBridge.M{1,2}_spec_rat_eq`), and (b) the eigenvalue
 bound. `maynard_eigenvalue_S1` is unchanged and still present, but
 it is strictly weaker for end-to-end audit because it does not
-surface the closed-form match.
+surface the closed-form match. Auditors who want to inspect the
+internal Z-level cross-check or the rat↔Z bridge separately can
+still target `MaynardVerify.all_match_M{1,2}Z_true` and
+`MaynardSpecBridge.M{1,2}_spec_rat_eq` directly — they remain
+standalone Qeds.
 
 `Print Assumptions maynard_M105_certified` (or
 `maynard_eigenvalue_S1`) after `coqc` of Cert.v prints exactly **51
@@ -1265,9 +1299,11 @@ L3 (char_poly root → eigenvalue)
 
 Headline (canonical, end-to-end):
   Cert.v   maynard_M105_certified
-    = all_match_M1Z_true /\ all_match_M2Z_true
-      /\ M1_spec_rat_eq /\ M2_spec_rat_eq
+    = (forall i j, M1_spec_ij i j = zrat M1_int[i,j] / zrat D_M1)
+      /\ (forall i j, M2_spec_ij i j = zrat M2_int[i,j] / zrat D_M2)
       /\ maynard_eigenvalue_S1
+    (the two rat-level identities are composed internally from
+     all_match_M{1,2}Z_true and M{1,2}_spec_rat_eq)
 
 Headline (eigenvalue-only sibling, kept for backward compatibility):
   Cert.v   maynard_eigenvalue_S1

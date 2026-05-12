@@ -30,30 +30,36 @@ algebraic claim inside the kernel.
 The end-to-end statement is
 \begin{verbatim}
 Theorem maynard_M105_certified :
-  all_match_M1Z = true /\
-  all_match_M2Z = true /\
-  (forall i j : nat,
-     MaynardSpec.M1_spec_ij i j
-     = MaynardSpecBridge.qfrac (MaynardSpec.m1_num_den_at i j)) /\
-  (forall i j : nat,
-     MaynardSpec.M2_spec_ij i j
-     = MaynardSpecBridge.qfrac (MaynardSpec.m2_num_den_at i j)) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M1_spec_ij i j = zrat (mat_get M1_int i j) / zrat D_M1) /\
+  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+     M2_spec_ij i j = zrat (mat_get M2_int i j) / zrat D_M2) /\
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 \end{verbatim}
-proven in \texttt{theories/S1/Cert.v}. The first two conjuncts are the
-$\Z$-level cross-multiplication checks linking the FLINT-shipped integer
-matrices $M_{1,2}^{\mathrm{int}}$ to the $\Z$-level closed form
-$\texttt{m\{1,2\}\_num\_den}$. The next two are the kernel-Qed bridge
-from the $\Z$-level closed form to the $\rat$-level paper-form spec
-$\texttt{M\{1,2\}\_spec\_ij}$, the readable transcription of Maynard's
-Lemma~8.2. Together they certify the full chain
+proven in \texttt{theories/S1/Cert.v}, where
+$\texttt{zrat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
+is the thin embedding of $\Z$ into $\rat$. The first two conjuncts are
+each a single composed identity per matrix: the $\rat$-level paper-form
+spec $\texttt{M\{1,2\}\_spec\_ij}$ (the readable transcription of
+Maynard's Lemma~8.2) is equal, as a rational, to the FLINT-shipped
+integer entry $\texttt{mat\_get}\,M_{1,2}^{\mathrm{int}}\,i\,j$ divided
+by the common denominator $\DMone$ / $\DMtwo$. The composition collapses
+the trust chain
 $\text{FLINT integer matrices} = \text{$\Z$-level closed form}
- = \text{$\rat$-level paper-form spec} \Rightarrow \text{eigenvalue} > 4/105$
-under a single \texttt{Print Assumptions}, which reports only Rocq's
-\texttt{PrimInt63} kernel primitives: the project itself contains zero
-\texttt{Axiom} declarations and zero \texttt{Admitted} lemmas.
+ = \text{$\rat$-level paper-form spec}$
+into one displayed equality per matrix, with the $\Z$-level boolean
+checks $\texttt{all\_match\_M\{1,2\}Z} = \texttt{true}$ and the
+$\rat\leftrightarrow\Z$ bridges $\texttt{M\{1,2\}\_spec\_rat\_eq}$
+moved into the proof body as implementation details. (Both remain
+available as standalone \Qed{}s in \texttt{MaynardVerify.v} and
+\texttt{MaynardSpecBridge.v} for auditors who want to trace the chain
+step by step.) Together with the eigenvalue conjunct, these certify
+$\text{eigenvalue} > 4/105$ under a single \texttt{Print Assumptions},
+which reports only Rocq's \texttt{PrimInt63} kernel primitives: the
+project itself contains zero \texttt{Axiom} declarations and zero
+\texttt{Admitted} lemmas.
 
 \paragraph{Scope.}
 What this Rocq layer proves, kernel-checked, is the left-hand side of
@@ -1095,42 +1101,87 @@ existential.
 \begin{theorem}[End-to-end certification]\label{thm:M105}
 \rocq{PrimeGapS1.Cert.maynard_M105_certified}
 \rocqok
-\uses{thm:M1_match, thm:M2_match, thm:M1_spec_rat_eq,
-      thm:M2_spec_rat_eq, thm:headline}
+\uses{lem:M1_spec_match_FLINT, lem:M2_spec_match_FLINT, thm:headline}
 The conjunction
 \[
 \begin{aligned}
-&\texttt{all\_match\_M1Z} = \texttt{true}
-\;\wedge\;
-\texttt{all\_match\_M2Z} = \texttt{true}\\
-&\quad\wedge\;
-\bigl(\forall i\,j.\;
+&\bigl(\forall i, j < 42.\;
   \texttt{M1\_spec\_ij}(i,j)
-    = \texttt{qfrac}(\texttt{m1\_num\_den\_at}(i,j))\bigr)\\
+    = \texttt{zrat}(M_1^{\mathrm{int}}[i][j]) \,/\, \texttt{zrat}(\DMone)\bigr)\\
 &\quad\wedge\;
-\bigl(\forall i\,j.\;
+\bigl(\forall i, j < 42.\;
   \texttt{M2\_spec\_ij}(i,j)
-    = \texttt{qfrac}(\texttt{m2\_num\_den\_at}(i,j))\bigr)\\
+    = \texttt{zrat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{zrat}(\DMtwo)\bigr)\\
 &\quad\wedge\;
 \bigl(\exists \lambda \in \realalg.\;
    \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
    \;\wedge\;
-   \texttt{ratr}(4/105) < \lambda\bigr).
+   \texttt{ratr}(4/105) < \lambda\bigr),
 \end{aligned}
 \]
+where $\texttt{zrat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
+is the thin $\Z \to \rat$ embedding.
 \end{theorem}
 \begin{proof}\rocqok
-A five-way \texttt{split} over the bool facts
-\texttt{all\_match\_M1Z\_true}, \texttt{all\_match\_M2Z\_true},
-the two paper-form $\leftrightarrow$ $\Z$-level bridges
-\texttt{MaynardSpecBridge.M1\_spec\_rat\_eq} and
-\texttt{MaynardSpecBridge.M2\_spec\_rat\_eq}, and the spectral
-existence Theorem~\ref{thm:headline}. The two bridge conjuncts close
-the trust chain from the FLINT-shipped integer matrices all the way to
-the $\rat$-level paper-form spec inside a single \Qed{}. The combined
-\texttt{Print Assumptions} reports only the standard Rocq
-\texttt{PrimInt63} kernel primitives (used by \vmcompute{} on the
-$\Uintsf$ CRT computations). No project-specific axioms.
+A three-way \texttt{split}: the two composed per-matrix identities are
+discharged by Lemmas~\ref{lem:M1_spec_match_FLINT}
+and~\ref{lem:M2_spec_match_FLINT} (each one identity per matrix,
+paper-form spec entry $=$ FLINT integer entry over the common
+denominator), and the eigenvalue existential by the spectral
+Theorem~\ref{thm:headline}. The two composed identities each fold
+together a $\Z$-level cross-multiplication
+(\texttt{all\_match\_M\{1,2\}Z\_true}) and a $\rat\leftrightarrow\Z$
+bridge (\texttt{MaynardSpecBridge.M\{1,2\}\_spec\_rat\_eq}) via a thin
+\texttt{qfrac\_eq\_div} helper. The Z-level booleans and the
+$\rat\leftrightarrow\Z$ bridges remain available as standalone \Qed{}s
+(Theorems~\ref{thm:M1_match}, \ref{thm:M2_match},
+\ref{thm:M1_spec_rat_eq}, \ref{thm:M2_spec_rat_eq}) for auditors who
+want to trace the chain step by step; they are not surfaced in the
+headline statement. The combined \texttt{Print Assumptions} reports
+only the standard Rocq \texttt{PrimInt63} kernel primitives (used by
+\vmcompute{} on the $\Uintsf$ CRT computations). No project-specific
+axioms.
+\end{proof}
+
+\begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_match_FLINT}
+\rocq{PrimeGapS1.Cert.M1_spec_match_FLINT}
+\rocqok
+\uses{thm:M1_match, thm:M1_spec_rat_eq}
+For every $(i, j) \in \{0, \ldots, 41\}^2$,
+\[
+  \texttt{M1\_spec\_ij}(i, j)
+    \;=\; \texttt{zrat}\bigl(M_1^{\mathrm{int}}[i][j]\bigr) \,/\,
+          \texttt{zrat}(\DMone) \quad\text{in } \rat.
+\]
+\end{lemma}
+\begin{proof}\rocqok
+Compose Theorem~\ref{thm:M1_spec_rat_eq}, which rewrites the
+$\rat$-level spec into $\texttt{qfrac}(\texttt{m1\_num\_den\_at}(i,j))$,
+with the $\Z$-level cross-multiplication from
+Theorem~\ref{thm:M1_match} (extracted per-entry from the $42 \times 42$
+\texttt{forallb}) via the helper
+\texttt{qfrac\_eq\_div}: in $\Z$, $a\cdot d = c\cdot b$ with $b, d > 0$
+implies $\texttt{qfrac}(a, b) = \texttt{zrat}(c)/\texttt{zrat}(d)$ in
+$\rat$. Denominator positivity is provided by
+\texttt{m1\_num\_den\_at\_den\_pos} (product of factorials) and
+\texttt{D\_M1\_pos} (\vmcompute).
+\end{proof}
+
+\begin{lemma}[$\Mtwo$ paper-form spec equals FLINT entry over $\DMtwo$]\label{lem:M2_spec_match_FLINT}
+\rocq{PrimeGapS1.Cert.M2_spec_match_FLINT}
+\rocqok
+\uses{thm:M2_match, thm:M2_spec_rat_eq}
+The analogous identity holds for $\Mtwo$:
+$\texttt{M2\_spec\_ij}(i, j)
+  = \texttt{zrat}(M_2^{\mathrm{int}}[i][j]) / \texttt{zrat}(\DMtwo)$
+for all $(i, j) \in \{0, \ldots, 41\}^2$.
+\end{lemma}
+\begin{proof}\rocqok
+Same shape as Lemma~\ref{lem:M1_spec_match_FLINT}, with
+Theorem~\ref{thm:M2_spec_rat_eq} and Theorem~\ref{thm:M2_match} in
+place of their $\Mone$ counterparts. Denominator positivity follows
+from \texttt{m2\_num\_den\_at\_den\_pos} (an inductive product of
+factorials over the $\texttt{fold\_left qplus}$ accumulator).
 \end{proof}
 
 \paragraph{Reading.}
