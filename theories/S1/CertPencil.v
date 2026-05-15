@@ -120,26 +120,49 @@ Definition det_M1_int : Z := List.nth 0 (char_poly_int M1_int) BinInt.Z0.
          CRT only gives modular info, not sign.
    Option (a) is the cleanest and what the task brief recommends.    *)
 
+(* ------------------------------------------------------------------
+   The two integer determinant signs.  Precomputed numerals shipped
+   in theories/S1/Witness_PencilDet.v:
+
+     det_M1_int_value   = det(M1_int)             — 2044 bits, positive
+     D_pencil_int_value = det(4*D_M2*M1_int -     — 31131 bits, negative
+                              105*D_M1*M2_int)
+
+   Sign verification on the literals is a single fast `vm_compute`:
+
+     Lemma D_pencil_int_value_neg : Z.lt D_pencil_int_value 0.
+     Proof. vm_compute. reflexivity. Qed.
+
+     Lemma det_M1_int_value_pos : Z.lt 0 det_M1_int_value.
+     Proof. vm_compute. reflexivity. Qed.
+
+   What still needs proving is the EQUALITY between the shipped
+   numerals and the fl_loop-computed values:
+
+     det_M1_int  = det_M1_int_value
+     D_pencil_int = D_pencil_int_value
+
+   Direct `vm_compute` on these equalities runs fl_loop on a 42x42
+   bignum matrix, ~hours (one experiment killed at 20m50s).  The
+   tractable route is a CRT cross-check on a single coefficient,
+   mirroring the 43-coefficient CRT check in `CharPolyAgree.v` /
+   `CRTLift.v` but specialised to the constant term.  Required
+   reuses: `char_poly_mod` (ModularArith.v), `crt_primes_all` /
+   `crt_product_710` (CRTBridge.v), `small_multiple_zero` (CRTCheck.v),
+   `all_primes_divide_product` (CRTCheck.v).  Estimated ~150 LOC of
+   new dedicated bridge.
+   ------------------------------------------------------------------ *)
+
 Lemma D_pencil_int_neg : BinInt.Z.lt D_pencil_int BinInt.Z0.
-Proof. (* TODO: ship `D_pencil_int_value : Z := <precomputed>` to
-        Witness.v + Lemma `D_pencil_int_value_eq : D_pencil_int = ...`
-        proved by `vm_compute. reflexivity.` (hopefully cheap eq
-        check between two Z numerals) + `vm_compute` on the literal
-        Z's sign. *)
+Proof. (* TODO: prove `D_pencil_int = D_pencil_int_value` via 1-coef
+        CRT (~150 LOC, sketched above), then vm_compute on the
+        literal's sign.  `Witness_PencilDet.v` ships
+        `D_pencil_int_value : Z` with bit-length 31131, negative. *)
 Admitted.
 
 Lemma det_M1_int_pos : BinInt.Z.lt BinInt.Z0 det_M1_int.
-Proof. (* Direct vm_compute on char_poly_int M1_int = fl_loop M1_int
-        runs >20 min: fl_loop is O(n^4) with bignum entries growing
-        Hadamard-style each step.  The existing IVT proof avoids this
-        by SHIPPING the precomputed char_poly in Witness.v
-        (`charpoly_int`) and verifying it via the CRT cross-check.
-        For this proof the analog would be: ship a precomputed
-        `det_M1_int_value : Z` literal in Witness_Quad.v, prove
-        `det_M1_int = det_M1_int_value` via a lightweight CRT
-        cross-check on the constant coefficient, then vm_compute the
-        sign of the literal.  Same shape as `M1_charpoly_hd_neq0` in
-        `CertL2.v`. *)
+Proof. (* TODO: same shape as `D_pencil_int_neg`. `Witness_PencilDet.v`
+        ships `det_M1_int_value : Z` with bit-length 2044, positive. *)
 Admitted.
 
 (* ================================================================== *)
