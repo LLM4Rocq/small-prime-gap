@@ -47,3 +47,5 @@ theories/S1/DetPencil.v
 theories/S1/CRTPencilChecksProof.v
 theories/S1/CRTPencilM1Bound.v
 theories/S1/CRTPencilCheck.v
+theories/S1/AbstractPencilHelper.v
+theories/S1/CertPencil.v
