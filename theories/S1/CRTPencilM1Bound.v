@@ -75,7 +75,7 @@ Qed.
 Lemma det_M1_int_abs_bound :
   (Z.abs det_M1_int <= fl_coeff_bound 42 (max_abs_entry M1_int))%Z.
 Proof.
-  unfold det_M1_int, CertPencilDef.det_M1_int.
+  rewrite det_M1_int_eq_nth.
   assert (H42 : (0 < 42)%nat) by lia.
   rewrite (char_poly_int_nth_lt M1_int 42 0 M1_int_dim' H42).
   unfold fl_coeff_bound.
@@ -86,8 +86,9 @@ Qed.
 (*  Hadamard bound check + sufficient inequality.                      *)
 (* ================================================================== *)
 
-Axiom fl_coeff_bound_M1_eq :
+Lemma fl_coeff_bound_M1_eq :
   fl_coeff_bound 42 (max_abs_entry M1_int) = fl_coeff_bound_M1_value.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma crt_bound_M1_sufficient_literal :
   (2 * fl_coeff_bound_M1_value + 2 * Z.abs det_M1_int_value

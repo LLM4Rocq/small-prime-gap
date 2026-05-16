@@ -249,7 +249,7 @@ Proof.
                  = Z_to_mod63 p det_M1_int_value.
   { transitivity (List.nth 0 (char_poly_mod p M1_int) 0%uint63);
     [exact (Logic.eq_sym HH) | exact Hagree]. }
-  unfold det_M1_int.
+  rewrite det_M1_int_eq_nth.
   exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
 Qed.
 
@@ -272,7 +272,7 @@ Proof.
                  = Z_to_mod63 p D_pencil_int_value.
   { transitivity (List.nth 0 (char_poly_mod p pencil_mat_int) 0%uint63);
     [exact (Logic.eq_sym HH) | exact Hagree]. }
-  unfold D_pencil_int.
+  rewrite D_pencil_int_eq_nth.
   exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
 Qed.
 
@@ -323,21 +323,31 @@ From PrimeGapS1 Require Import CRTPencilM1Bound.
 (*  Assembly: lift per-prime divisibility + Hadamard bound to Z.       *)
 (* ================================================================== *)
 
-(* det_M1_int_eq IS structurally complete: the proof
-   `small_multiple_zero crt_product_710` chained with
-   `all_primes_divide_product` (using `per_prime_div_M1`) and the
-   Hadamard bound from `CRTPencilM1Bound.crt_bound_M1_sufficient` —
-   the EXACT same pattern as CRTLift's lift theorems.  However
-   Qed-time kernel re-verification of this proof in this compilation
-   unit does not terminate in 30+ minutes here (memory keeps growing
-   past 5 GB).  Splitting into sub-lemmas, swapping `unfold` for
-   `change`, and rewriting via `Z.le_lt_trans` were tried — none
-   helped.  The IDENTICAL pattern compiles in <2 min in CRTLift.v
-   for the A_int case (smaller bit-bound on entries).  Root cause
-   not yet diagnosed.  Leaving Admitted so the rest of the file is
-   usable. *)
 Theorem det_M1_int_eq : det_M1_int = det_M1_int_value.
-Admitted.
+Proof.
+  (* Mirror CRTLift.fl_eq_flint: introduce a, b via `set` to keep the
+     kernel from reducing det_M1_int during Qed conversion checks. *)
+  set (a := det_M1_int).
+  set (b := det_M1_int_value).
+  cut ((a - b)%Z = 0%Z); [unfold a, b; lia|].
+  apply (small_multiple_zero _ crt_product_710).
+  - unfold crt_product_710.
+    apply all_primes_divide_product.
+    + exact crt_primes_710_NoDup.
+    + exact crt_primes_710_all_prime.
+    + intros pz Hpz. apply List.in_map_iff in Hpz.
+      destruct Hpz as [p [Hpeq Hin]]. subst pz.
+      exact (per_prime_div_M1 p Hin).
+  - exact crt_product_710_pos.
+  - apply Z.le_lt_trans with
+      (2 * fl_coeff_bound 42 (max_abs_entry M1_int) +
+       2 * Z.abs det_M1_int_value)%Z;
+      [|exact crt_bound_M1_sufficient].
+    have HA := det_M1_int_abs_bound.
+    have Hsub : (Z.abs (a - b) <= Z.abs a + Z.abs b)%Z.
+    { have := Z.abs_triangle a (-b). by rewrite Z.abs_opp -Z.add_opp_r. }
+    unfold a, b in *. lia.
+Qed.
 
 (* Pencil-side equality cannot close at the current prime count
    (see note above the Hadamard checks): 2 * |D_pencil_int_value| ~

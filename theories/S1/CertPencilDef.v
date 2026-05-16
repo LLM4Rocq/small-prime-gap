@@ -55,10 +55,29 @@ Definition pencil_mat_int : list (list Z) :=
    coefficient of `char_poly_int` (which equals det up to sign;
    for n = 42 even, the sign factor is +1). *)
 
-Definition D_pencil_int : Z :=
-  List.nth 0 (char_poly_int pencil_mat_int) BinInt.Z0.
+(* Strong sealing via Qed-protected sigT witness — `Opaque` alone is
+   insufficient because the kernel can still reduce through it during
+   Qed-time conversion checks.  By going through `proj1_sig` of a
+   Qed-sealed `existsT`, the body is truly hidden from the kernel.
+   The bridge lemmas `det_M1_int_eq_nth` / `D_pencil_int_eq_nth` give
+   downstream code access to the value without unsealing. *)
 
-Definition det_M1_int : Z := List.nth 0 (char_poly_int M1_int) BinInt.Z0.
+Lemma det_M1_int_witness : { z : Z | z = List.nth 0 (char_poly_int M1_int) BinInt.Z0 }.
+Proof. exists (List.nth 0 (char_poly_int M1_int) BinInt.Z0). reflexivity. Qed.
+
+Lemma D_pencil_int_witness : { z : Z | z = List.nth 0 (char_poly_int pencil_mat_int) BinInt.Z0 }.
+Proof. exists (List.nth 0 (char_poly_int pencil_mat_int) BinInt.Z0). reflexivity. Qed.
+
+Definition det_M1_int : Z := proj1_sig det_M1_int_witness.
+Definition D_pencil_int : Z := proj1_sig D_pencil_int_witness.
+
+Lemma det_M1_int_eq_nth :
+  det_M1_int = List.nth 0 (char_poly_int M1_int) BinInt.Z0.
+Proof. exact (proj2_sig det_M1_int_witness). Qed.
+
+Lemma D_pencil_int_eq_nth :
+  D_pencil_int = List.nth 0 (char_poly_int pencil_mat_int) BinInt.Z0.
+Proof. exact (proj2_sig D_pencil_int_witness). Qed.
 
 (* ================================================================== *)
 (*  Structural facts                                                    *)
