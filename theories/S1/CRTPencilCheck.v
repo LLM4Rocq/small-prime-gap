@@ -38,7 +38,7 @@ From mathcomp Require Import all_ssreflect.
 
 From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly.
 From PrimeGapS1 Require Import ModularArith CRTBridge CRTCheck CRTLift Fermat PrimeCheck.
-From PrimeGapS1 Require Import CharPolyAgree.   (* forallb_all_rows_len *)
+From PrimeGapS1 Require Import AllRowsLenHelper.   (* forallb_all_rows_len *)
 From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import Witness_PencilDet.
 From PrimeGapS1 Require Import CertL2 CertPencilDef.

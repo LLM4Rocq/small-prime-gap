@@ -21,7 +21,7 @@
 From Stdlib Require Import ZArith List Lia.
 From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly.
 From PrimeGapS1 Require Import CRTBridge.   (* fl_all_divisible_from_L2 *)
-From PrimeGapS1 Require Import CharPolyAgree.   (* forallb_all_rows_len *)
+From PrimeGapS1 Require Import AllRowsLenHelper.   (* forallb_all_rows_len *)
 From PrimeGapS1 Require Import CRTLift.
 From PrimeGapS1 Require Import CertL2.   (* M1_int_dim'/rows_42/wf' *)
 From PrimeGapS1 Require Import CertPencilDef.   (* det_M1_int *)

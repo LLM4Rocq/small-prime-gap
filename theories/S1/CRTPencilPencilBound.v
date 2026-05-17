@@ -23,7 +23,7 @@ From Stdlib Require Import ZArith List Lia.
 From mathcomp Require Import all_ssreflect.
 From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly.
 From PrimeGapS1 Require Import CRTBridge.
-From PrimeGapS1 Require Import CharPolyAgree.
+From PrimeGapS1 Require Import AllRowsLenHelper.
 From PrimeGapS1 Require Import CRTLift.
 From PrimeGapS1 Require Import CertL2.   (* M1_int_dim'/wf' (and M2 lemmas below) *)
 From PrimeGapS1 Require Import CertPencilDef.   (* pencil_mat_int, D_pencil_int, etc *)
