@@ -9,11 +9,11 @@ Maynard's published proof). Maynard references use the v3 / Annals
 numbering ([arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600);
 Annals **181** (2015), 383–413).
 
-This checklist describes the **pencil-determinant route** that lives
-on this `quad` branch.  The canonical proof on `main` follows a
-Sturm/IVT route with a different items 5–6; see the equivalent
-checklist on that branch.  Both routes share items 1–4 and 7 and end
-with the same headline trust contract.
+This is the auditor's checklist for the Rocq mechanisation of
+Maynard's `M_{105} > 4` bound via the **pencil-determinant
+identity**.  The headline theorem is
+`CertPencil.maynard_M105_certified_pencil` in
+`theories/S1/CertPencil.v`.
 
 | # | Claim | Maynard ref | Rocq backing |
 |---|---|---|---|

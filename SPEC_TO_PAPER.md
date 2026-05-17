@@ -121,9 +121,9 @@ Lemma M{1,2}_spec_eq_int i j :
 ```
 
 where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
-`maynard_M105_certified` exposes this composed identity directly (one
-conjunct per matrix), not the Z-level bool match and the rat<->Z bridge
-as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
+`CertPencil.maynard_M105_certified_pencil` exposes this composed
+identity directly (one conjunct per matrix), not the Z-level bool
+match and the rat<->Z bridge as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
 and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
 `Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
 individually `Print Assumptions`-able — they just no longer appear as
@@ -516,7 +516,7 @@ M_k = sup_F  Σ_m J_k^{(m)}(F) / I_k(F)
 ```
 
 where `M_2` is **per-coordinate** `J_k^{(1)}` (what `M2_entry` computes).
-Equivalently, the Cert.v threshold
+Equivalently, the headline threshold
 
 ```
 λ_max( M_1^{-1} · M_2 )  >  4 / k  =  4 / 105
@@ -671,7 +671,8 @@ of digits before `qplus` collapses it.
 ### 9.1 Lemma 8.3 (`M_k = k · λ_max(M_1^{-1} M_2)`) — *paper-side only*
 
 The Rocq layer proves "there exists a real algebraic eigenvalue of
-`M_1^{-1} M_2` strictly above `4/105`" (`Cert.maynard_eigenvalue_S1`).
+`M_1^{-1} M_2` strictly above `4/105`"
+(`CertPencil.maynard_eigenvalue_S1_pencil`).
 Bridging this to `M_{105} > 4` requires:
 
 (a) Lemma 8.3's identity `M_k = k · λ_max(M_1^{-1} M_2)`
@@ -703,8 +704,8 @@ proof in Maynard. We do not reproduce this analytic step inside Rocq.
 What Rocq *does* certify is that the resulting closed-form rational
 matches the shipped integer matrix `M1_int / D_M1`, `M2_int / D_M2`
 entry-for-entry. So if a reviewer accepts Maynard's Lemma 8.1 / 8.2
-on paper, the kernel guarantees the matrices `Cert.v` consumes are
-exactly the Maynard matrices.
+on paper, the kernel guarantees the matrices `CertPencil.v` consumes
+are exactly the Maynard matrices.
 
 ---
 
@@ -725,5 +726,5 @@ exactly the Maynard matrices.
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
 | `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_eq_int`) |
 | `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_eq_int`) |
-| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified` |
-| `maynard_M105_certified` | `Cert.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |
+| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified_pencil` |
+| `maynard_M105_certified_pencil` | `CertPencil.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |

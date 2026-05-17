@@ -1,4 +1,4 @@
-# Maynard `M_{105} > 4` — a Rocq replacement for the Mathematica notebook
+# Maynard `M_{105} > 4` — a Rocq mechanisation via the pencil-determinant identity
 
 [![Blueprint CI](https://img.shields.io/github/actions/workflow/status/LLM4Rocq/small-prime-gap/blueprint.yml?branch=main&style=for-the-badge&label=blueprint%20CI)](https://github.com/LLM4Rocq/small-prime-gap/actions/workflows/blueprint.yml)
 [![Blueprint](https://img.shields.io/badge/blueprint-online-blue?style=for-the-badge)](https://llm4rocq.github.io/small-prime-gap/blueprint/)
@@ -7,8 +7,9 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg?style=for-the-badge)](https://creativecommons.org/licenses/by/4.0/)
 
-This repository contains a re-implementation of the numerical
-computation involved in the proof of **Proposition 4.3 / formula (8.15)**` of James Maynard's article *Small gaps between primes*
+This repository contains a standalone Rocq mechanisation of the
+numerical step in the proof of **Proposition 4.3 / formula (8.15)**
+of James Maynard's article *Small gaps between primes*
 (Annals of Mathematics **181** (2015), 383--413), also available as a preprint ([arXiv:1311.4600](https://arxiv.org/abs/1311.4600)). The present README refers to the labels used in this published version of the article. Maynard's proof relies on a (single) computational proof in order to establish a lower bound:
 
  $$M_{105}  > 4$$
@@ -27,11 +28,11 @@ This re-implementation aims at improving the reproducibility of the calculations
 ## The headline theorems
 
 ```rocq
-Theorem maynard_eigenvalue_S1 :
+Theorem maynard_eigenvalue_S1_pencil :
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* L1 + L2 + L3 *) Qed.
+Proof. (* pencil-determinant signs + IVT *) Qed.
 ```
 
 The following variant conjoins the spectral bound with the closed-form match of the input matrices, based on Lemmas (8.1) and (8.2). This last step consists in checking that the computation-friendly version of each matrix agrees with its deduction-friendly version, which in turn essentially consists in changing the datastructure respectively used for integers and for matrices.
@@ -39,7 +40,7 @@ The following variant conjoins the spectral bound with the closed-form match of 
 Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as definitions for the coefficients of matrices `M1` and `M2` :
 
 ```rocq
-Theorem maynard_M105_certified :
+Theorem maynard_M105_certified_pencil :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
@@ -47,55 +48,57 @@ Theorem maynard_M105_certified :
   exists lambda : realalg,
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1 *) Qed.
+Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1_pencil *) Qed.
 ```
 
-A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
+A single `Print Assumptions maynard_M105_certified_pencil` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
 
 ## Relation to Maynard's notebook
 
 Maynard's original Mathematica notebook `Computations.nb` essentially defines a certain 42x42 matrix, from the formulas provided by Lemmas (8.1) and (8.2), and computes a well-chosen eigenvector. Then, its snaps this vector to a small-denominator rational vector `v`, and evaluates the Rayleigh quotient of the matrix at `v`, using exact rational arithmetic. The value obtained is greater than 4, which provides a rigorous lower bound on the eignevalues of the initial matrix, where rigorous here should be understood in the sense of rigorous computation.
 
-In the current state of this project, the mechanized proof takes a different route. It consists in computing the characteristic
-polynomial of the same matrix, before applying the intermediate value theorem. As the size of the coefficients in the initial matrix are big, computing the characteristic polynomial is delicate. The formal proof thus compares modulo enough big primes the value obtained by the FLINT code with that obtained by a Rocq implementation of the Faddeev-Le Verrier algorithm, and concludes via the Chinese Reminder Theorem.
+The mechanized proof takes a different route.  Setting `A := M₁⁻¹·M₂`,
+it uses the determinant-pencil identity (a generic fact of
+commutative-ring algebra, provable in one line of mathcomp)
 
-## Two proof routes: `main` (Sturm/IVT) vs. `quad` (pencil-determinant)
+```
+det(λ·M₁ − M₂) = det(M₁) · char_poly(A)(λ)
+```
 
-The repository hosts two complete proofs of `maynard_M105_certified` on
-two branches. Both share the FLINT-cross-checked input matrices, the
-Faddeev-LeVerrier characteristic polynomial, and the realalg / IVT
-closing step; they differ on how they extract the sign information
-needed by the IVT.
+specialised at `λ = 4/105`: clearing denominators reduces the
+eigenvalue bound to the sign of two integer determinants, namely
+`det(M1_int)` (positive) and `det(pencil_int_clean)` (negative,
+where `pencil_int_clean := D_pencil_clean · (4·M1_rat − 105·M2_rat)`
+is the *clean* integer pencil scaled through the LCM of the
+denominators of `4·M1_rat − 105·M2_rat`).  Both integer determinants
+are closed by a per-prime modular CRT lift across the same 710
+Uint63 primes (the clean pencil's determinant is 2613 bits, well
+within the ~21300-bit `crt_product_710` headroom); the resulting
+sign of `char_poly(A)(4/105)` is negative, while the leading
+coefficient is `1 > 0`, so MathComp's intermediate value theorem
+(`poly_ivtoo`) extracts a realalg eigenvalue strictly above `4/105`.
+The Rocq layer compares each `char_poly_mod p (M1_int)` and
+`char_poly_mod p (pencil_int_clean)` modulo each of the 710 primes
+against the shipped constant terms `det_M1_int_value`,
+`D_pencil_int_value` via a closed-form Hadamard-style coefficient
+bound, and concludes via the Chinese Remainder Theorem.
 
-* **`main` branch (canonical)** -- uses the 43-coefficient CRT
-  comparison `charpoly_int_agrees_710` against the FLINT-shipped
-  characteristic polynomial, then applies Sturm's theorem on the lifted
-  realalg polynomial to localise the eigenvalue above `4/105`. About
-  600 quad-specific LOC across 9 files, ~30-50 min fresh compile.
-* **`quad` branch (alternative)** -- uses Agent A's pencil identity
-  `det(λM₁ − M₂) = det(M₁) · char_poly(M₁⁻¹M₂)(λ)` and a 710-prime CRT
-  lift on the two integer determinants `det(M1_int)` and
-  `det(pencil_int_clean)` (the **clean** integer pencil:
-  `pencil_int_clean := D_pencil_clean · (4·M1_rat − 105·M2_rat)` scaled
-  through the LCM `D_pencil_clean` of the denominators of
-  `4·M1_rat − 105·M2_rat`, ~half of `D_M1·D_M2`) to derive
-  `(char_poly A_rat).[4/105] < 0` directly, then closes via IVT on the
-  realalg lift.  Headline theorem: `maynard_M105_certified_pencil` in
-  `theories/S1/CertPencil.v`.  About 1500 quad-specific LOC across 14
-  files, ~30-45 min fresh compile.
+## A single-line headline summary
 
-| Route | Headline | Files | LOC | Compile |
-|-------|----------|-------|-----|---------|
-| `main` | `maynard_M105_certified`        | 9 quad files  | ~600  | ~30-50 min |
-| `quad` | `maynard_M105_certified_pencil` | 14 quad files | ~1500 | ~30-45 min |
+| Headline                          | Files | LOC    | Compile     |
+|-----------------------------------|-------|--------|-------------|
+| `maynard_M105_certified_pencil`   | 41    | 15 964 | ~30-50 min  |
 
-The `main` route is the canonical proof; the `quad` route demonstrates
-that the pencil-determinant approach is mechanizable.  After the
-clean-pencil refactor it is roughly 3× the size of the main route at
-comparable compile time; the original 1210-prime / `4·D_M2·M1 −
-105·D_M1·M2` formulation inflated the pencil determinant to 31131 bits
-(vs.\ 2613 in the clean form), which required a 1210-prime CRT product
-and ~50–85 min of compile.
+The 41 files / 15 964 LOC count covers `theories/S1/` in full; the
+pencil-determinant proof itself adds roughly 1500–1900 LOC of
+pencil-specific machinery
+(`DetPencil.v`, `CertPencilDef.v`, `AbstractPencilHelper.v`,
+`CRTPencilCheck.v`, `CRTPencilChecksProof.v`,
+`CRTPencilHadamardGeneric.v`, `CRTPencilM1Bound.v`,
+`CRTPencilPencilBound.v`, `PencilCleanGrid.v`,
+`Witness_PencilDet.v`, `Witness_PencilClean.v`, `Witness_M1Bound.v`,
+`Witness_PencilBound.v`, `AllRowsLenHelper.v`, `CertPencil.v`)
+on top of a shared FLINT / MathComp / CharPoly / MaynardVerify base.
 
 ## Repository layout and disclaimer
 Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:
@@ -120,26 +123,26 @@ prime_gap/
 |   +-- m1m2.pkl                    cached exact-rational M1, M2
 |   +-- certificate.json            small certificate (~510 KB)
 |
-+-- theories/S1/                    23 top-level .v files + 14 chunk files
++-- theories/S1/                    41 .v files (incl. 7 in MaynardVerify/, 1 in CharPolyAgree/)
     +-- Recompose.v                 bigZ <-> Z helpers
     +-- Witness.v                   certificate data (autogenerated)
+    +-- Witness_PencilDet.v         shipped det(M1_int)   integer literal
+    +-- Witness_PencilClean.v       shipped clean pencil matrix + det literal
+    +-- Witness_M1Bound.v           shipped Hadamard-bound literal for det(M1_int)
+    +-- Witness_PencilBound.v       shipped Hadamard-bound literal for det(pencil)
     |
     +-- IntPoly.v                   list Z polynomial library
     +-- IntMat.v                    list (list Z) matrix library
-    +-- SignChain.v                 sign-variation counting (sgn_Z, sign_at_*)
+    +-- AllRowsLenHelper.v          all_rows_len reflection helper
     |
     +-- CharPoly.v                  Faddeev-LeVerrier + rat bridges
-    +-- CharPolyAgree.v             710-prime CRT assembly
-    +-- CharPolyAgree/              definitions + 6 parallel chunks
-    |   +-- Def.v                   definitions (modular arith, prime list)
-    |   +-- Chunk_0.v ... Chunk_5.v 119-prime chunks (proved by `make -j`)
-    +-- CharPolyScale.v             char_poly(c *: M) scaling formula
+    +-- CharPolyAgree/Def.v         710-prime list + per-prime modular toolkit
     |
     +-- ModularArith.v              shared Uint63 modular operations
     +-- CRTBridge.v                 FL modular soundness
     +-- CRTCheck.v                  CRT correctness lemmas (max_abs_coeff,
     |                               small_multiple_zero, all_primes_divide_product)
-    +-- CRTLift.v                   CRT lift: fl_eq_flint + matrix_identity_Z
+    +-- CRTLift.v                   CRT toolkit (Hadamard coefficient bounds)
     +-- Fermat.v                    Fermat's little theorem bridges
     +-- PrimeCheck.v                Z-level trial division + MathComp bridge
     |
@@ -152,15 +155,24 @@ prime_gap/
     |   +-- M2_0.v ... M2_5.v       7-row chunks of the M2 check
     +-- MaynardSpecBridge.v         kernel-Qed: paper-form (rat) <-> computational (Z) spec
     |
-    +-- Bridge.v                    L1 bridge to MathComp real-closed
-    +-- CertL1.v                    L1 IVT proof
-    +-- CertL2.v                    L2 assembly (charpoly_int_Dq_scaled)
-    +-- Cert.v                      headline theorem
+    +-- DetPencil.v                 det_pencil identity (generic mathcomp fact)
+    +-- CertPencilDef.v             sealed det_M1_int / D_pencil_int / pencil_mat_int
+    +-- AbstractPencilHelper.v      generic-n pencil cell / matrix bridge
+    +-- PencilCleanGrid.v           1764-cell per-entry pencil cross-check
+    +-- CRTPencilCheck.v            per-prime modular agreement for det(M1) / det(pencil)
+    +-- CRTPencilChecksProof.v      710-prime vm_compute Qeds (check_M1_det_710 etc.)
+    +-- CRTPencilHadamardGeneric.v  generic Hadamard chain for CRT-pencil bounds
+    +-- CRTPencilM1Bound.v          bound vs. crt_product_710 for det(M1)
+    +-- CRTPencilPencilBound.v      bound vs. crt_product_710 for det(pencil)
+    |
+    +-- CertL2.v                    A_rat / M1_1_unit / structural lemmas
+    +-- Cert.v                      M{1,2}_spec_eq_int (composed paper-spec identity)
+    +-- CertPencil.v                headline pencil-determinant assembly
 ```
 
 ## Auditor's checklist
 
-See [`AUDITOR_CHECKLIST.md`](./AUDITOR_CHECKLIST.md) for the 8-row
+See [`AUDITOR_CHECKLIST.md`](./AUDITOR_CHECKLIST.md) for the 7-row
 table mapping each verifiable claim to its reference in Maynard's
 paper ([arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600); Annals
 **181** (2015), 383–413) and the Rocq lemma backing it.
@@ -186,25 +198,23 @@ source .venv/bin/activate && python python/build_certificate.py
 # 2. Regenerate Rocq witness files (optional -- pre-built)
 python python/json_to_v.py
 
-# 3. Build all Rocq files (~28 min with `make -j6`, ~62 min with `make -j2`).
-#    The two heaviest phases each split into 6 parallel chunks so that
-#    they overlap under `make -j6`:
-#      - CharPolyAgree/Chunk_0..5.v    710-prime CRT checks
-#      - MaynardVerify/M2_0..5.v       42x42 M2 spec cross-check (7 rows each)
+# 3. Build all Rocq files (~30-50 min wall clock with `make -j6`).
+#    The heaviest phase is the 42x42 M2 spec cross-check, split into
+#    six parallel chunks (MaynardVerify/M2_0..5.v) so they overlap
+#    under `make -j6`.
 coq_makefile -f _CoqProject -o Makefile
 make -j6
 
 # 4. Verify the end-to-end theorem has no project-specific axioms.
-#    `maynard_M105_certified` is the recommended target: it conjoins
-#    `all_match_M{1,2}Z = true` (the Z-level closed-form input-matrix
-#    check), `M{1,2}_spec_rat_eq` (the Z-level <-> rat-level paper-form
-#    bridge from MaynardSpecBridge), and the eigenvalue bound, so a
-#    single Print Assumptions covers the full pipeline. The
-#    spectral-only sibling `maynard_eigenvalue_S1` reports the same
-#    assumption set minus the matrix-pinning bool facts.
+#    `maynard_M105_certified_pencil` is the recommended target: it
+#    conjoins the per-matrix paper-form spec identities (M{1,2}_spec_ij
+#    = Z2rat(M_int[i,j]) / Z2rat D_M{1,2}, composed internally from
+#    `all_match_M{1,2}Z = true` plus the rat<->Z bridge from
+#    MaynardSpecBridge) with the eigenvalue bound, so a single
+#    Print Assumptions covers the full pipeline.
 coqtop -Q theories/S1 PrimeGapS1 \
-  -l theories/S1/Cert.v -batch \
-  -e 'Print Assumptions maynard_M105_certified.'
+  -l theories/S1/CertPencil.v -batch \
+  -e 'Print Assumptions maynard_M105_certified_pencil.'
 # Expected: only Rocq's standard PrimInt63 / Uint63Axioms primitive-integer
 # interface (the footprint inherited by every vm_compute-driven proof).
 # No project-specific axioms, no Admitted.

@@ -7,8 +7,8 @@
 %   \label{...}                      -- unique label, prefixed by env type
 %
 % The Rocq logical name of every theory file is `PrimeGapS1.<File>` (see
-% `_CoqProject`), so e.g. `Cert.maynard_M105_certified` becomes
-% `PrimeGapS1.Cert.maynard_M105_certified`.
+% `_CoqProject`), so e.g. `CertPencil.maynard_M105_certified_pencil` becomes
+% `PrimeGapS1.CertPencil.maynard_M105_certified_pencil`.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter*{Introduction}
@@ -29,7 +29,7 @@ algebraic claim inside the kernel.
 
 The end-to-end statement is
 \begin{verbatim}
-Theorem maynard_M105_certified :
+Theorem maynard_M105_certified_pencil :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
@@ -38,7 +38,7 @@ Theorem maynard_M105_certified :
     eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
     /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
 \end{verbatim}
-proven in \texttt{theories/S1/Cert.v}, where
+proven in \texttt{theories/S1/CertPencil.v}, where
 $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin embedding of $\Z$ into $\rat$. The first two conjuncts are
 each a single composed identity per matrix: the $\rat$-level paper-form
@@ -79,13 +79,22 @@ route}: it numerically computes the top eigenvector of $\Mone^{-1}\Mtwo$,
 snaps it to a small-denominator rational vector, and evaluates the
 Rayleigh quotient $k\cdot v^T M_2 v / v^T M_1 v$ in exact rational
 arithmetic. This is a true rigorous lower bound regardless of how~$v$
-is obtained. Our Rocq proof takes the \emph{characteristic-polynomial
-route}: the intermediate value theorem on $\charpolysym_{\Arat}$
-certifies the existence of an eigenvalue strictly above $4/105$ from
-just the sign of the polynomial at the lower endpoint (negative, by
-direct \vmcompute{}) and at MathComp's \texttt{cauchy\_bound} (positive,
-from the leading-coefficient sign). No eigenvector or Sturm chain is
-constructed. Both routes are sound; together, they form an independent
+is obtained. Our Rocq proof takes the \emph{pencil-determinant route}:
+a generic identity of commutative-ring algebra,
+\[
+   \det(\lambda\,M_1 - M_2)
+     \;=\; \det(M_1)\,\cdot\,\chi_{M_1^{-1}M_2}(\lambda),
+\]
+(Rocq lemma \rocq{PrimeGapS1.DetPencil.det_pencil}, one-line
+mathcomp proof), specialised at $\lambda = 4/105$ and rescaled to
+integers, reduces the eigenvalue bound to the sign of two integer
+determinants.  Both signs are extracted by a single shared
+$710$-prime CRT lift on the \emph{constant terms} of the
+characteristic polynomials, and the intermediate value theorem on
+$\charpolysym_{\Arat}$ (MathComp's \texttt{poly\_ivtoo} together
+with \texttt{cauchy\_bound}) certifies the existence of an
+eigenvalue strictly above $4/105$.  No eigenvector is constructed.
+Both routes are sound; together, they form an independent
 double-check of Maynard's headline value $\Mk[105] \approx 4.0021$.
 
 \paragraph{How to read this blueprint.}
@@ -480,14 +489,11 @@ Maynard's exact closed form.
 \chapter{The characteristic polynomial route}\label{ch:charpoly}
 
 This chapter develops the in-kernel characteristic polynomial
-machinery. We use a hand-rolled Faddeev--LeVerrier (FL) recurrence on
-\texttt{list (list Z)} matrices, prove that it computes the same
-polynomial as MathComp's \texttt{char\_poly} on the corresponding
-$\Q$-matrix, and develop the $c \cdot M$ scaling formula needed to
-relate the cleared-denominator polynomial to the rational
-$\charpolysym_{\Arat}$. The material lives in
-\texttt{IntPoly.v}, \texttt{IntMat.v}, \texttt{CharPoly.v} and
-\texttt{CharPolyScale.v}.
+machinery.  We use a hand-rolled Faddeev--LeVerrier (FL) recurrence
+on \texttt{list (list Z)} matrices and prove that it computes the
+same polynomial as MathComp's \texttt{char\_poly} on the
+corresponding $\Q$-matrix.  The material lives in
+\texttt{IntPoly.v}, \texttt{IntMat.v}, and \texttt{CharPoly.v}.
 
 \section{Integer polynomial and matrix libraries}
 
@@ -575,55 +581,49 @@ of \texttt{char\_poly} is~$1$ and that the next-to-leading coefficient
 is $-\trace M$, both already in MathComp.
 \end{proof}
 
-\section{The \texorpdfstring{$c \cdot M$}{c.M} scaling formula}
+\section{The determinant-pencil identity}
 
-The cleared-denominator polynomial $\texttt{charpoly\_int}$ shipped in
-\texttt{Witness.v} satisfies
-$\texttt{charpoly\_int} = \Dq \cdot \charpolysym_{\Arat}$ \emph{up to} a
-power of $\DA$ that comes from $\Arat = \Aint / \DA$. The bridge is the
-following one-lemma file.
+The bridge from the two integer determinants
+$\det(M_1^{\mathrm{int}})$ and $\det(\texttt{pencil\_int\_clean})$
+to a sign of $\charpolysym_{\Arat}$ at $4/105$ is the
+\emph{pencil identity}, a one-line mathcomp fact.
 
-\begin{lemma}[Char-poly scaling]\label{lem:char_poly_scale}
-\rocq{PrimeGapS1.CharPolyScale.char_poly_scale}
+\begin{theorem}[Pencil determinant identity]\label{thm:det_pencil}
+\rocq{PrimeGapS1.DetPencil.det_pencil}
 \rocqok
-For $F$ a field, $M : 'M[F]_n$, $c \in F$ with $c \ne 0$, and
-$k \le n$:
+For any commutative ring with unit $R$, dimension $n$, matrices
+$M_1, M_2 : 'M[R]_n$ with $M_1 \in \mathrm{unitmx}$, and scalar
+$\lambda$:
 \[
-\bigl(\charpolysym(c \cdot M)\bigr)_k
-   \;=\; c^{n - k} \cdot \bigl(\charpolysym(M)\bigr)_k.
+\det\bigl(\lambda\,M_1 - M_2\bigr)
+   \;=\; \det(M_1)\,\cdot\,\charpolysym\bigl(M_1^{-1}\,M_2\bigr)(\lambda).
 \]
-\end{lemma}
+\end{theorem}
 \begin{proof}\rocqok
-Factor $c$ out of $xI - cM = c \cdot ((x/c) I - M)$. Since
-$\charpolysym(M)(x) = \det(xI - M)$ and $\det$ is multilinear in rows,
-\[
-\det(xI - cM) = c^n \det\!\bigl((x/c) I - M\bigr) = c^n \cdot \charpolysym(M)(x/c).
-\]
-Reading off the coefficient of $x^k$ on the right via
-\texttt{coef\_comp\_scaleX} gives
-$c^n \cdot c^{-k} \cdot (\charpolysym(M))_k = c^{n - k} (\charpolysym(M))_k$,
-which is what we wanted. The proof uses MathComp's
-\texttt{det\_map\_mx} plus a direct coefficient computation.
+One-line proof on top of \texttt{char\_poly\_horner\_eval}: substitute
+$M_2 = (M_1)(M_1^{-1}M_2)$ in $\lambda M_1 - M_2$, factor $M_1$ out
+of the determinant, and recognise the residual as
+$\charpolysym(M_1^{-1}M_2)$ evaluated at $\lambda$.
 \end{proof}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{CRT cross-validation}\label{ch:crt}
 
-The most computationally heavy step in the entire proof is showing that
-$\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$, the
-shipped char-poly of the $42 \times 42$ integer matrix $\Aint$. Both
-sides are lists of $43$ integers with coefficients up to ${\sim}20{,}000$
-bits. Direct \vmcompute{} on the LHS would take hours and produce
-unwieldy proof terms. Instead we use a Chinese Remainder Theorem (CRT)
-lift: verify the equality modulo $710$ Uint63 primes, then close
-$|a - b| = 0$ from $(\prod p_i) \mid (a - b)$ via a verified bound. The
-same pattern handles the matrix identity $\Mtwo \cdot \Mone \cdot \Aint
-= \DMone \cdot \DA \cdot \Mtwo$ that links the cleared denominators.
-This chapter follows files \texttt{ModularArith.v}, \texttt{CRTBridge.v},
-the \texttt{CharPolyAgree/} directory (\texttt{Def.v} + six parallel
-\texttt{Chunk\_0..5.v} + the assembly \texttt{CharPolyAgree.v}),
-\texttt{CRTCheck.v}, \texttt{Fermat.v}, \texttt{PrimeCheck.v} and
-\texttt{CRTLift.v}.
+The most computationally heavy step in the entire proof is showing
+that the two shipped integer determinants
+$\texttt{det\_M1\_int\_value}$ and $\texttt{D\_pencil\_int\_value}$
+are the actual constant coefficients of
+$\texttt{char\_poly\_int}(M_1^{\mathrm{int}})$ and
+$\texttt{char\_poly\_int}(\texttt{pencil\_int\_clean})$
+respectively.  Both integers are large ($2044$ and $2613$ bits) and
+direct \vmcompute{} on the LHS would take hours and produce
+unwieldy proof terms.  Instead we use a Chinese Remainder Theorem
+(CRT) lift: verify the equality modulo $710$ Uint63 primes, then
+close $|a - b| = 0$ from $(\prod p_i) \mid (a - b)$ via a verified
+Hadamard-style coefficient bound.  This chapter follows files
+\texttt{ModularArith.v}, \texttt{CRTBridge.v},
+\texttt{CharPolyAgree/Def.v}, \texttt{CRTCheck.v},
+\texttt{Fermat.v}, \texttt{PrimeCheck.v}, and \texttt{CRTLift.v}.
 
 \section{Modular arithmetic in Uint63}
 
@@ -644,16 +644,16 @@ processes a single $42 \times 42$ FL chain in ${\sim}0.5$~s.
 \begin{remark}[Why \texttt{ModularArith.v} exists as one file]
 \label{rem:modular_arith_factor}
 The original development duplicated all modular operations across
-\texttt{CRTBridge.v} and \texttt{CharPolyAgree.v}. When
-\texttt{CRTLift.v} tried to rewrite a fact mentioning
-\texttt{char\_poly\_mod}~$p\,\Aint$ from one file by an equation
-mentioning the same expression but defined in the other file, the
-kernel saw two distinct head constants and tried to delta-unfold both,
-which is exactly the FL recurrence on a concrete $42 \times 42$
-matrix. Empirically that hung the kernel for $> 25$ minutes per
-rewrite. Factoring every modular operation into one file pins each
-constant to a single kernel name, so unification of the same head
-symbol is by reflexivity.
+\texttt{CRTBridge.v} and the per-prime check files.  When
+\texttt{CRTPencilCheck.v} tried to rewrite a fact mentioning
+\texttt{char\_poly\_mod}\,$p\,M_1^{\mathrm{int}}$ from one file by
+an equation mentioning the same expression but defined in another
+file, the kernel saw two distinct head constants and tried to
+delta-unfold both, which is exactly the FL recurrence on a
+concrete $42 \times 42$ matrix.  Empirically that hung the kernel
+for $> 25$ minutes per rewrite.  Factoring every modular operation
+into one file pins each constant to a single kernel name, so
+unification of the same head symbol is by reflexivity.
 \end{remark}
 
 \section{Per-prime correctness of modular FL}
@@ -703,8 +703,8 @@ Via MathComp's \texttt{expf\_card} on the multiplicative group $\Fp^\ast$.
 \section{The 710 primes}
 
 \begin{definition}[CRT prime list]\label{def:crt_primes}
-\rocq{PrimeGapS1.CharPolyAgree.crt_primes_local,
-      PrimeGapS1.CharPolyAgree.crt_primes_extra}
+\rocq{PrimeGapS1.CharPolyAgree.Def.crt_primes_local,
+      PrimeGapS1.CharPolyAgree.Def.crt_primes_extra}
 \rocqok
 A concatenated list \texttt{crt\_primes\_all} of $710$ distinct
 $\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The product
@@ -757,214 +757,247 @@ imply $pq \mid c$ when $\gcd(p, q) = 1$. The \texttt{NoDup} hypothesis
 is precisely what guarantees pairwise coprimality at each step.
 \end{proof}
 
-\begin{theorem}[CRT lift: shipped char-poly is correct]
-\label{thm:fl_eq_flint}
-\rocq{PrimeGapS1.CRTLift.fl_eq_flint}
+\begin{theorem}[CRT lift: integer determinants match shipped literals]
+\label{thm:det_int_eq}
+\rocq{PrimeGapS1.CRTPencilCheck.det_M1_int_eq,
+      PrimeGapS1.CRTPencilCheck.D_pencil_int_eq}
 \rocqok
 \uses{def:char_poly_mod, thm:char_poly_mod_sound, def:crt_primes,
       lem:crt_primes_all_prime, lem:small_multiple_zero,
       lem:all_primes_divide}
-$\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$
-in $\texttt{list }\Z$.
+$\texttt{det\_M1\_int} = \texttt{det\_M1\_int\_value}$ and
+$\texttt{D\_pencil\_int} = \texttt{D\_pencil\_int\_value}$, both
+in $\Z$, where
+$\texttt{det\_M1\_int}$ /
+$\texttt{D\_pencil\_int}$ are the sealed
+$\sigT/\mathrm{proj1\_sig}$ wrappers around
+$\texttt{List.nth 0 (char\_poly\_int}\,M_1^{\mathrm{int}})\,0$
+and $\texttt{List.nth 0 (char\_poly\_int}\,\texttt{pencil\_int\_clean})\,0$
+respectively.
 \end{theorem}
 \begin{proof}\rocqok
-Both sides are lists of $43$ integers. We prove equality
-coefficient-by-coefficient by reducing
-$a_n - b_n = 0$ to Lemma~\ref{lem:small_multiple_zero}.
+The two proofs share the same template; we describe the $M_1$ case.
+We reduce $a - b = 0$ (with
+$a := \texttt{det\_M1\_int}$, $b := \texttt{det\_M1\_int\_value}$)
+to Lemma~\ref{lem:small_multiple_zero}.
 
 For each prime $p$ in \texttt{crt\_primes\_all},
 Theorem~\ref{thm:char_poly_mod_sound} gives
 $\texttt{List.map}\,(\texttt{Z\_to\_mod63}\,p)\,
-   (\texttt{char\_poly\_int}\,\Aint)
-   = \texttt{char\_poly\_mod}\,p\,\Aint$.
-On the other hand, a single-prime \vmcompute{} check inside
-\texttt{check\_charpoly\_710} (a Boolean check that all $710$ per-prime
-agreements hold simultaneously, closed by \vmcompute{} +
-\texttt{reflexivity}) gives
-$\texttt{char\_poly\_mod}\,p\,\Aint
-   = \texttt{List.map}\,(\texttt{bigZ\_to\_mod63}\,p)\,
-       \texttt{charpoly\_of\_A\_int\_bigZ}$.
-Concatenating these two facts, every coefficient of the
-left-hand side and the right-hand side has the same residue modulo
-each $p$; hence $p \mid (a_n - b_n)$. By
-Lemma~\ref{lem:all_primes_divide}, $\prod p \mid (a_n - b_n)$.
+   (\texttt{char\_poly\_int}\,M_1^{\mathrm{int}})
+   = \texttt{char\_poly\_mod}\,p\,M_1^{\mathrm{int}}$.
+A single-prime \vmcompute{} check inside
+\texttt{check\_M1\_det\_710\_true} (a Boolean check that all $710$
+per-prime agreements hold simultaneously, closed by \vmcompute{}
+$+$ \texttt{reflexivity}) gives
+$\texttt{List.nth 0 (char\_poly\_mod}\,p\,M_1^{\mathrm{int}})\,0
+   = \texttt{Z\_to\_mod63}\,p\,\texttt{det\_M1\_int\_value}$.
+Combining the two, $p \mid (a - b)$.  By
+Lemma~\ref{lem:all_primes_divide}, $\prod p \mid (a - b)$.
 
-The bound $|a_n|, |b_n| \le B$ is established by
-\texttt{charpoly\_coeff\_bound} (which tracks the FL recurrence's
-own coefficient growth via \texttt{fl\_bound\_aux}) for $a_n$ and
-\texttt{max\_abs\_coeff\_bound} for $b_n$. The combined bound
-$2B + 2|c'| < \prod p_i$ is verified by \vmcompute{} in
-\texttt{fl\_crt\_bound}, the single dominant step of the entire
-build (${\sim}18$~min wall-clock comparing a ${\sim}10000$-digit
-arithmetic chain). Lemma~\ref{lem:small_multiple_zero} then closes
-$a_n = b_n$, and \texttt{nth\_ext} aggregates the per-coefficient
-equalities into list equality.
-\end{proof}
+The bound $|a|, |b| \le B$ is established by a Hadamard-style
+chain (\texttt{CRTPencilHadamardGeneric.v}) applied to
+$M_1^{\mathrm{int}}$, then specialised in
+\texttt{CRTPencilM1Bound.v}; the closed-form
+$\texttt{fl\_coeff\_bound}\,42\,(\texttt{max\_abs\_entry}\,M_1^{\mathrm{int}})$
+matches the shipped literal $\texttt{fl\_coeff\_bound\_M1\_value}$
+via the \vmcompute{}-Qed
+$\texttt{fl\_coeff\_bound\_M1\_eq}$.
+The combined bound $2B + 2|\texttt{det\_M1\_int\_value}|
+< \prod p_i$ is verified by \vmcompute{} in
+$\texttt{crt\_bound\_M1\_sufficient\_literal}$.
+Lemma~\ref{lem:small_multiple_zero} then closes $a = b$.
 
-\begin{theorem}[Matrix identity in $\Z$]\label{thm:matrix_identity_Z}
-\rocq{PrimeGapS1.CRTLift.matrix_identity_Z}
-\rocqok
-\uses{def:char_poly_mod, def:crt_primes, lem:small_multiple_zero,
-      lem:all_primes_divide}
-\[
-\DMtwo \cdot (\Mone^{\mathrm{int}} \cdot \Aint)
-   \;=\; (\DMone \cdot \DA) \cdot \Mtwo^{\mathrm{int}}
-   \quad\text{in } \texttt{mat}.
-\]
-\end{theorem}
-\begin{proof}\rocqok
-Identical CRT pattern to Theorem~\ref{thm:fl_eq_flint}, but the
-coefficient bound is much simpler because the entries are not the
-output of a long recurrence: each entry of either side is bounded by
-$|D| \cdot \texttt{max\_abs\_entry}$ products of three matrices of
-fixed dimension. The same $710$-prime product covers it with room
-to spare.
+The pencil case (\texttt{D\_pencil\_int\_eq}) is structurally
+identical, with
+\texttt{CRTPencilChecksProof.check\_pencil\_det\_710\_true},
+\texttt{CRTPencilPencilBound.crt\_bound\_pencil\_sufficient\_literal},
+and $\texttt{pencil\_int\_clean}$ in place of their $M_1$
+counterparts.  The clean-pencil refactor was what made the same
+$710$-prime product suffice for both determinants.
 \end{proof}
 
 \begin{remark}[\texttt{Strategy opaque} as a kernel-engineering tool]
 \label{rem:strategy_opaque}
 A naive proof of the per-prime fact
-$\texttt{char\_poly\_mod}\,p\,\Aint
-   = \texttt{List.map}\,(\texttt{bigZ\_to\_mod63}\,p)\,
-       \texttt{charpoly\_of\_A\_int\_bigZ}$
-hangs the \Qed{} for $> 25$~minutes: the kernel's ordinary reducer
-tries to iota-reduce \texttt{list\_eqb63} and forces WHNF on
-$\texttt{char\_poly\_mod}\,p\,\Aint$, which triggers the full FL
-recurrence on a concrete $42 \times 42$ matrix. The fix is to wrap
-the \Qed{} in
-\texttt{Strategy opaque [list\_eqb63 char\_poly\_mod $\Aint$ \ldots]},
+$\texttt{List.nth 0 (char\_poly\_mod}\,p\,M_1^{\mathrm{int}})\,0
+   = \texttt{Z\_to\_mod63}\,p\,\texttt{det\_M1\_int\_value}$
+hangs the \Qed{} at conversion time: the kernel's ordinary reducer
+forces WHNF on $\texttt{char\_poly\_mod}\,p\,M_1^{\mathrm{int}}$,
+which triggers the full FL recurrence on a concrete $42 \times 42$
+matrix.  The fix is to wrap the \Qed{} in
+\texttt{Strategy opaque [char\_poly\_mod}\,$M_1^{\mathrm{int}}$\,\texttt{\ldots]},
 forcing the kernel to compare head symbols structurally, not unfold
-the values. This is mathematically a no-op but operationally
-indispensable.
+the values.  This is mathematically a no-op but operationally
+indispensable.  The shipped determinants \texttt{det\_M1\_int} and
+\texttt{D\_pencil\_int} are additionally sealed via
+\texttt{sigT}/\texttt{proj1\_sig} in
+\texttt{theories/S1/CertPencilDef.v} so that the conversion-time
+opacity propagates to all downstream uses.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The IVT root extraction}\label{ch:sturm}
+\chapter{The pencil-determinant assembly}\label{ch:pencil}
 
-This chapter constructs an explicit real algebraic root of
-$\texttt{charpoly\_int}$ above $4/105$. The strategy is the
-\emph{intermediate value theorem} on a real-closed field: we show
-$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from two direct
-\vmcompute{} sign Qeds on $\texttt{charpoly\_int}$ itself, and let
-MathComp's \texttt{poly\_ivtoo} produce a root in the interval. The
-material lives in \texttt{SignChain.v}, \texttt{Bridge.v} and
-\texttt{CertL1.v}; no Sturm chain is shipped or consumed.
+This chapter assembles the eigenvalue bound from the pencil
+identity (Theorem~\ref{thm:det_pencil}), the two integer
+determinant lifts
+(\texttt{CRTPencilCheck.det\_M1\_int\_eq} and
+\texttt{D\_pencil\_int\_eq}), the per-cell clean-pencil grid
+identity
+(\texttt{PencilCleanGrid.all\_pencil\_clean\_match\_true}), and the
+intermediate value theorem.  The material lives in
+\texttt{DetPencil.v}, \texttt{CertPencilDef.v},
+\texttt{AbstractPencilHelper.v}, \texttt{PencilCleanGrid.v},
+\texttt{CRTPencilCheck.v}, \texttt{CRTPencilChecksProof.v},
+\texttt{CRTPencilHadamardGeneric.v}, \texttt{CRTPencilM1Bound.v},
+\texttt{CRTPencilPencilBound.v}, and \texttt{CertPencil.v}.
 
-\section{Endpoint signs of \texttt{charpoly\_int}}
+\section{Signs of the two integer determinants}
 
-\begin{lemma}[Sign at $4/105$]\label{lem:signs_at_x0}
-\rocq{PrimeGapS1.CertL1.sign_at_rat_charpoly}
+\begin{lemma}[Sign of $\det(M_1^{\mathrm{int}})$]\label{lem:det_M1_int_pos}
+\rocq{PrimeGapS1.CertPencil.det_M1_int_pos,
+      PrimeGapS1.CRTPencilCheck.det_M1_int_eq}
 \rocqok
-$\texttt{sign\_at\_rat}\,\texttt{charpoly\_int}\,4\,105 = -1$.
-Equivalently, $\sgn(\texttt{charpoly\_int}(4/105)) = -1$, i.e.\
-$P(4/105) < 0$.
+The shipped integer determinant
+\texttt{det\_M1\_int\_value} (in
+\texttt{theories/S1/Witness\_PencilDet.v}) equals the constant
+coefficient of $\texttt{char\_poly\_int}(M_1^{\mathrm{int}})$, and
+it is strictly positive.
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} on the $43$-entry $\Z$-list \texttt{charpoly\_int}
-evaluated by \texttt{peval\_at\_rat} (clears the denominator and
-returns $105^{42}\cdot P(4/105)$, whose sign is $-1$).
+The equality follows from the $710$-prime CRT lift of
+Chapter~\ref{ch:crt} applied to the shipped literal:
+\texttt{check\_M1\_det\_710\_true} checks
+$\texttt{List.nth 0 (char\_poly\_mod}\,p\,M_1^{\mathrm{int}})\,0
+  = \texttt{Z\_to\_mod63}\,p\,\texttt{det\_M1\_int\_value}$
+modulo each of the $710$ primes via \vmcompute, and a closed-form
+Hadamard bound
+(\texttt{CRTPencilM1Bound.crt\_bound\_M1\_sufficient\_literal})
+ensures $2 \cdot \texttt{fl\_coeff\_bound}\,42\,(\texttt{max\_abs\_entry}\,M_1^{\mathrm{int}})
++ 2 \cdot |\texttt{det\_M1\_int\_value}|
+<\texttt{crt\_product\_710}$.  The determinant literal is
+$2044$ bits and the CRT product is ${\sim}21300$ bits, so the
+inequality holds by \vmcompute.  Positivity of the literal is a
+single-\vmcompute{} Qed
+(\texttt{det\_M1\_int\_value\_pos}).
 \end{proof}
 
-\begin{lemma}[Sign at $+\infty$]\label{lem:signs_at_inf}
-\rocq{PrimeGapS1.CertL1.sign_at_pinf_charpoly}
+\begin{lemma}[Sign of $\det(\texttt{pencil\_int\_clean})$]\label{lem:D_pencil_neg}
+\rocq{PrimeGapS1.CertPencil.D_pencil_int_neg,
+      PrimeGapS1.CRTPencilCheck.D_pencil_int_eq}
 \rocqok
-$\texttt{sign\_at\_pinf}\,\texttt{charpoly\_int} = +1$.
-Equivalently, $\sgn(\lcoeff(\texttt{charpoly\_int})) = +1$ (the
-leading coefficient is positive).
+The shipped integer determinant
+\texttt{D\_pencil\_int\_value} (in
+\texttt{theories/S1/Witness\_PencilClean.v}) equals the constant
+coefficient of
+$\texttt{char\_poly\_int}(\texttt{pencil\_int\_clean})$, and it is
+strictly negative.
 \end{lemma}
 \begin{proof}\rocqok
-\vmcompute{} reads the sign of \texttt{plead\,charpoly\_int}.
+Same CRT pattern as Lemma~\ref{lem:det_M1_int_pos}, with the
+Hadamard bound discharged by
+\texttt{CRTPencilPencilBound.crt\_bound\_pencil\_sufficient\_literal}.
+The pencil determinant literal is $2613$ bits, comfortably under
+the same $710$-prime CRT product.  Negativity is a single
+\vmcompute{} Qed (\texttt{D\_pencil\_int\_value\_neg}).
+\end{proof}
+
+\section{Per-cell clean-pencil identity}
+
+\begin{lemma}[Per-cell clean-pencil match]\label{lem:pencil_clean_match}
+\rocq{PrimeGapS1.PencilCleanGrid.all_pencil_clean_match_true,
+      PrimeGapS1.PencilCleanGrid.pencil_clean_match_Z}
+\rocqok
+For every $(i, j) \in \{0, \ldots, 41\}^2$,
+\[
+D_{M_1}\,D_{M_2}\,\texttt{pencil\_int\_clean}[i, j]
+   \;=\; D_{\mathrm{pencil}}^{\mathrm{clean}}\,\cdot\,
+   \bigl(4\,D_{M_2}\,M_1^{\mathrm{int}}[i, j]
+         - 105\,D_{M_1}\,M_2^{\mathrm{int}}[i, j]\bigr)
+\quad\text{in } \Z.
+\]
+\end{lemma}
+\begin{proof}\rocqok
+Single 1764-cell \vmcompute.  The literal
+$D_{\mathrm{pencil}}^{\mathrm{clean}}$ is the LCM of the
+denominators of $4 M_1 - 105 M_2$ (689~bits, roughly half of
+$D_{M_1} \cdot D_{M_2} = 1368$~bits), so the resulting integer
+matrix \texttt{pencil\_int\_clean} stays comfortably under the
+710-prime CRT product.
+\end{proof}
+
+\section{The pencil sign of \texorpdfstring{$\charpolysym_{\Arat}(4/105)$}{chi A\_rat at 4/105}}
+
+\begin{theorem}[Pencil sign of $\charpolysym_{\Arat}(4/105)$]\label{thm:charpoly_neg}
+\rocq{PrimeGapS1.CertPencil.abstract_charpoly_neg,
+      PrimeGapS1.CertPencil.charpoly_neg_at_threshold_rat}
+\rocqok
+\uses{thm:det_pencil, lem:det_M1_int_pos, lem:D_pencil_neg,
+      lem:pencil_clean_match}
+The rational evaluation $(\charpolysym_{\Arat}).\![4/105] < 0$.
+\end{theorem}
+\begin{proof}\rocqok
+By the determinant-pencil identity (Theorem~\ref{thm:det_pencil})
+specialised at $M_1 := \Mone^{\mathrm{rat}}$,
+$M_2 := \Mtwo^{\mathrm{rat}}$, $\lambda := 4/105$:
+\[
+\det\!\bigl((4/105)\,M_1 - M_2\bigr)
+  = \det(M_1) \cdot (\charpolysym_{\Arat}).\![4/105].
+\]
+Lemma~\ref{lem:pencil_clean_match} lifts to the rat-level matrix
+equality
+$D_{M_1} D_{M_2} (4 M_1^{\mathrm{rat}} - 105 M_2^{\mathrm{rat}})
+  = D_{\mathrm{pencil}}^{\mathrm{clean}}\,\cdot\,\texttt{pencil\_int\_clean}$
+(via \texttt{AbstractPencilHelper.pencil\_matrix\_bridge} at
+generic dimension), so
+$\det\!\bigl((4/105) M_1 - M_2\bigr)$ has the same sign as
+$\det(\texttt{pencil\_int\_clean})$, which is negative by
+Lemma~\ref{lem:D_pencil_neg}.  Lemma~\ref{lem:det_M1_int_pos}
+gives $\det(M_1) > 0$, so the right-hand side of the pencil
+identity has the same sign as the left, and therefore
+$(\charpolysym_{\Arat}).\![4/105] < 0$.
 \end{proof}
 
 \section{IVT: a root exists above \texorpdfstring{$4/105$}{4/105}}
 
-\begin{theorem}[L1: IVT root]\label{thm:maynard_L1}
-\rocq{PrimeGapS1.CertL1.maynard_L1_concrete}
+\begin{theorem}[Root in realalg above $4/105$]\label{thm:maynard_root}
+\rocq{PrimeGapS1.CertPencil.maynard_root_above_threshold}
 \rocqok
-\uses{lem:signs_at_x0, lem:signs_at_inf}
+\uses{thm:charpoly_neg}
 There exists $\lambda \in \realalg$ such that
-\[
-\texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda
-\quad\text{and}\quad
-\texttt{ratr}(4/105) < \lambda.
-\]
+$(\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym_{\Arat}).[\lambda] = 0$
+and $\texttt{ratr}(4/105) < \lambda$.
 \end{theorem}
 \begin{proof}\rocqok
-The proof rests on MathComp's intermediate value theorem
-\texttt{poly\_ivtoo} on a real-closed field. We need two sign facts at
-the endpoints:
-
-\textbf{Lower endpoint.} Lemma~\ref{lem:signs_at_x0} gives
-$\sgn(P(4/105)) = -1$, hence $P(4/105) < 0$ (via the
-\texttt{sgn\_matches}-style bridges in \texttt{Bridge.v}).
-
-\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P)$,
-MathComp's explicit rational upper bound for all real roots of $P$
-derived from its coefficients. Two facts: $P \ne 0$ (its leading
-coefficient is nonzero by Lemma~\ref{lem:signs_at_inf}) and
-$\sgn(\lcoeff(P)) = +1$. Since $cb$ is a strict upper bound for all
-roots, $\sgn(P(cb)) = \sgn(\lcoeff(P)) = +1$, hence $P(cb) > 0$.
-
-\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P(x) = 0$.
-Since $P(4/105) < 0$ but $P(x) = 0$, $x \ne 4/105$, hence
-$4/105 < x$. Setting $\lambda := x$ closes the existential.
+MathComp's \texttt{poly\_ivtoo} on a real-closed field.  Two
+endpoint sign facts on
+$\widehat{P} := \texttt{map\_poly}\,\texttt{ratr}\,\charpolysym_{\Arat}$:
+\begin{itemize}
+\item Lower endpoint $\texttt{ratr}(4/105)$: by
+  Theorem~\ref{thm:charpoly_neg} together with the $\texttt{ratr}$
+  morphism pushed through \texttt{horner}.
+\item Upper endpoint $\texttt{cauchy\_bound}\,\widehat{P}$: the
+  leading coefficient of $\charpolysym_{\Arat}$ is $1 > 0$ (so the
+  leading coefficient of $\widehat{P}$ is also $1 > 0$); by the
+  standard property of \texttt{cauchy\_bound}, $\widehat{P}$
+  evaluated above its Cauchy bound has the sign of its leading
+  coefficient, hence is positive.
+\end{itemize}
+\texttt{poly\_ivtoo} yields $x \in [\texttt{ratr}(4/105),
+\texttt{cauchy\_bound}\,\widehat{P}]$ with $\widehat{P}(x) = 0$;
+strictness at the lower endpoint follows because $\widehat{P}$ is
+\emph{strictly} negative there.
 \end{proof}
-
-\begin{remark}
-This is \emph{IVT}, not a Sturm-count proof: we only need the
-existence of some root above the threshold, not any count. The
-bridge from \texttt{list Z}-level signs to MathComp's
-$\texttt{sgp\_pinfty}$ / polynomial-value signs is supplied by
-\texttt{Bridge.v} (\texttt{pol\_to\_polyralg}, the
-$\texttt{sgn\_matches}$-style lemmas, \texttt{cauchy\_bound}
-boilerplate).
-\end{remark}
-
-\begin{remark}[Alternative route on the \texttt{quad} branch]
-A second, independent proof of the eigenvalue bound is shipped on
-the \texttt{quad} git branch (headline theorem
-\texttt{maynard\_M105\_certified\_pencil} in
-\texttt{theories/S1/CertPencil.v}, $\sim 1500$ quad-specific lines
-of code across $\sim 14$ files, $\sim 30$--$45$~min fresh compile).
-Instead of comparing the full $43$-coefficient \texttt{charpoly\_int}
-against the FLINT-shipped polynomial via CRT
-(Chapter~\ref{ch:crt}), the alternative uses the \emph{pencil
-identity}
-\[
-\det(\lambda \cdot M_1 - M_2) =
-\det(M_1) \cdot \chi_{M_1^{-1}M_2}(\lambda)
-\]
-and a one-coefficient CRT lift on the two integer determinants
-$\det(M_1^{int})$ and $\det(\texttt{pencil\_int\_clean})$, where
-\[
-\texttt{pencil\_int\_clean}[i,j] :=
-D_{\mathrm{pencil}}^{\mathrm{clean}}
-\cdot \bigl(4 \cdot M_{1,\mathrm{rat}}[i,j]
-       - 105 \cdot M_{2,\mathrm{rat}}[i,j]\bigr),
-\]
-with $D_{\mathrm{pencil}}^{\mathrm{clean}}$ the LCM of the
-denominators of $4 M_1 - 105 M_2$ (689~bits, roughly half of
-$D_{M_1} \cdot D_{M_2} = 1368$~bits). The resulting integer
-determinant is $\sim 2613$~bits, comfortably under the $\sim
-21300$~bit product of the same $710$-prime CRT set used for the
-$M_1$ determinant.  (The earlier $4 D_{M_2} M_1 - 105 D_{M_1} M_2$
-formulation produced a $\sim 31131$-bit determinant requiring a
-$1210$-prime extended product.)  The signs of those two
-determinants then give $\chi_{A_{\mathrm{rat}}}(4/105) < 0$ directly,
-and the same IVT / realalg closing step yields the eigenvalue. The
-branch is kept as a worked demonstration that the pencil-determinant
-approach is mechanizable; the main-branch Sturm/IVT proof is the
-canonical one.
-\end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Assembly: from root to eigenvalue}\label{ch:assembly}
 
-This chapter glues the IVT root from Chapter~\ref{ch:sturm}, the CRT
-lift from Chapter~\ref{ch:crt}, and the FL correctness from
-Chapter~\ref{ch:charpoly} into the headline theorem. The four-line
-\Qed{} of \texttt{maynard\_eigenvalue\_S1} in \texttt{Cert.v} is what
-holds the whole proof tree together.
+This chapter glues the IVT root of Chapter~\ref{ch:pencil}, the
+CRT lift of Chapter~\ref{ch:crt}, and the FL correctness of
+Chapter~\ref{ch:charpoly} into the headline theorem.  The two-line
+\Qed{} of \texttt{maynard\_eigenvalue\_S1\_pencil} in
+\texttt{CertPencil.v} is what holds the whole proof tree together.
 
 \section{\texorpdfstring{$\Arat$ is a well-defined $\Q$-matrix}{A\_rat is a well-defined Q-matrix}}
 
@@ -995,87 +1028,11 @@ witnesses $\det \ne 0$ over $\Z$, hence over $\Q$). MathComp's
 \texttt{unitmxE} closes the goal from $\det \ne 0$.
 \end{proof}
 
-\section{Linking the cleared polynomial to \texorpdfstring{$\charpolysym_{\Arat}$}{chi\_A\_rat}}
-
-\begin{lemma}[Structural matrix scaling]
-\label{lem:mat_A_scale_eq_Arat}
-\rocq{PrimeGapS1.CertL2.mat_A_scale_eq_Arat,
-      PrimeGapS1.CertL2.abstract_mat_scale}
-\rocqok
-\uses{def:A_rat, lem:M1_unit, thm:matrix_identity_Z}
-$\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$
-in $'M[\Q]_{42}$.
-\end{lemma}
-\begin{proof}\rocqok
-The structural identity holds at any field $F$ and any dimension $n$:
-given $\Mone, \Mtwo, A : 'M[F]_n$ with $c_2 \cdot (\Mone \cdot A) = (c_1 c_A) \cdot \Mtwo$
-and $\Mone$ invertible, one solves
-$A = c_A \cdot (c_1^{-1} \Mone)^{-1} \cdot (c_2^{-1} \Mtwo)$.
-This is proved once at generic $F$, $n$ in
-\texttt{abstract\_mat\_scale}, then specialised to $(F, n) = (\Q, 42)$.
-
-The reason for the abstraction is purely operational: at concrete
-$'M[\Q]_{42}$, MathComp's HB canonical-structure resolver traverses
-an instance graph quadratic in the goal term, taking ${\sim}40$--$90$~min
-per rewrite. At generic $F$ and $n$, the instance graph is
-small ($F$ and $n$ are opaque), so elaboration is instantaneous.
-The hypothesis $c_2 \cdot (\Mone \cdot A) = (c_1 c_A) \cdot \Mtwo$ is
-discharged at the call site by Theorem~\ref{thm:matrix_identity_Z}
-(the $\Z$-level matrix identity, lifted to $\Q$ via
-\texttt{mat\_int\_to\_rat}).
-\end{proof}
-
-\begin{theorem}[L2: cleared polynomial is $\Dq \cdot \charpolysym_{\Arat}$]
-\label{thm:charpoly_int_Dq}
-\rocq{PrimeGapS1.CertL2.charpoly_int_Dq_scaled,
-      PrimeGapS1.CertL2.char_poly_scale_rat42}
-\rocqok
-\uses{thm:char_poly_int_correct, thm:fl_eq_flint,
-      lem:mat_A_scale_eq_Arat, lem:char_poly_scale}
-\[
-\texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   \;=\; (\Dq)_{\Q} \cdot \charpolysym(\Arat)
-   \quad\text{in } \Q[X].
-\]
-\end{theorem}
-\begin{proof}\rocqok
-We chain four facts:
-\begin{enumerate}
-\item Theorem~\ref{thm:fl_eq_flint}:
-  $\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$
-  (CRT lift).
-\item Theorem~\ref{thm:char_poly_int_correct}:
-  $\texttt{pol\_to\_polyrat}(\texttt{char\_poly\_int}(\Aint))
-   = \charpolysym(\texttt{mat\_int\_to\_rat}(\Aint, 1, 42))$.
-\item Lemma~\ref{lem:mat_A_scale_eq_Arat}:
-  $\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$.
-\item Lemma~\ref{lem:char_poly_scale}:
-  $(\charpolysym(c \cdot M))_k = c^{n - k} \cdot (\charpolysym(M))_k$.
-\end{enumerate}
-A direct combination at the polynomial level gives
-\[
-\texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   = (\Dq)_{\Q} \cdot \charpolysym(\Arat),
-\]
-where $\Dq$ absorbs the per-coefficient scaling factors $\DA^{42 - k}$
-through the per-coefficient identity \texttt{scaling\_Z\_from\_check}
-(verified via the same CRT route in \texttt{CharPolyAgree.v}).
-
-The proof is closed by term-level rewriting (avoiding the slow
-\texttt{rewrite} that would force HB elaboration on $'M[\Q]_{42}$):
-the rewritten hypothesis is built explicitly via
-\texttt{eq\_trans}~$\circ$~\texttt{f\_equal} chains, and
-Lemma~\ref{lem:char_poly_scale} is invoked through the
-pre-specialised \texttt{char\_poly\_scale\_rat42}. Both techniques
-keep the concrete $'M[\Q]_{42}$ out of the tactic-level goal, where
-HB resolution would stall for hours.
-\end{proof}
-
 \section{The headline theorem}
 
-\begin{lemma}[L3: char-poly root $\Rightarrow$ eigenvalue]
+\begin{lemma}[Char-poly root $\Rightarrow$ eigenvalue]
 \label{lem:eigenvalue_of_root}
-\rocq{PrimeGapS1.Cert.eigenvalue_of_root_realalg}
+\rocq{PrimeGapS1.CertPencil.maynard_eigenvalue_S1_pencil}
 \rocqok
 For any $\lambda \in \realalg$, if
 $\texttt{root}\,(\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym(\Arat))\,\lambda$
@@ -1089,32 +1046,11 @@ MathComp) says an eigenvalue is exactly a root of the char poly.
 Composing the two gives the implication.
 \end{proof}
 
-\begin{lemma}[L2': root transfer]\label{lem:charpoly_root_transfer}
-\rocq{PrimeGapS1.Cert.charpoly_root_transfer}
-\rocqok
-\uses{thm:charpoly_int_Dq}
-For $\lambda \in \realalg$, if
-$\texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda$
-then
-$\texttt{root}\,(\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym(\Arat))\,\lambda$.
-\end{lemma}
-\begin{proof}\rocqok
-By Theorem~\ref{thm:charpoly_int_Dq},
-$\texttt{pol\_to\_polyrat}\,\texttt{charpoly\_int}
-   = \Dq \cdot \charpolysym(\Arat)$.
-Mapping through $\texttt{ratr}$ pulls the scalar out
-($\texttt{map\_polyZ}$), and \texttt{rootZ} says a nonzero scalar does
-not kill roots. Nonzero-ness of $\Dq$ is checked inline by
-\vmcompute{} on the shipped constant.
-\end{proof}
-
 \begin{theorem}[Spectral headline: an eigenvalue exceeds $4/105$]
 \label{thm:headline}
-\rocq{PrimeGapS1.Cert.maynard_eigenvalue_S1,
-      PrimeGapS1.Cert.sturm_count_correct}
+\rocq{PrimeGapS1.CertPencil.maynard_eigenvalue_S1_pencil}
 \rocqok
-\uses{thm:maynard_L1, lem:charpoly_root_transfer,
-      lem:eigenvalue_of_root}
+\uses{thm:maynard_root, lem:eigenvalue_of_root}
 There exists $\lambda \in \realalg$ such that
 \[
 \texttt{eigenvalue}\,(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
@@ -1123,20 +1059,17 @@ There exists $\lambda \in \realalg$ such that
 \]
 \end{theorem}
 \begin{proof}\rocqok
-A four-line tactic. From Theorem~\ref{thm:maynard_L1}
-(\texttt{sturm\_count\_correct} is a thin wrapper) we obtain
+Two-line tactic.  Theorem~\ref{thm:maynard_root} produces
 $\lambda \in \realalg$ that is a root of
-$\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int}$ and satisfies
-$\texttt{ratr}(4/105) < \lambda$. Lemma~\ref{lem:charpoly_root_transfer}
-transfers root-ness from $\texttt{charpoly\_int}$ to $\charpolysym(\Arat)$.
+$\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym(\Arat)$ and
+satisfies $\texttt{ratr}(4/105) < \lambda$.
 Lemma~\ref{lem:eigenvalue_of_root} converts a char-poly root to an
-eigenvalue of $\texttt{map\_mx}\,\texttt{ratr}\,\Arat$. The strict
-inequality is preserved verbatim from $L_1$. Combining gives the
-existential.
+eigenvalue of $\texttt{map\_mx}\,\texttt{ratr}\,\Arat$.  The strict
+inequality is preserved verbatim.  Combining gives the existential.
 \end{proof}
 
 \begin{theorem}[End-to-end certification]\label{thm:M105}
-\rocq{PrimeGapS1.Cert.maynard_M105_certified}
+\rocq{PrimeGapS1.CertPencil.maynard_M105_certified_pencil}
 \rocqok
 \uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:headline}
 The conjunction
@@ -1264,43 +1197,45 @@ $\Mk[105] > 4$ end-to-end.
 
 \section{Reported assumptions}
 
-\texttt{Print Assumptions maynard\_M105\_certified} (or
-\texttt{maynard\_eigenvalue\_S1}) reports only the Rocq~9.0/9.1 kernel
-primitives for native 63-bit integers and \texttt{BigN}: things like
-$\texttt{Uint63.add}$, $\texttt{Uint63.mul}$, $\texttt{Uint63.to\_Z}$,
-$\texttt{BigN.succ\_spec}$. These are not project-specific axioms;
-they are Rocq's declaration that the OCaml-implemented native-integer
-kernel primitives implement their stated specifications. Any proof
-that uses \vmcompute{} on $\Uintsf$ exposes the same set.
+\texttt{Print Assumptions maynard\_M105\_certified\_pencil} reports
+only the Rocq~9.0/9.1 kernel primitives for native 63-bit integers
+and \texttt{BigN}: things like $\texttt{Uint63.add}$,
+$\texttt{Uint63.mul}$, $\texttt{Uint63.to\_Z}$,
+$\texttt{BigN.succ\_spec}$.  These are not project-specific axioms;
+they are Rocq's declaration that the OCaml-implemented
+native-integer kernel primitives implement their stated
+specifications.  Any proof that uses \vmcompute{} on $\Uintsf$
+exposes the same set.
 
 The project does not invoke \texttt{native\_compute} anywhere — a
-\texttt{grep -n native\_compute theories/S1} returns zero hits in real
-proof code. This keeps the trust-base enumeration minimal at the cost
-of a slightly longer build (the dominant \texttt{fl\_crt\_bound}
-\vmcompute{} runs in ${\sim}18$~min instead of ${\sim}2$~min with
-\texttt{native\_compute}).
+\texttt{grep -n native\_compute theories/S1} returns zero hits in
+real proof code.  This keeps the trust-base enumeration minimal.
 
 \section{The FLINT layer is outside the trust base}
 
 The FLINT pipeline (Python + \texttt{python-flint}) is the candidate
-generator for the certificate data and an independent cross-check, but
-the Rocq proof never invokes Python and never loads the JSON
-certificate directly. The autogenerated \texttt{Witness.v} is an
-ordinary Rocq file; if the FLINT layer shipped wrong data, one of the
+generator for the certificate data and an independent cross-check,
+but the Rocq proof never invokes Python and never loads the JSON
+certificate directly.  The autogenerated witness files are ordinary
+Rocq files; if the FLINT layer shipped wrong data, one of the
 following \vmcompute{}-based checks would fail:
 \begin{itemize}
 \item Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}: the
   $42 \times 42$ matrix entries match Maynard's closed form
   (Lemma~8.2).
-\item \texttt{check\_charpoly\_710}: the shipped char-poly is the
-  char poly of $\Aint$ modulo each of $710$ primes.
-\item \texttt{matrix\_identity\_710}: the shipped denominator-clearing
-  matrix identity holds modulo each of $710$ primes.
-\item Lemmas~\ref{lem:signs_at_x0} and~\ref{lem:signs_at_inf}: the
-  signs of \texttt{charpoly\_int} at $4/105$ and at $+\infty$ are
-  $-1$ and $+1$ respectively, by direct \vmcompute{} on the integer
-  list. These two facts feed the endpoint signs into
-  \texttt{poly\_ivtoo}.
+\item Lemma~\ref{lem:pencil_clean_match}
+  (\texttt{all\_pencil\_clean\_match\_true}): the shipped
+  $\texttt{pencil\_int\_clean}$ matrix equals
+  $4 D_{M_2} M_1^{\mathrm{int}} - 105 D_{M_1} M_2^{\mathrm{int}}$
+  per-cell after the appropriate scaling.
+\item \texttt{check\_M1\_det\_710\_true} and
+  \texttt{check\_pencil\_det\_710\_true}: the shipped constant-term
+  literals for the two integer determinants are correct modulo each
+  of $710$ primes.
+\item $\texttt{crt\_bound\_M1\_sufficient\_literal}$ and
+  $\texttt{crt\_bound\_pencil\_sufficient\_literal}$:
+  $2 \cdot \texttt{bound} + 2 \cdot |\texttt{literal}|
+   < \texttt{crt\_product\_710}$ for each determinant.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.
 
@@ -1311,78 +1246,76 @@ Each is a \Qed{} closed by pure kernel arithmetic.
 Maynard's $\Mk[105]$ construction uses $42$ basis polynomials
 $\{F_{b,c} : b + 2c \le 11\}$.
 
-\paragraph{Char-poly degree.} $42$ (so $43$ coefficients), with
-coefficients up to ${\sim}20{,}000$ bits.
+\paragraph{Determinants.}
+$\det(M_1^{\mathrm{int}})$ is $2044$ bits, positive;
+$\det(\texttt{pencil\_int\_clean})$ is $2613$ bits, negative.
 
 \paragraph{CRT primes.} $710$ \Uintsf\ primes in $[2^{30}, 2^{31})$,
-with product exceeding $2^{21300}$ — well above the verified bound
-$2B < 2^{6500}$ needed for the CRT lift.
+with product exceeding $2^{21300}$ — well above the Hadamard-style
+coefficient bounds (${\sim}2^{2044}$ for $M_1^{\mathrm{int}}$,
+${\sim}2^{5830}$ for the clean pencil).
 
 \paragraph{Denominators.} $\DMone$ has ${\sim}221$ decimal digits,
-$\DMtwo$ ${\sim}227$, $\DA$ ${\sim}139$, $\Dq$ ${\sim}333$. All four
-are strictly positive (the others follow from being products of
-factorials; positivity of $\Dq$ is checked inline by \vmcompute{} in
-\texttt{charpoly\_root\_transfer}).
+$\DMtwo$ ${\sim}227$, and $D_{\mathrm{pencil}}^{\mathrm{clean}}$
+${\sim}210$ decimal digits.  All three are strictly positive.
 
 \paragraph{Cauchy bound.} The IVT step uses MathComp's
-\texttt{cauchy\_bound} — an explicit rational upper bound on all real
-roots derived from the polynomial coefficients. No custom bound is
-introduced.
+\texttt{cauchy\_bound} — an explicit rational upper bound on all
+real roots derived from the polynomial coefficients.  No custom
+bound is introduced.
 
 \paragraph{Build profile.}
-On a 16~GB / 6-thread machine: ${\sim}28$~min wall-clock with
-\texttt{make -j6}, ${\sim}62$~min wall-clock with \texttt{make -j2}
-(clean rebuild). The dominant single-\Qed{} costs are:
+On a 16~GB / 6-thread machine: ${\sim}30$--$50$~min wall-clock with
+\texttt{make -j6} (clean rebuild).  The dominant single-\Qed{} costs
+are:
 \begin{itemize}
-\item \texttt{fl\_crt\_bound}: ${\sim}18$~min — the
-  $2B + 2|c'| < \prod p_i$ comparison with ${\sim}10{,}000$-digit
-  arithmetic.
 \item Theorem~\ref{thm:M2_match}
   (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially across
-  the six $7$-row chunks (\texttt{MaynardVerify/M2\_0..5.v}), reduced to
-  a per-chunk wall of a few minutes under \texttt{make -j} — $1764$
-  entries, each up to $36$ rational summands with intermediate
+  the six $7$-row chunks (\texttt{MaynardVerify/M2\_0..5.v}), reduced
+  to a per-chunk wall of a few minutes under \texttt{make -j} —
+  $1764$ entries, each up to $36$ rational summands with intermediate
   denominators reaching $\sim 10^{7000}$ digits.
 \item Lemma~\ref{lem:crt_primes_all_prime}
   (\texttt{crt\_primes\_710\_all\_prime}): ${\sim}7$~min — $710$
   pure-$\Z$ trial-division primality checks.
-\item \texttt{check\_charpoly\_710}, \texttt{matrix\_identity\_710}:
-  ${\sim}5$--$10$~min each — $710 \times 42$-step modular FL.
+\item \texttt{check\_M1\_det\_710\_true},
+  \texttt{check\_pencil\_det\_710\_true}: ${\sim}5$--$10$~min each —
+  $710 \times 42$-step modular FL plus the constant-term extraction.
+\item \texttt{crt\_bound\_M1\_sufficient\_literal} and
+  \texttt{crt\_bound\_pencil\_sufficient\_literal}: a few minutes
+  each (\vmcompute{} on a few-thousand-digit arithmetic comparison).
 \item Theorem~\ref{thm:M1_match}: ${\sim}90$~s.
-\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal parser
-  on the shipped \texttt{charpoly\_of\_A\_int\_bigZ} integers.
+\item \texttt{Witness.v} / \texttt{Witness\_PencilClean.v} parsing:
+  ${\sim}30$--$60$~s.
 \end{itemize}
-With \texttt{make -j6} the six M2 chunks, the CRT primality phase, and
-the $710$-FL phases all run concurrently, so the longest single chunk
-plus \texttt{fl\_crt\_bound} dominates the wall clock rather than the
-sequential sum.
 
-\paragraph{Project size.} $23$ top-level \texttt{.v} files plus $14$
-files in two parallel-chunk subdirectories (\texttt{MaynardVerify/} and
-\texttt{CharPolyAgree/}, each with a \texttt{Def.v} and six chunks),
-${\sim}13{,}000$ lines total under \texttt{theories/S1/};
-\texttt{Witness.v} alone is ${\sim}5{,}700$ lines of autogenerated
-certificate data.
+\paragraph{Project size.}  $41$ \texttt{.v} files (33 top-level
+files plus $8$ chunk files: \texttt{MaynardVerify/Def.v},
+\texttt{MaynardVerify/M2\_0..5.v}, \texttt{CharPolyAgree/Def.v}),
+${\sim}15{,}964$ lines total under \texttt{theories/S1/};
+\texttt{Witness.v} alone is ${\sim}5{,}700$ lines and
+\texttt{Witness\_PencilClean.v} ${\sim}1{,}890$ lines of
+autogenerated certificate data.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
 
-The dependency graph has three independent backbones merging at
-\texttt{Cert.v}:
+The dependency graph has two independent backbones merging at
+\texttt{CertPencil.v}:
 
-\paragraph{IVT backbone.}
-\texttt{Witness} $\to$ \texttt{IntPoly} / \texttt{SignChain} $\to$
-\texttt{Bridge} $\to$ \texttt{CertL1}.
-Headline output: Theorem~\ref{thm:maynard_L1}.
-
-\paragraph{CharPoly backbone.}
-\texttt{Witness} $\to$ \texttt{IntMat} / \texttt{IntPoly} $\to$
-\texttt{CharPoly} $\to$ \texttt{ModularArith} $\to$
-\texttt{CharPolyAgree/} (\texttt{Def.v} + \texttt{Chunk\_0..5.v} +
-assembly) + \texttt{CRTBridge} $\to$ \texttt{Fermat} +
-\texttt{PrimeCheck} + \texttt{CRTCheck} $\to$ \texttt{CRTLift}
-$\to$ \texttt{CharPolyScale} $\to$ \texttt{CertL2}.
-Headline output: Theorem~\ref{thm:charpoly_int_Dq}.
+\paragraph{Pencil backbone.}
+\texttt{Witness} / \texttt{Witness\_PencilClean} $\to$
+\texttt{IntMat} / \texttt{IntPoly} $\to$ \texttt{CharPoly} $\to$
+\texttt{ModularArith} $\to$ \texttt{CharPolyAgree/Def} +
+\texttt{CRTBridge} + \texttt{CRTLift} +
+\texttt{Fermat} + \texttt{PrimeCheck} + \texttt{CRTCheck} $\to$
+\texttt{CRTPencilCheck} + \texttt{CRTPencilChecksProof} +
+\texttt{CRTPencilHadamardGeneric} + \texttt{CRTPencilM1Bound} +
+\texttt{CRTPencilPencilBound} + \texttt{PencilCleanGrid} +
+\texttt{AbstractPencilHelper} + \texttt{CertPencilDef} +
+\texttt{DetPencil} + \texttt{CertL2}.
+Headline output: Theorem~\ref{thm:det_int_eq} and
+Theorem~\ref{thm:charpoly_neg}.
 
 \paragraph{Maynard-spec backbone.}
 \texttt{Witness} $\to$ \texttt{MaynardFactQ} $\to$
@@ -1390,8 +1323,10 @@ Headline output: Theorem~\ref{thm:charpoly_int_Dq}.
 \texttt{MaynardVerify/} (\texttt{Def.v} + \texttt{M2\_0..5.v} +
 assembly). Headline output: Theorems~\ref{thm:M1_match}
 and~\ref{thm:M2_match}. The leaf \texttt{MaynardSpecBridge.v} adds
-Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} on top.
+Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} on
+top, and \texttt{Cert.v} composes the rat-level matrix identity
+\texttt{M\{1,2\}\_spec\_eq\_int} consumed by the headline.
 
-The three backbones merge at \texttt{Cert.v}, producing
+The two backbones merge at \texttt{CertPencil.v}, producing
 Theorems~\ref{thm:headline} and~\ref{thm:M105}. A single
-\texttt{Require Import PrimeGapS1.Cert.} loads the full proof.
+\texttt{Require Import PrimeGapS1.CertPencil.} loads the full proof.
