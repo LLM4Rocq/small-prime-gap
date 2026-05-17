@@ -89,16 +89,18 @@ bound, and concludes via the Chinese Remainder Theorem.
 |-----------------------------------|-------|--------|-------------|
 | `maynard_M105_certified_pencil`   | 41    | 15 964 | ~30-50 min  |
 
-The 41 files / 15 964 LOC count covers `theories/S1/` in full; the
-pencil-determinant proof itself adds roughly 1500–1900 LOC of
-pencil-specific machinery
+The 41 files / 15 964 LOC count covers `theories/S1/` in full.  The
+pencil-determinant proof itself adds ~3 450 LOC of pencil-specific
+files on top of a shared FLINT / MathComp / CharPoly / MaynardVerify
+base, of which ~1 950 LOC is generated witness data
+(`Witness_PencilClean.v` ships the 42×42 clean integer pencil literal;
+`Witness_PencilDet.v`, `Witness_PencilBound.v`, `Witness_M1Bound.v`
+ship the determinant / bound literals) and ~1 500 LOC is proof code
 (`DetPencil.v`, `CertPencilDef.v`, `AbstractPencilHelper.v`,
 `CRTPencilCheck.v`, `CRTPencilChecksProof.v`,
 `CRTPencilHadamardGeneric.v`, `CRTPencilM1Bound.v`,
-`CRTPencilPencilBound.v`, `PencilCleanGrid.v`,
-`Witness_PencilDet.v`, `Witness_PencilClean.v`, `Witness_M1Bound.v`,
-`Witness_PencilBound.v`, `AllRowsLenHelper.v`, `CertPencil.v`)
-on top of a shared FLINT / MathComp / CharPoly / MaynardVerify base.
+`CRTPencilPencilBound.v`, `PencilCleanGrid.v`, `AllRowsLenHelper.v`,
+`CertPencil.v`).
 
 ## Repository layout and disclaimer
 Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:

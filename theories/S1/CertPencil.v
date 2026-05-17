@@ -29,8 +29,6 @@
 
      6. `eigenvalue_root_char` + `map_char_poly` convert to
         `eigenvalue (map_mx ratr A_rat) lambda`.
-
-   Drop-in alternative to `Cert.maynard_eigenvalue_S1` (main route).
    ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -447,7 +445,7 @@ Proof.
 Qed.
 
 (* ==================================================================
-   Section 5: trust contract (mirrors Cert.maynard_M105_certified).
+   Section 5: trust contract.
    ================================================================== *)
 
 Theorem maynard_M105_certified_pencil :

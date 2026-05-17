@@ -22,7 +22,7 @@
    `M{1,2}_spec_rat_eq` in `MaynardSpecBridge.v` (no axioms,
    "Closed under the global context").  `MaynardVerify.v`
    consumes the (num, den) pair directly for the Z-level
-   cross-multiplication check, and `Cert.maynard_M105_certified`
+   cross-multiplication check, and `CertPencil.maynard_M105_certified_pencil`
    conjoins both the Z-level bool match and the rat-level paper-form
    bridge so a single `Print Assumptions` covers the full
    FLINT-matrix → Z-spec → rat-paper-form → eigenvalue chain.

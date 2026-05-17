@@ -25,10 +25,6 @@ theories/S1/MaynardVerify.v
 theories/S1/MaynardSpecBridge.v
 theories/S1/Cert.v
 theories/S1/CertL2.v
-# CertPencil.v is NOT in _CoqProject: its compile peaks at ~16 GB RSS,
-# right at the host cgroup limit, and OOMs under `make -j`.  Compile it
-# standalone with:
-#   coqc -R theories/S1 PrimeGapS1 theories/S1/CertPencil.v
 theories/S1/Witness_PencilDet.v
 theories/S1/Witness_PencilClean.v
 theories/S1/Witness_M1Bound.v
