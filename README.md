@@ -81,13 +81,13 @@ needed by the IVT.
   `4·M1_rat − 105·M2_rat`, ~half of `D_M1·D_M2`) to derive
   `(char_poly A_rat).[4/105] < 0` directly, then closes via IVT on the
   realalg lift.  Headline theorem: `maynard_M105_certified_pencil` in
-  `theories/S1/CertPencil.v`.  About 1800 quad-specific LOC across 12
+  `theories/S1/CertPencil.v`.  About 1500 quad-specific LOC across 14
   files, ~30-45 min fresh compile.
 
 | Route | Headline | Files | LOC | Compile |
 |-------|----------|-------|-----|---------|
 | `main` | `maynard_M105_certified`        | 9 quad files  | ~600  | ~30-50 min |
-| `quad` | `maynard_M105_certified_pencil` | 14 quad files | ~1800 | ~30-45 min |
+| `quad` | `maynard_M105_certified_pencil` | 14 quad files | ~1500 | ~30-45 min |
 
 The `main` route is the canonical proof; the `quad` route demonstrates
 that the pencil-determinant approach is mechanizable.  After the
