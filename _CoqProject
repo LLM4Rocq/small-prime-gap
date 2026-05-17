@@ -51,6 +51,7 @@ theories/S1/CRTPencilExtraPrimes.v
 theories/S1/CRTPencilExtra_PrimesProof.v
 theories/S1/CRTPencilExtraPrimesProof.v
 theories/S1/CRTPencilExtraChecksProof.v
+theories/S1/CRTPencilHadamardGeneric.v
 theories/S1/CRTPencilM1Bound.v
 theories/S1/CRTPencilCheck.v
 theories/S1/CRTPencilPencilBound.v
