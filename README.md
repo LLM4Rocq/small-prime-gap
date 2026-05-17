@@ -59,6 +59,36 @@ Maynard's original Mathematica notebook `Computations.nb` essentially defines a 
 In the current state of this project, the mechanized proof takes a different route. It consists in computing the characteristic
 polynomial of the same matrix, before applying the intermediate value theorem. As the size of the coefficients in the initial matrix are big, computing the characteristic polynomial is delicate. The formal proof thus compares modulo enough big primes the value obtained by the FLINT code with that obtained by a Rocq implementation of the Faddeev-Le Verrier algorithm, and concludes via the Chinese Reminder Theorem.
 
+## Two proof routes: `main` (Sturm/IVT) vs. `quad` (pencil-determinant)
+
+The repository hosts two complete proofs of `maynard_M105_certified` on
+two branches. Both share the FLINT-cross-checked input matrices, the
+Faddeev-LeVerrier characteristic polynomial, and the realalg / IVT
+closing step; they differ on how they extract the sign information
+needed by the IVT.
+
+* **`main` branch (canonical)** -- uses the 43-coefficient CRT
+  comparison `charpoly_int_agrees_710` against the FLINT-shipped
+  characteristic polynomial, then applies Sturm's theorem on the lifted
+  realalg polynomial to localise the eigenvalue above `4/105`. About
+  600 quad-specific LOC across 9 files, ~30-50 min fresh compile.
+* **`quad` branch (alternative)** -- uses Agent A's pencil identity
+  `det(λM₁ − M₂) = det(M₁) · char_poly(M₁⁻¹M₂)(λ)` and a 1210-prime CRT
+  lift on the two integer determinants `det(M1_int)` and
+  `det(4·D_M2·M1_int − 105·D_M1·M2_int)` to derive
+  `(char_poly A_rat).[4/105] < 0` directly, then closes via IVT on the
+  realalg lift.  Headline theorem: `maynard_M105_certified_pencil` in
+  `theories/S1/CertPencil.v`.  About 2400 quad-specific LOC across 18
+  files, ~50-85 min fresh compile.
+
+| Route | Headline | Files | LOC | Compile |
+|-------|----------|-------|-----|---------|
+| `main` | `maynard_M105_certified`        | 9 quad files  | ~600  | ~30-50 min |
+| `quad` | `maynard_M105_certified_pencil` | 18 quad files | ~2400 | ~50-85 min |
+
+The `main` route is the canonical proof; the `quad` route demonstrates
+that the pencil-determinant approach is mechanizable but is roughly 4x
+larger and slower than the direct Sturm route.
 
 ## Repository layout and disclaimer
 Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:

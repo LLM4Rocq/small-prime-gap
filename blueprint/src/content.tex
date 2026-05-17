@@ -920,6 +920,31 @@ $\texttt{sgn\_matches}$-style lemmas, \texttt{cauchy\_bound}
 boilerplate).
 \end{remark}
 
+\begin{remark}[Alternative route on the \texttt{quad} branch]
+A second, independent proof of the eigenvalue bound is shipped on
+the \texttt{quad} git branch (headline theorem
+\texttt{maynard\_M105\_certified\_pencil} in
+\texttt{theories/S1/CertPencil.v}). Instead of comparing the full
+$43$-coefficient \texttt{charpoly\_int} against the FLINT-shipped
+polynomial via CRT (Chapter~\ref{ch:crt}), the alternative uses the
+\emph{pencil identity}
+\[
+\det(\lambda \cdot M_1 - M_2) =
+\det(M_1) \cdot \chi_{M_1^{-1}M_2}(\lambda)
+\]
+and a one-coefficient CRT lift on the two integer determinants
+$\det(M_1^{int})$ and $\det(4 \cdot D_{M_2} \cdot M_1^{int} -
+105 \cdot D_{M_1} \cdot M_2^{int})$. The signs of those two
+determinants then give $\chi_{A_{\mathrm{rat}}}(4/105) < 0$ directly,
+and the same IVT / realalg closing step yields the eigenvalue. The
+alternative requires a 1210-prime CRT product (vs.\ 710 on the main
+route) but a single-coefficient comparison per prime, and runs in
+roughly twice the wall-clock time of the main route. The branch is
+kept as a worked demonstration that the pencil-determinant approach
+is mechanizable; the main-branch Sturm/IVT proof is the canonical
+one.
+\end{remark}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Assembly: from root to eigenvalue}\label{ch:assembly}
 

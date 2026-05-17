@@ -252,6 +252,40 @@ It verifies, in this order:
    `eigenvalue_root_char` + `map_char_poly` that root is an
    eigenvalue of `A_rat` over `realalg`.
 
+### 2.3 An alternative route: the `quad` branch (pencil determinant)
+
+The `quad` branch ships an independent proof of
+`maynard_M105_certified_pencil` (in `theories/S1/CertPencil.v`) that
+substitutes the 43-coefficient CRT comparison of step 2 with a
+**single-coefficient** comparison on the constant term of two integer
+matrices, then derives the sign of `(char_poly A_rat).[4/105]` via
+Agent A's pencil identity
+
+```
+\det (l *: M1 - M2) = \det M1 * (char_poly (M1^-1 *m M2)).[l].
+```
+
+Specialising `M1 := M1_rat`, `M2 := M2_rat`, `l := 4/105` and clearing
+denominators reduces the eigenvalue bound to the sign of two integer
+determinants:
+
+* `det(M1_int)` — 2044 bits, positive — closed via a 710-prime CRT
+  product (`crt_product_710` in `CRTLift.v`).
+* `det(4·D_M2·M1_int − 105·D_M1·M2_int)` — 31131 bits, negative —
+  closed via a 1210-prime extended product `crt_product_pencil`
+  (`CRTPencilExtraPrimes.v` + `CRTPencilExtraPrimesProof.v`).
+
+Both comparisons run a 1-coefficient `vm_compute` per prime (vs. the
+main route's 43-coefficient comparison) and a Hadamard-style bound on
+`|det|` (`CRTPencilHadamardGeneric.v` + the per-matrix
+specialisations). The remaining steps (IVT / realalg / eigenvalue)
+are identical to the main route.
+
+Trade-offs: about 4× the LOC and ~2× the fresh compile time relative
+to the main route. The `quad` branch is kept as a worked alternative
+that demonstrates the pencil approach is mechanizable; it is not the
+canonical proof.
+
 ## 3. The Rocq tree, file by file
 
 The dependency order is exactly the order of `_CoqProject`. There are
