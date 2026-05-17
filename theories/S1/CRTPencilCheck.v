@@ -230,6 +230,33 @@ Proof.
   apply Z.mod_0_l; lia.
 Qed.
 
+(* Generic per-prime divisibility lift.  Given
+   - the matrix M (e.g. M1_int or pencil_mat_int)
+   - the shipped Z literal D (e.g. det_M1_int_value or D_pencil_int_value)
+   - the sealed Z determinant D_int (e.g. det_M1_int or D_pencil_int)
+   - the "D_int = nth 0 (char_poly_int M) 0" link
+   - the per-prime modular sound bridge
+   - the precomputed per-prime check passing,
+   produce `p | (D_int - D)`. *)
+Lemma per_prime_div_generic
+  (M : mat) (D : Z) (D_int : Z) (p : Uint63.int)
+  (Hint_eq : D_int = List.nth 0 (char_poly_int M) 0%Z)
+  (Hvp     : valid_prime p)
+  (Hsound  : List.map (Z_to_mod63 p) (char_poly_int M) = char_poly_mod p M)
+  (Hagree  : List.nth 0 (char_poly_mod p M) 0%uint63 = Z_to_mod63 p D) :
+  (Uint63.to_Z p | (D_int - D))%Z.
+Proof.
+  have HH : List.nth 0 (char_poly_mod p M) 0%uint63
+          = Z_to_mod63 p (List.nth 0 (char_poly_int M) 0%Z).
+  { rewrite -(Z_to_mod63_zero p Hvp) -Hsound. apply List.map_nth. }
+  have Heq_mod_u : Z_to_mod63 p (List.nth 0 (char_poly_int M) 0%Z)
+                 = Z_to_mod63 p D.
+  { transitivity (List.nth 0 (char_poly_mod p M) 0%uint63);
+    [exact (Logic.eq_sym HH) | exact Hagree]. }
+  rewrite Hint_eq.
+  exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
+Qed.
+
 Lemma per_prime_div_M1 (p : Uint63.int) :
   In p crt_primes_all ->
   (Uint63.to_Z p | (det_M1_int - det_M1_int_value))%Z.
@@ -238,19 +265,9 @@ Proof.
   have Hagree : check_M1_det_at p = true
     := proj1 (List.forallb_forall _ _) check_M1_det_710_true p Hin.
   apply Uint63.eqb_spec in Hagree.
-  have Hvp : valid_prime p := crt_primes_valid p Hin.
-  have Hsound : List.map (Z_to_mod63 p) (char_poly_int M1_int)
-              = char_poly_mod p M1_int
-    := per_prime_mod_eq_M1 p Hin.
-  have HH : List.nth 0 (char_poly_mod p M1_int) 0%uint63
-          = Z_to_mod63 p (List.nth 0 (char_poly_int M1_int) 0%Z).
-  { rewrite -(Z_to_mod63_zero p Hvp) -Hsound. apply List.map_nth. }
-  have Heq_mod_u : Z_to_mod63 p (List.nth 0 (char_poly_int M1_int) 0%Z)
-                 = Z_to_mod63 p det_M1_int_value.
-  { transitivity (List.nth 0 (char_poly_mod p M1_int) 0%uint63);
-    [exact (Logic.eq_sym HH) | exact Hagree]. }
-  rewrite det_M1_int_eq_nth.
-  exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
+  exact (per_prime_div_generic M1_int det_M1_int_value det_M1_int p
+           det_M1_int_eq_nth (crt_primes_valid p Hin)
+           (per_prime_mod_eq_M1 p Hin) Hagree).
 Qed.
 
 Lemma per_prime_div_pencil (p : Uint63.int) :
@@ -261,19 +278,9 @@ Proof.
   have Hagree : check_pencil_det_at p = true
     := proj1 (List.forallb_forall _ _) check_pencil_det_710_true p Hin.
   apply Uint63.eqb_spec in Hagree.
-  have Hvp : valid_prime p := crt_primes_valid p Hin.
-  have Hsound : List.map (Z_to_mod63 p) (char_poly_int pencil_mat_int)
-              = char_poly_mod p pencil_mat_int
-    := per_prime_mod_eq_pencil p Hin.
-  have HH : List.nth 0 (char_poly_mod p pencil_mat_int) 0%uint63
-          = Z_to_mod63 p (List.nth 0 (char_poly_int pencil_mat_int) 0%Z).
-  { rewrite -(Z_to_mod63_zero p Hvp) -Hsound. apply List.map_nth. }
-  have Heq_mod_u : Z_to_mod63 p (List.nth 0 (char_poly_int pencil_mat_int) 0%Z)
-                 = Z_to_mod63 p D_pencil_int_value.
-  { transitivity (List.nth 0 (char_poly_mod p pencil_mat_int) 0%uint63);
-    [exact (Logic.eq_sym HH) | exact Hagree]. }
-  rewrite D_pencil_int_eq_nth.
-  exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
+  exact (per_prime_div_generic pencil_mat_int D_pencil_int_value D_pencil_int p
+           D_pencil_int_eq_nth (crt_primes_valid p Hin)
+           (per_prime_mod_eq_pencil p Hin) Hagree).
 Qed.
 
 (* ================================================================== *)

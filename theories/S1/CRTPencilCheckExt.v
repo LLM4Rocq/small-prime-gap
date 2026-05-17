@@ -90,19 +90,9 @@ Proof.
     by unfold crt_primes_pencil; apply List.in_or_app; right; exact Hin.
   have Hagree : check_pencil_det_at p = true := check_pencil_det_extra_at p Hin.
   apply Uint63.eqb_spec in Hagree.
-  have Hvp : valid_prime p := crt_primes_pencil_valid p Hp_pencil.
-  have Hsound : List.map (Z_to_mod63 p) (char_poly_int pencil_mat_int)
-              = char_poly_mod p pencil_mat_int
-    := per_prime_mod_eq_pencil_extra p Hin.
-  have HH : List.nth 0 (char_poly_mod p pencil_mat_int) 0%uint63
-          = Z_to_mod63 p (List.nth 0 (char_poly_int pencil_mat_int) 0%Z).
-  { rewrite -(Z_to_mod63_zero p Hvp) -Hsound. apply List.map_nth. }
-  have Heq_mod_u : Z_to_mod63 p (List.nth 0 (char_poly_int pencil_mat_int) 0%Z)
-                 = Z_to_mod63 p D_pencil_int_value.
-  { transitivity (List.nth 0 (char_poly_mod p pencil_mat_int) 0%uint63);
-    [exact (Logic.eq_sym HH) | exact Hagree]. }
-  rewrite D_pencil_int_eq_nth.
-  exact (mod_eq_to_divide p _ _ Hvp Heq_mod_u).
+  exact (per_prime_div_generic pencil_mat_int D_pencil_int_value D_pencil_int p
+           D_pencil_int_eq_nth (crt_primes_pencil_valid p Hp_pencil)
+           (per_prime_mod_eq_pencil_extra p Hin) Hagree).
 Qed.
 
 Lemma per_prime_div_pencil_ext (p : Uint63.int) :
