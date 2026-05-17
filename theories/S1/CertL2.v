@@ -18,7 +18,8 @@ Import ListNotations.
 From mathcomp Require Import all_boot all_algebra.
 Import GRing.Theory.
 
-From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness ModularArith CharPolyAgree.
+From PrimeGapS1 Require Import IntPoly IntMat CharPoly Witness ModularArith.
+From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import Fermat CRTBridge PrimeCheck CRTCheck CRTLift.
 
 Open Scope ring_scope.

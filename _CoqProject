@@ -6,14 +6,6 @@ theories/S1/IntMat.v
 theories/S1/CharPoly.v
 theories/S1/ModularArith.v
 theories/S1/CharPolyAgree/Def.v
-theories/S1/CharPolyAgree/Chunk_0.v
-theories/S1/CharPolyAgree/Chunk_1.v
-theories/S1/CharPolyAgree/Chunk_2.v
-theories/S1/CharPolyAgree/Chunk_3.v
-theories/S1/CharPolyAgree/Chunk_4.v
-theories/S1/CharPolyAgree/Chunk_5.v
-theories/S1/CharPolyAgree.v
-theories/S1/CharPolyScale.v
 theories/S1/CRTCheck.v
 theories/S1/Fermat.v
 theories/S1/CRTBridge.v

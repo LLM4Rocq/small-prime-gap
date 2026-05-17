@@ -8,7 +8,8 @@
    NO MathComp imports to avoid scope issues and slow type resolution. *)
 
 From Stdlib Require Import ZArith List Lia Uint63 Bool Znumtheory.
-From PrimeGapS1 Require Import IntMat CharPoly Witness ModularArith CharPolyAgree.
+From PrimeGapS1 Require Import IntMat CharPoly Witness ModularArith.
+From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import CRTBridge CRTCheck Fermat PrimeCheck.
 
 Definition max_abs_entry (M : list (list Z)) : Z :=
