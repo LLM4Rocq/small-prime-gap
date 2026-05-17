@@ -1,39 +1,38 @@
-(* ================================================================== *)
-(*  theories/S1/CertPencil.v                                            *)
-(*                                                                      *)
-(*  End-to-end "determinant-sign + IVT" proof that the rat matrix       *)
-(*  A_rat = M1^{-1} M2 has a realalg eigenvalue strictly above 4/105.   *)
-(*                                                                      *)
-(*  Strategy (replaces the full Faddeev-LeVerrier / CRT route):         *)
-(*                                                                      *)
-(*    1. Compute an integer determinant                                 *)
-(*         D := det(4*D_M2*M1_int  -  105*D_M1*M2_int).                 *)
-(*       Its sign equals sign(det((4/105) M1_rat - M2_rat)) (after      *)
-(*       clearing the common denominator D_M1 * D_M2).                  *)
-(*                                                                      *)
-(*    2. Verify by vm_compute:                                          *)
-(*         D < 0          (Section 1, deferred to Agent B)              *)
-(*         det M1_int > 0 (Section 1, deferred to Agent B)              *)
-(*                                                                      *)
-(*    3. Bridge via Agent A's `det_pencil`:                             *)
-(*         \det (l *: M1 - M2) = \det M1 * (char_poly (M1^-1 * M2)).[l] *)
-(*       Specialising l := 4/105, M1 := M1_rat, M2 := M2_rat gives      *)
-(*         (char_poly A_rat).[4/105] < 0.                               *)
-(*                                                                      *)
-(*    4. Leading coefficient: char_poly A_rat is monic of degree 42, so *)
-(*       its leading coefficient is 1 > 0; above the Cauchy bound the   *)
-(*       evaluation is positive (mirror of `charpoly_pos_at_cb`).       *)
-(*                                                                      *)
-(*    5. IVT (`poly_ivtoo`) yields a realalg root in (4/105, cb).       *)
-(*                                                                      *)
-(*    6. `eigenvalue_root_char` + `map_char_poly` convert to            *)
-(*       `eigenvalue (map_mx ratr A_rat) lambda`.                       *)
-(*                                                                      *)
-(*  Drop-in replacement for `Cert.maynard_eigenvalue_S1`.               *)
-(*                                                                      *)
-(*  TODO: add to _CoqProject (currently isolated; rocq_compile_file     *)
-(*        picks it up via the workspace -Q flag).                       *)
-(* ================================================================== *)
+(* ==================================================================
+   theories/S1/CertPencil.v
+
+   End-to-end "determinant-sign + IVT" proof that the rat matrix
+   A_rat = M1^{-1} M2 has a realalg eigenvalue strictly above 4/105.
+
+   Strategy:
+     1. Take precomputed integer determinants
+          det_M1_int_value  := det(M1_int)            (positive)
+          D_pencil_int_value := det(4*D_M2*M1_int - 105*D_M1*M2_int)
+                                                       (negative)
+        shipped as Z literals in Witness_PencilDet.v.
+
+     2. Close `det_M1_int = det_M1_int_value` and
+        `D_pencil_int = D_pencil_int_value` via per-prime CRT lifts
+        (CRTPencilCheck.v + CRTPencilCheckExt.v) over 710 / 1210
+        Uint63 primes plus the Hadamard coefficient bound
+        (CRTPencilM1Bound.v / CRTPencilPencilBound.v via the generic
+        CRTPencilHadamardGeneric.v).
+
+     3. Bridge via Agent A's `det_pencil`:
+          \det (l *: M1 - M2) = \det M1 * (char_poly (M1^-1 *m M2)).[l]
+        Specialising l := 4/105 gives (char_poly A_rat).[4/105] < 0.
+
+     4. Leading coefficient: char_poly A_rat is monic of degree 42, so
+        its leading coefficient is 1 > 0; above the Cauchy bound the
+        evaluation is positive.
+
+     5. IVT (`poly_ivtoo`) yields a realalg root in (4/105, cb).
+
+     6. `eigenvalue_root_char` + `map_char_poly` convert to
+        `eigenvalue (map_mx ratr A_rat) lambda`.
+
+   Drop-in alternative to `Cert.maynard_eigenvalue_S1` (main route).
+   ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
 Import ListNotations.
@@ -43,27 +42,23 @@ From mathcomp.real_closed Require Import polyrcf realalg.
 
 From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly Bridge.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge.
-From PrimeGapS1 Require Import CertL2.   (* A_rat, M1_1_unit, mat_identity_rat *)
-From PrimeGapS1 Require Import DetPencil. (* Agent A's deliverable: det_pencil. *)
-From PrimeGapS1 Require Import Cert.      (* M1_spec_eq_int, M2_spec_eq_int.    *)
-From PrimeGapS1 Require Import CertPencilDef.  (* sigT-sealed det_M1_int, D_pencil_int, pencil_mat_int *)
-From PrimeGapS1 Require Import Witness_PencilDet.  (* shipped Z literals *)
+From PrimeGapS1 Require Import CertL2.
+From PrimeGapS1 Require Import DetPencil.        (* Agent A's deliverable: det_pencil *)
+From PrimeGapS1 Require Import Cert.             (* M1_spec_eq_int, M2_spec_eq_int    *)
+From PrimeGapS1 Require Import CertPencilDef.    (* sealed det_M1_int, D_pencil_int, pencil_mat_int *)
+From PrimeGapS1 Require Import Witness_PencilDet.
 From PrimeGapS1 Require Import CRTPencilCheck.     (* det_M1_int_eq *)
-From PrimeGapS1 Require Import CRTPencilCheckExt.  (* D_pencil_int_eq — extended-prime CRT lift *)
-From PrimeGapS1 Require AbstractPencilHelper.  (* abstract_pencil_scale — Require, NOT Import *)
+From PrimeGapS1 Require Import CRTPencilCheckExt.  (* D_pencil_int_eq via 1210-prime extension *)
+From PrimeGapS1 Require AbstractPencilHelper.      (* abstract_pencil_scale -- Require, NOT Import *)
 
 Import GRing.Theory Num.Theory.
 Import order.Order.POrderTheory.
 
 Local Open Scope ring_scope.
 
-(* ================================================================== *)
-(*  Section 0: the rat-level M1, M2 matrices and the pencil scalar.    *)
-(* ================================================================== *)
-
-(* `mat_int_to_rat M D 42` is the rat-valued 42x42 matrix with entries
-   M[i,j] / D.  Already defined in IntMat.v.  We give local notations
-   matching the proof sketch. *)
+(* ==================================================================
+   Section 0: the rat-level M1, M2 matrices and the pencil scalar.
+   ================================================================== *)
 
 Definition M1_rat : 'M[rat]_42 := mat_int_to_rat M1_int D_M1 42.
 Definition M2_rat : 'M[rat]_42 := mat_int_to_rat M2_int D_M2 42.
@@ -71,70 +66,9 @@ Definition M2_rat : 'M[rat]_42 := mat_int_to_rat M2_int D_M2 42.
 (* The threshold scalar 4/105 as a rat. *)
 Definition lambda_q : rat := 4%:Q / 105%:Q.
 
-(* ================================================================== *)
-(*  Section 1: the integer determinant and its sign.                   *)
-(*                                                                      *)
-(*  These two lemmas reduce to single-Z `vm_compute` discharges once    *)
-(*  Agent B has produced the 42x42 integer determinant.  Either         *)
-(*  reuse `fl_loop` on the integer pencil matrix, or call the           *)
-(*  Faddeev-LeVerrier driver directly.                                  *)
-(* ================================================================== *)
-
-(* `pencil_mat_int`, `D_pencil_int`, `det_M1_int` are imported from
-   `CertPencilDef.v` (sigT/proj1_sig sealed).  Do NOT shadow them
-   here: local transparent re-definitions bypass the seal and cause
-   the kernel to unfold through the matrix at proof time. *)
-
-(* The two Z-level sign checks.
-
-   STATUS: ADMITTED.  Both reduce to `vm_compute` discharges on the
-   constant coefficient of a 42x42 integer characteristic polynomial,
-   but FL on bignum entries of this size (~20kb-coefficient
-   polynomials) does not finish in tractable time inside Coq's
-   `vm_compute` (one experiment ran 10 min and still timed out).
-
-   OBSTACLE: We would need to either
-     (a) ship the precomputed `det_M1_int` and `D_pencil_int` numerals
-         from FLINT (extending `python/build_quad_witness.py`), then
-         verify by a cheaper `vm_compute` equality test against
-         `List.nth 0 (char_poly_int M_int) 0`, OR
-     (b) chain through `char_poly_mod_sound` + CRT lift (the
-         L1/CRTLift route) to prove the sign without full FL — but
-         CRT only gives modular info, not sign.
-   Option (a) is the cleanest and what the task brief recommends.    *)
-
-(* ------------------------------------------------------------------
-   The two integer determinant signs.  Precomputed numerals shipped
-   in theories/S1/Witness_PencilDet.v:
-
-     det_M1_int_value   = det(M1_int)             — 2044 bits, positive
-     D_pencil_int_value = det(4*D_M2*M1_int -     — 31131 bits, negative
-                              105*D_M1*M2_int)
-
-   Sign verification on the literals is a single fast `vm_compute`:
-
-     Lemma D_pencil_int_value_neg : Z.lt D_pencil_int_value 0.
-     Proof. vm_compute. reflexivity. Qed.
-
-     Lemma det_M1_int_value_pos : Z.lt 0 det_M1_int_value.
-     Proof. vm_compute. reflexivity. Qed.
-
-   What still needs proving is the EQUALITY between the shipped
-   numerals and the fl_loop-computed values:
-
-     det_M1_int  = det_M1_int_value
-     D_pencil_int = D_pencil_int_value
-
-   Direct `vm_compute` on these equalities runs fl_loop on a 42x42
-   bignum matrix, ~hours (one experiment killed at 20m50s).  The
-   tractable route is a CRT cross-check on a single coefficient,
-   mirroring the 43-coefficient CRT check in `CharPolyAgree.v` /
-   `CRTLift.v` but specialised to the constant term.  Required
-   reuses: `char_poly_mod` (ModularArith.v), `crt_primes_all` /
-   `crt_product_710` (CRTBridge.v), `small_multiple_zero` (CRTCheck.v),
-   `all_primes_divide_product` (CRTCheck.v).  Estimated ~150 LOC of
-   new dedicated bridge.
-   ------------------------------------------------------------------ *)
+(* ==================================================================
+   Section 1: integer determinant signs (via the shipped literals).
+   ================================================================== *)
 
 Lemma D_pencil_int_neg : BinInt.Z.lt D_pencil_int BinInt.Z0.
 Proof. rewrite D_pencil_int_eq. exact D_pencil_int_value_neg. Qed.
@@ -142,28 +76,12 @@ Proof. rewrite D_pencil_int_eq. exact D_pencil_int_value_neg. Qed.
 Lemma det_M1_int_pos : BinInt.Z.lt BinInt.Z0 det_M1_int.
 Proof. rewrite det_M1_int_eq. exact det_M1_int_value_pos. Qed.
 
-(* ================================================================== *)
-(*  Section 2: bridge to char_poly A_rat via Agent A's det_pencil.     *)
-(* ================================================================== *)
+(* ==================================================================
+   Section 2: bridge to char_poly A_rat via Agent A's det_pencil.
+   ================================================================== *)
 
-(* Agent A's deliverable `det_pencil` is now imported from DetPencil.v.
-   Its statement is the pencil identity we use:
-
-     det_pencil :
-       forall (R : comUnitRingType) (n : nat) (M1 M2 : 'M[R]_n) (l : R),
-         M1 \in unitmx ->
-         \det (l *: M1 - M2) = \det M1 * (char_poly (invmx M1 *m M2)).[l].
-*)
-
-(* The Z-level identity that connects D_pencil_int to the rat-level
-   determinant `\det (lambda_q *: M1_rat - M2_rat)`.  This is the
-   "denominator-clearing" step: multiplying the rat pencil by the
-   denominators of M1_rat, M2_rat, and lambda_q yields the integer
-   pencil matrix `pencil_mat_int`, and the determinant scales by
-   the 42nd power of that common factor (a positive rational).        *)
-
-(* Generic positivity / negativity for Z2rat — avoids triggering
-   unfolding of large Z definitions inside case analysis. *)
+(* Z2rat sign helpers -- generic-typed to avoid triggering unfolding of
+   large Z definitions inside case analysis. *)
 Lemma Z2rat_pos_gen (z : Z) : Z.lt 0 z -> 0 < Z2rat z.
 Proof.
 move=> Hz; rewrite /Z2rat ltr0z.
@@ -177,10 +95,9 @@ move=> Hz; rewrite /Z2rat ltrz0.
 by case: z Hz => [|p|p] //=.
 Qed.
 
-(* General bridge: det of (mat_int_to_rat M 1 n) equals Z2rat of the
-   constant coefficient of char_poly_int M, when n is even.  Mirrors
-   the "AbstractMatScale" pattern: abstract over n and M, so the
-   unifier never sees the concrete 42x42 M1_int. *)
+(* Generic: det of (mat_int_to_rat M 1 n) equals Z2rat of the constant
+   coefficient of char_poly_int M, when n is even.  Abstract over (n, M)
+   so the unifier never walks the concrete 42x42 matrix cells. *)
 Lemma det_mat_int_to_rat_via_charpoly (M : mat) (n : nat)
   (sq : mat_dim M = n)
   (wf : forall i, (i < List.length M)%coq_nat -> List.length (List.nth i M nil) = n)
@@ -205,17 +122,13 @@ have Hcalc : (-1 : rat) ^+ n * \det (mat_int_to_rat M 1 n) =
 by rewrite -Hcalc Hsign mul1r.
 Qed.
 
-(* 42 is even (k.*2 = k+k); witness for the helper above. *)
 Lemma M1_int_dim_even : exists k, (42 = k.*2)%nat.
 Proof. by exists 21%nat. Qed.
 
-(* `abstract_pencil_scale` and the scalar `intrM` helper lemmas
-   (`Z_to_int_mul_mul_intrM_three`, `Z_to_int_mul_intrM_two`) are
-   imported from `AbstractPencilHelper.v` — they MUST live in a
-   separate file so that ssreflect's `rewrite intrM` inside their
-   proofs doesn't walk the concrete `'M[rat]_42` cells from this
-   file's `M1_rat / M2_rat / pencil_mat_int` (each `%:~R` match
-   branches combinatorially through every entry, hitting >16 GB RSS). *)
+(* `abstract_pencil_scale` and the scalar `intrM` helper lemmas live in
+   AbstractPencilHelper.v -- separated so their proofs don't walk
+   M1_rat/M2_rat/pencil_mat_int cells (which combinatorially explode
+   memory at concrete 42x42). *)
 
 (* M2_int well-formedness, mirror of M1_int_dim'/wf'. *)
 Lemma M2_int_dim' : mat_dim M2_int = 42%nat.
@@ -229,7 +142,7 @@ Lemma M2_int_wf' : forall i, (i < length M2_int)%coq_nat ->
 Proof. by move=> i Hi; move: M2_int_rows_42; rewrite List.forallb_forall =>
   /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
 
-(* List-level helpers, used in pencil_mat_int_{dim,wf}. *)
+(* List-level helpers used in pencil_mat_int_{dim,wf}. *)
 Lemma length_vadd_eq (xs ys : list Z) :
   length xs = length ys -> length (vadd xs ys) = length xs.
 Proof.
@@ -254,7 +167,7 @@ Proof.
 elim: A B => [|a A IH] [|b B] //= [Hlen]. by rewrite IH.
 Qed.
 
-(* pencil_mat_int's dim equals 42 since both summands do. *)
+(* pencil_mat_int has dim 42 since both summands do. *)
 Lemma pencil_mat_int_dim : mat_dim pencil_mat_int = 42%nat.
 Proof.
   rewrite /pencil_mat_int /mat_dim.
@@ -300,15 +213,13 @@ rewrite length_vadd_eq; first by exact: HrowM1.
 by rewrite HrowM1 HrowM2.
 Qed.
 
-(* char_poly_int pencil_mat_int is non-empty (FL produces a 43-element list). *)
 Lemma char_poly_int_pencil_neq_nil : char_poly_int pencil_mat_int <> nil.
 Proof. unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. Qed.
 
 (* The scaled pencil's det in terms of mat_int_to_rat pencil_mat_int.
-   The `rewrite D_pencil_int_eq_nth` exposes the underlying nth-of-
-   char_poly_int form so that `apply: det_mat_int_to_rat_via_charpoly`
-   unifies without forcing the kernel to chase the sigT seal on
-   D_pencil_int — chasing it triggered an OOM. *)
+   `rewrite D_pencil_int_eq_nth` exposes the nth-of-char_poly_int form
+   so apply unifies without forcing the kernel to chase the sigT seal
+   on D_pencil_int (chasing it triggers OOM). *)
 Lemma det_pencil_rat_aux :
   \det (mat_int_to_rat pencil_mat_int 1 42) = Z2rat D_pencil_int.
 Proof.
@@ -320,9 +231,10 @@ Proof.
     |exact: M1_int_dim_even].
 Qed.
 
-(* Now the bridge identity at the matrix level: K *: pencil_rat
-   equals mat_int_to_rat pencil_mat_int 1 42, where K is the
-   (positive) scaling factor 105*D_M1*D_M2 (as rat).             *)
+(* Bridge: K *: (lambda_q *: M1_rat - M2_rat) equals
+   mat_int_to_rat pencil_mat_int 1 42, where K := 105*D_M1*D_M2.
+   Uses [in RHS]/cbv beta zeta tricks to keep the rewrite engine from
+   walking the heavy concrete matrix cells. *)
 Lemma pencil_rat_scaled_eq :
   let K : rat := (Z_to_int (Z.mul (Z.mul 105 D_M1) D_M2))%:~R in
   K *: (lambda_q *: M1_rat - M2_rat) = mat_int_to_rat pencil_mat_int 1 42.
@@ -340,9 +252,6 @@ Proof.
     by rewrite /cM2 intr_eq0; apply: Z_to_int_neq0'; discriminate.
   have Hc105_ne : c105 != 0
     by rewrite /c105 intr_eq0; apply: Z_to_int_neq0'; discriminate.
-  (* lambda_q = c4 / c105 — original used two `rewrite -[...]/(...)` which
-     time out (the unifier walks the M1_rat / M2_rat matrix cells looking
-     for `4%:Q` / `105%:Q`).  Pure `reflexivity` works in 5 ms. *)
   have Hlq : lambda_q = c4 / c105.
   { rewrite /lambda_q /c4 /c105. reflexivity. }
   set M1' : 'M[rat]_42 := mat_int_to_rat M1_int 1 42.
@@ -360,9 +269,6 @@ Proof.
              (mscale (Z.opp (Z.mul 105 D_M1)) M2_int) 42).
   - rewrite !mat_int_to_rat_mscale.
     rewrite /c4 /cM2 /c105 /cM1.
-    (* Build the scalar rewrites as TERMs (proof body, not by-tactic) and
-       apply them via `rewrite [in RHS]` — without the `[in RHS]` scope,
-       the rewrite engine walks the matrix cells and times out. *)
     have ZM2 : (Z_to_int (4 * D_M2))%:~R = (Z_to_int 4)%:~R * (Z_to_int D_M2)%:~R :> rat
       := AbstractPencilHelper.Z_to_int_mul_intrM_two _ _.
     have ZM3 : (Z_to_int (- (105 * D_M1)))%:~R
@@ -389,8 +295,6 @@ Lemma pencil_rat_eq_int_scaled :
    /\ \det (lambda_q *: M1_rat - M2_rat) = c * (Z2rat D_pencil_int).
 Proof.
   set K : rat := (Z_to_int (Z.mul (Z.mul 105 D_M1) D_M2))%:~R.
-  (* `apply: Z2rat_pos_gen` times out (unifier walks the concrete matrix);
-     use the ltr0z/Pos2Nat path explicitly. *)
   have HK_pos : 0 < K.
   { rewrite /K ltr0z; apply/ltP. by apply: (Pos2Nat.is_pos _). }
   have HK_neq0 : K != 0 by apply: lt0r_neq0.
@@ -398,8 +302,6 @@ Proof.
   split.
   - apply: exprn_gt0; rewrite invr_gt0; exact: HK_pos.
   - have Hscale := pencil_rat_scaled_eq.
-    (* `rewrite /= in Hscale` reduces under the let, walking M1_rat /
-       M2_rat — times out.  `cbv beta zeta` does only the let-reduction. *)
     cbv beta zeta in Hscale.
     have Hdet : \det (K *: (lambda_q *: M1_rat - M2_rat))
               = \det (mat_int_to_rat pencil_mat_int 1 42)
@@ -409,19 +311,15 @@ Proof.
     have HK42_neq0 : K ^+ 42 != 0 := expf_neq0 42 HK_neq0.
     apply: (mulfI HK42_neq0).
     rewrite -Hdet.
-    (* Abstract K and D before the scalar manipulation — `mulrA` / `divff`
-       walk the heavy concrete K body and time out otherwise. *)
     set D := \det (lambda_q *: M1_rat - M2_rat).
     clearbody K D.
     clear -HK_neq0 HK42_neq0.
     by rewrite mulrA mulrA -exprMn divff // expr1n mul1r.
 Qed.
 
-(* M1_int's char_poly_int is non-empty (used to extract head=nth 0). *)
 Lemma char_poly_int_M1_int_neq_nil : char_poly_int M1_int <> nil.
 Proof. unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. Qed.
 
-(* Same treatment for det_M1_int (also sigT-sealed). *)
 Lemma det_M1_rat_aux :
   \det (mat_int_to_rat M1_int 1 42) = Z2rat det_M1_int.
 Proof.
@@ -433,8 +331,6 @@ Proof.
     |exact: M1_int_dim_even].
 Qed.
 
-(* Likewise, det(M1_rat) is a positive multiple of det_M1_int.
-   Same scoping precautions as `pencil_rat_eq_int_scaled`. *)
 Lemma det_M1_rat_eq_int_scaled :
   exists (c : rat), 0 < c
    /\ \det M1_rat = c * (Z2rat det_M1_int).
@@ -451,10 +347,8 @@ Proof.
     congr (_ * _).
 Qed.
 
-(* Abstract-dimension helper to bypass the canonical-structure
-   elaboration cost at concrete n=42 (mirrors CertL2's
-   `abstract_mat_scale` design pattern; see CertL2.v Section
-   `AbstractMatScale` for the rationale). *)
+(* Abstract-dimension helper to bypass canonical-structure elaboration
+   cost at concrete n=42 (mirrors the AbstractMatScale design in CertL2). *)
 Section UnitScaleHelper.
 Variable (F : fieldType) (n : nat).
 Variables (A : 'M[F]_n) (c : F).
@@ -465,7 +359,6 @@ Lemma scale_inv_unit : c^-1 *: A \in unitmx.
 Proof. rewrite unitmxZ //. by rewrite unitfE invr_neq0. Qed.
 End UnitScaleHelper.
 
-(* M1_rat is invertible (matches `M1_1_unit` modulo the scalar). *)
 Lemma M1_rat_unit : M1_rat \in unitmx.
 Proof.
   rewrite /M1_rat (mat_int_to_rat_scale_inv' M1_int D_M1 42).
@@ -474,11 +367,10 @@ Proof.
   by apply: Z_to_int_neq0'; discriminate.
 Qed.
 
-(* A_rat is exactly invmx M1_rat *m M2_rat. *)
 Lemma A_rat_decomp : A_rat = invmx M1_rat *m M2_rat.
 Proof. by rewrite /A_rat /M1_rat /M2_rat. Qed.
 
-(* The pencil identity at lambda_q. *)
+(* Agent A's det_pencil specialised to lambda_q. *)
 Lemma pencil_at_lambda :
   \det (lambda_q *: M1_rat - M2_rat) =
   \det M1_rat * (char_poly A_rat).[lambda_q].
@@ -487,14 +379,8 @@ Proof.
   exact: det_pencil M1_rat_unit.
 Qed.
 
-(* (char_poly A_rat).[4/105] < 0.
-
-   Assemble from `pencil_at_lambda`, `pencil_rat_eq_int_scaled`,
-   `det_M1_rat_eq_int_scaled`, `D_pencil_int_neg`, `det_M1_int_pos`,
-   and the positivity of the clearing factors. *)
-(* Abstract bridge — generic-typed to avoid canonical-structure
-   elaboration on concrete 'M[rat]_42 matrices.  Mirrors the
-   `AbstractMatScale` pattern in CertL2.v. *)
+(* Generic-typed abstract bridge -- avoids canonical-structure
+   elaboration on concrete 'M[rat]_42 matrices. *)
 Section AbstractPencilNeg.
 Variables (M1r M2r : 'M[rat]_42) (lq : rat) (Ar : 'M[rat]_42).
 Variables (Dpi dMi : Z).
@@ -537,7 +423,6 @@ Proof.
                                 det_M1_int_pos D_pencil_int_neg).
 Qed.
 
-(* The leading coefficient of char_poly A_rat is 1 > 0. *)
 Lemma charpoly_lc_pos_rat :
   0 < lead_coef (char_poly A_rat).
 Proof.
@@ -545,7 +430,6 @@ Proof.
   by rewrite (monicP Hmon) ltr01.
 Qed.
 
-(* char_poly A_rat is nonzero. *)
 Lemma charpoly_neq0_rat : char_poly A_rat != 0.
 Proof.
   apply/eqP => H0.
@@ -553,18 +437,15 @@ Proof.
   by rewrite H0 lead_coef0 ltxx in Hlc.
 Qed.
 
-(* ================================================================== *)
-(*  Section 3: lift to realalg + Cauchy bound + IVT.                   *)
-(* ================================================================== *)
+(* ==================================================================
+   Section 3: lift to realalg + Cauchy bound + IVT.
+   ================================================================== *)
 
-(* Lift char_poly A_rat to {poly realalg}. *)
 Definition charpoly_A_realalg : {poly realalg} :=
   map_poly (ratr : rat -> realalg) (char_poly A_rat).
 
-(* The threshold lambda_q lifted to realalg. *)
 Definition lambda_ralg : realalg := ratr lambda_q.
 
-(* The leading coefficient of P_realalg equals ratr 1 = 1. *)
 Lemma charpoly_A_realalg_lead_coef :
   lead_coef charpoly_A_realalg = 1.
 Proof.
@@ -573,7 +454,6 @@ Proof.
   by rewrite (monicP (char_poly_monic _)) rmorph1.
 Qed.
 
-(* P_realalg is nonzero (its leading coefficient is 1, which is nonzero). *)
 Lemma charpoly_A_realalg_neq0 : charpoly_A_realalg != 0.
 Proof.
   apply/eqP => H0.
@@ -582,7 +462,6 @@ Proof.
   by have := oner_neq0 realalg; rewrite -Hlc eqxx.
 Qed.
 
-(* Size of P_realalg = size of char_poly A_rat = 43. *)
 Lemma charpoly_A_realalg_size :
   size charpoly_A_realalg = 43.
 Proof.
@@ -591,7 +470,6 @@ Proof.
   exact: size_char_poly.
 Qed.
 
-(* P_realalg at lambda_ralg is negative (lift of `charpoly_neg_at_threshold_rat`). *)
 Lemma charpoly_A_realalg_neg_at_threshold :
   charpoly_A_realalg.[lambda_ralg] < 0.
 Proof.
@@ -601,15 +479,13 @@ Proof.
   exact: charpoly_neg_at_threshold_rat.
 Qed.
 
-(* P_realalg leading coefficient is positive. *)
 Lemma charpoly_A_realalg_lc_pos :
   (0 : realalg) < lead_coef charpoly_A_realalg.
 Proof.
   by rewrite charpoly_A_realalg_lead_coef ltr01.
 Qed.
 
-(* P_realalg evaluated at its Cauchy bound is positive (mirror of
-   `charpoly_pos_at_cb` from CertL1.v). *)
+(* P_realalg at its Cauchy bound is positive (mirror of charpoly_pos_at_cb). *)
 Lemma charpoly_A_realalg_pos_at_cb :
   0 < charpoly_A_realalg.[cauchy_bound charpoly_A_realalg].
 Proof.
@@ -629,7 +505,6 @@ Proof.
   rewrite -sgr_gt0 Hsgn /sgp_pinfty sgr_gt0 //.
 Qed.
 
-(* The threshold sits below the Cauchy bound. *)
 Lemma threshold_lt_cb_A :
   lambda_ralg < cauchy_bound charpoly_A_realalg.
 Proof.
@@ -642,7 +517,7 @@ Proof.
     apply: sumr_ge0 => i _; exact: normr_ge0.
 Qed.
 
-(* IVT: there is a realalg root of P_realalg in (lambda_ralg, cb). *)
+(* IVT: realalg root of P_realalg lies in (lambda_ralg, cb). *)
 Lemma maynard_root_above_threshold :
   exists lambda : realalg,
     root charpoly_A_realalg lambda
@@ -661,9 +536,9 @@ Proof.
   by move: Hx; rewrite inE /= => /andP [].
 Qed.
 
-(* ================================================================== *)
-(*  Section 4: the headline pencil theorem.                            *)
-(* ================================================================== *)
+(* ==================================================================
+   Section 4: the headline pencil theorem.
+   ================================================================== *)
 
 Theorem maynard_eigenvalue_S1_pencil :
   exists lambda : realalg,
@@ -677,9 +552,9 @@ Proof.
     exact: Hroot.
 Qed.
 
-(* ================================================================== *)
-(*  Section 5: trust contract (mirrors Cert.maynard_M105_certified).   *)
-(* ================================================================== *)
+(* ==================================================================
+   Section 5: trust contract (mirrors Cert.maynard_M105_certified).
+   ================================================================== *)
 
 Theorem maynard_M105_certified_pencil :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
@@ -694,18 +569,3 @@ Proof.
   split; first by move=> i j Hi Hj; apply: M2_spec_eq_int.
   exact: maynard_eigenvalue_S1_pencil.
 Qed.
-
-(* ==================================================================
-   ADMITTED INVENTORY
-   ------------------------------------------------------------------
-   Section 1 (Agent B, vm_compute on integer FL outputs):
-     - D_pencil_int_neg
-     - det_M1_int_pos
-   Section 2 (denominator-clearing bridge, single matrix manipulation):
-     - pencil_rat_eq_int_scaled
-     - det_M1_rat_eq_int_scaled
-   Section 2 (Agent A, DetPencil.v deliverable):
-     - det_pencil  (DONE — imported from DetPencil.v, used in pencil_at_lambda)
-   Section 5 (paper-form spec ↔ integer entries, reuse Cert.v):
-     - the two `admit`s inside maynard_M105_certified_pencil
-   ================================================================== *)
