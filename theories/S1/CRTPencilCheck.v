@@ -349,19 +349,11 @@ Proof.
     unfold a, b in *. lia.
 Qed.
 
-(* Pencil-side equality cannot close at the current prime count
-   (see note above the Hadamard checks): 2 * |D_pencil_int_value| ~
-   2^31132 > crt_product_710 ~ 2^21300.  We keep the per-prime
-   divisibility lemma above (which is fully closed) and the full
-   Hadamard / shipped-literal sign infrastructure, so that adding
-   ~330 more primes (a one-shot precomputation step) suffices to
-   close this without re-deriving any of the modular arithmetic. *)
-Theorem D_pencil_int_eq : D_pencil_int = D_pencil_int_value.
-Proof.
-  (* Same structure as det_M1_int_eq, but the Hadamard bound is
-     unprovable at 710 primes.  Sketch retained for the +330-prime
-     extension; see comment above. *)
-Admitted.
+(* D_pencil_int_eq lives in CRTPencilCheckExt.v: it uses the
+   1210-prime extension `crt_primes_pencil` (710 mainline + 500
+   extras) to close the Hadamard bound, which the 710-prime product
+   alone cannot bound (D_pencil_int is ~31131 bits, crt_product_710
+   is only ~21300 bits). *)
 
 (* Restore expand strategy on names used by downstream files so that
    mathcomp elaboration (e.g. in CertPencil.v) can fold/unfold these

@@ -27,10 +27,8 @@ From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import Witness_PencilDet.
 From PrimeGapS1 Require Import CertL2 CertPencilDef.
 From PrimeGapS1 Require Import CRTPencilExtraPrimes.
-From PrimeGapS1 Require Import CRTPencilExtra_NoDupProof.    (* crt_primes_pencil_NoDup *)
 From PrimeGapS1 Require Import CRTPencilExtra_PrimesProof.   (* extra_prime_at *)
-From PrimeGapS1 Require Import CRTPencilExtra_ValidProof.    (* extra_gt_43_at *)
-From PrimeGapS1 Require Import CRTPencilExtraPrimesProof.
+From PrimeGapS1 Require Import CRTPencilExtraPrimesProof.    (* NoDup, valid, gt_43, product *)
 From PrimeGapS1 Require Import CRTPencilExtraChecksProof.
 From PrimeGapS1 Require Import CRTPencilChecksProof.   (* check_pencil_det_at *)
 From PrimeGapS1 Require Import CRTPencilCheck.   (* mod_eq_to_divide, per_prime_div_pencil for 710 *)

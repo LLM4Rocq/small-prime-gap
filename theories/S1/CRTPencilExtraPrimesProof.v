@@ -1,15 +1,21 @@
 (* ==================================================================
    CRTPencilExtraPrimesProof.v
 
-   Assembly: NoDup + all-prime + valid-range + crt_product_pos for
-   the full crt_primes_pencil list (710 mainline + 500 extras).
+   Assembly + cheap checks for the 500 EXTRA primes that, combined
+   with the original 710 mainline primes, give the 1210-prime list
+   `crt_primes_pencil` used by the pencil-determinant lift.
 
-   Heavy vm_computes are pre-cached in sibling files:
-     CRTPencilExtra_NoDupProof.v   — NoDup (1210 keys, ~0.1 s)
-     CRTPencilExtra_PrimesProof.v  — primality of 500 extras (~6 min)
-     CRTPencilExtra_ValidProof.v   — valid range of 500 extras (cheap)
-   This file just glues them with the original 710-prime lemmas in
-   CRTLift.v, then defines the 1210-prime product and proves its sign.
+   Heavy vm_computes stay in sibling files:
+     CRTPencilExtra_PrimesProof.v  -- primality of the 500 extras
+                                     (~6 min vm_compute)
+     CRTPencilExtraChecksProof.v   -- per-prime mod check over 500
+                                     extras (~9 min vm_compute)
+
+   This file performs the cheap checks (NoDup over 1210 keys, valid
+   range over 500 extras) and bundles them with the 710-mainline
+   lemmas in CRTLift.v to expose `crt_primes_pencil_NoDup`,
+   `crt_primes_pencil_valid`, `crt_primes_pencil_all_prime`,
+   `crt_product_pencil`, and `crt_product_pencil_pos`.
    ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia Bool.
@@ -21,11 +27,56 @@ From mathcomp Require Import all_ssreflect.
 From PrimeGapS1 Require Import ModularArith CRTBridge CRTLift PrimeCheck CRTCheck Fermat.
 From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import CRTPencilExtraPrimes.
-From PrimeGapS1 Require Import CRTPencilExtra_NoDupProof.
 From PrimeGapS1 Require Import CRTPencilExtra_PrimesProof.
-From PrimeGapS1 Require Import CRTPencilExtra_ValidProof.
 
 Open Scope Z_scope.
+
+(* ================================================================== *)
+(*  NoDup over the full 1210-prime list (cheap vm_compute, ~0.1 s).    *)
+(* ================================================================== *)
+
+Definition check_pencil_NoDup : bool :=
+  nodup_Z (List.map Uint63.to_Z crt_primes_pencil).
+
+Lemma check_pencil_NoDup_true : check_pencil_NoDup = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma crt_primes_pencil_NoDup : NoDup (List.map Uint63.to_Z crt_primes_pencil).
+Proof. apply nodup_Z_sound. exact check_pencil_NoDup_true. Qed.
+
+(* ================================================================== *)
+(*  Valid-range check (1 < p < 2^31) for the 500 EXTRA primes.         *)
+(* ================================================================== *)
+
+Definition two_pow_31 : Z := 2147483648.
+
+Definition check_extra_valid : bool :=
+  List.forallb (fun p => (Z.ltb 1 (Uint63.to_Z p) && Z.ltb (Uint63.to_Z p) two_pow_31)%bool)
+               crt_primes_pencil_extra.
+
+Lemma check_extra_valid_true : check_extra_valid = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Opaque crt_primes_pencil_extra.
+
+Lemma extra_valid_at (p : Uint63.int) (Hin : In p crt_primes_pencil_extra) :
+  (Z.ltb 1 (Uint63.to_Z p) && Z.ltb (Uint63.to_Z p) two_pow_31)%bool = true.
+Proof. exact (proj1 (List.forallb_forall _ _) check_extra_valid_true p Hin). Qed.
+
+(* Every extra prime is > 43 (in fact > 1073756473). *)
+Definition check_extra_gt_43 : bool :=
+  List.forallb (fun p => Z.ltb 43 (Uint63.to_Z p)) crt_primes_pencil_extra.
+
+Lemma check_extra_gt_43_true : check_extra_gt_43 = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma extra_gt_43_at (p : Uint63.int) (Hin : In p crt_primes_pencil_extra) :
+  Z.ltb 43 (Uint63.to_Z p) = true.
+Proof. exact (proj1 (List.forallb_forall _ _) check_extra_gt_43_true p Hin). Qed.
+
+(* ================================================================== *)
+(*  Assembly: all-prime + valid + product positivity over 1210 primes. *)
+(* ================================================================== *)
 
 Lemma crt_primes_pencil_all_prime :
   forall p, In p (List.map Uint63.to_Z crt_primes_pencil) -> Znumtheory.prime p.
@@ -36,8 +87,6 @@ Proof.
   - exact (crt_primes_710_all_prime _ (List.in_map _ _ _ Hin1)).
   - apply check_prime_Z_sound. exact (extra_prime_at pi Hin2).
 Qed.
-
-Opaque crt_primes_pencil_extra.
 
 Lemma crt_primes_pencil_valid :
   forall p, In p crt_primes_pencil -> valid_prime p.
