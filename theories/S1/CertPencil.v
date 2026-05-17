@@ -48,7 +48,8 @@ From PrimeGapS1 Require Import DetPencil. (* Agent A's deliverable: det_pencil. 
 From PrimeGapS1 Require Import Cert.      (* M1_spec_eq_int, M2_spec_eq_int.    *)
 From PrimeGapS1 Require Import CertPencilDef.  (* sigT-sealed det_M1_int, D_pencil_int, pencil_mat_int *)
 From PrimeGapS1 Require Import Witness_PencilDet.  (* shipped Z literals *)
-From PrimeGapS1 Require Import CRTPencilCheck.     (* det_M1_int_eq, D_pencil_int_eq *)
+From PrimeGapS1 Require Import CRTPencilCheck.     (* det_M1_int_eq *)
+From PrimeGapS1 Require Import CRTPencilCheckExt.  (* D_pencil_int_eq — extended-prime CRT lift *)
 From PrimeGapS1 Require AbstractPencilHelper.  (* abstract_pencil_scale — Require, NOT Import *)
 
 Import GRing.Theory Num.Theory.

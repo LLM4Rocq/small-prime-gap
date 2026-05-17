@@ -42,10 +42,19 @@ theories/S1/CertL2.v
 #   coqc -R theories/S1 PrimeGapS1 theories/S1/CertPencil.v
 theories/S1/Witness_PencilDet.v
 theories/S1/Witness_M1Bound.v
+theories/S1/Witness_PencilBound.v
 theories/S1/CertPencilDef.v
 theories/S1/DetPencil.v
 theories/S1/CRTPencilChecksProof.v
+theories/S1/CRTPencilExtraPrimes.v
+theories/S1/CRTPencilExtra_NoDupProof.v
+theories/S1/CRTPencilExtra_PrimesProof.v
+theories/S1/CRTPencilExtra_ValidProof.v
+theories/S1/CRTPencilExtraPrimesProof.v
+theories/S1/CRTPencilExtraChecksProof.v
 theories/S1/CRTPencilM1Bound.v
 theories/S1/CRTPencilCheck.v
+theories/S1/CRTPencilPencilBound.v
+theories/S1/CRTPencilCheckExt.v
 theories/S1/AbstractPencilHelper.v
 theories/S1/CertPencil.v
