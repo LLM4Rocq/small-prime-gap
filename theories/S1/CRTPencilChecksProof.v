@@ -24,7 +24,8 @@ From PrimeGapS1 Require Import IntMat Witness CharPoly.
 From PrimeGapS1 Require Import ModularArith CRTBridge.
 From PrimeGapS1.CharPolyAgree Require Import Def.   (* crt_primes_all *)
 From PrimeGapS1 Require Import Witness_PencilDet.
-From PrimeGapS1 Require Import CertPencilDef.       (* pencil_mat_int *)
+From PrimeGapS1 Require Import Witness_PencilClean.   (* D_pencil_int_value alias *)
+From PrimeGapS1 Require Import CertPencilDef.       (* pencil_mat_int = pencil_int_clean *)
 
 Open Scope Z_scope.
 

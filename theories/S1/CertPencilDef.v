@@ -2,19 +2,33 @@
    CertPencilDef.v
 
    Integer-side definitions for the determinant-pencil M_{105} > 4
-   proof: the pencil matrix `pencil_mat_int := 4*D_M2*M1_int -
-   105*D_M1*M2_int`, its determinant `D_pencil_int`, and the
-   determinant of `M1_int` (`det_M1_int`).
+   proof.
+
+   * pencil_mat_int : the CLEAN integer pencil
+       pencil_int_clean[i][j] := D_pencil_clean * (4*M1_rat[i][j]
+                                                   - 105*M2_rat[i][j]),
+     shipped in Witness_PencilClean.v.  The clean pencil scales by
+     D_pencil_clean (689 bits) instead of D_M1*D_M2 (1368 bits), so
+     |det| is 2613 bits (vs. 31131 in the old `4*D_M2*M1 - 105*D_M1*M2`
+     formulation).  The clean determinant fits comfortably under the
+     710-prime CRT product — no prime extension is required.
+
+   * D_pencil_int : the constant coef of `char_poly_int pencil_mat_int`
+     (= det up to sign for n = 42), sealed via a sigT witness so the
+     Qed kernel never reduces through it.  The shipped literal
+     `D_pencil_clean_value` (in Witness_PencilClean.v) is the integer
+     value, closed against D_pencil_int by the 710-prime CRT chain in
+     `CRTPencilCheck.v`.
+
+   * det_M1_int : same sigT seal for det(M1_int), with literal
+     `det_M1_int_value` shipped in Witness_PencilDet.v (unchanged).
 
    Structural facts (dim/wf/non-emptiness of fl_loop output) needed
-   downstream by the CRT cross-check in `CRTPencilCheck.v` and the
-   eigenvalue assembly in `CertPencil.v`.
+   downstream by the CRT cross-check and the eigenvalue assembly.
 
    This file uses ONLY Stdlib + the project's integer-level modules
    (`IntMat`, `IntPoly`, `Witness`, `CharPoly`).  No mathcomp/algebra
-   imports.  Compiles in <30s.  Splitting it out of `CertPencil.v`
-   avoids re-doing the heavy mathcomp elaboration each time the CRT
-   bridge file is touched.
+   imports.  Compiles in <30s.
    ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
@@ -24,6 +38,7 @@ From mathcomp Require Import all_ssreflect.
 
 From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly.
 From PrimeGapS1 Require Import CertL2.   (* M1_int_dim' / M1_int_wf' *)
+From PrimeGapS1 Require Import Witness_PencilClean. (* pencil_int_clean *)
 
 Open Scope Z_scope.
 
@@ -41,21 +56,21 @@ Definition vsub (xs ys : list Z) : list Z :=
 Definition msub (A B : list (list Z)) : list (list Z) :=
   madd A (mscale (-1) B).
 
-(* The integer pencil matrix at l = 4/105: clear the denominator 105
-   by multiplying l *: M1_rat - M2_rat through by D_M1 * D_M2 * 105.
-   Concretely we work with
-     N := 4 * D_M2 * M1_int  +  (-(105 * D_M1)) * M2_int
-   as a list (list Z). *)
+(* The integer pencil matrix at l = 4/105.  We use the CLEAN pencil
+   shipped in Witness_PencilClean.v, equal entry-wise to
+     D_pencil_clean * (4*M1_rat - 105*M2_rat).
+   Cross-multiplication identity:
+     D_M1 * D_M2 * pencil_int_clean[i][j]
+       = D_pencil_clean * (4*D_M2*M1_int[i][j] - 105*D_M1*M2_int[i][j])
+   is closed in PencilCleanGrid.v. *)
 
-Definition pencil_mat_int : list (list Z) :=
-  madd (mscale (BinInt.Z.mul 4 D_M2) M1_int)
-       (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int).
+Definition pencil_mat_int : list (list Z) := pencil_int_clean.
 
 (* The integer determinants.  Both are extracted as the constant
    coefficient of `char_poly_int` (which equals det up to sign;
-   for n = 42 even, the sign factor is +1). *)
+   for n = 42 even, the sign factor is +1).
 
-(* Strong sealing via Qed-protected sigT witness — `Opaque` alone is
+   Strong sealing via Qed-protected sigT witness — `Opaque` alone is
    insufficient because the kernel can still reduce through it during
    Qed-time conversion checks.  By going through `proj1_sig` of a
    Qed-sealed `existsT`, the body is truly hidden from the kernel.
@@ -130,50 +145,23 @@ Proof.
   apply Nat.eqb_eq in H. exact H.
 Qed.
 
-(* pencil_mat_int dimension and well-formedness. *)
+(* pencil_mat_int = pencil_int_clean: dim 42 and wf, verified by vm_compute
+   on the shipped 42x42 literal. *)
 Lemma pencil_mat_int_dim : mat_dim pencil_mat_int = 42%nat.
-Proof.
-  rewrite /pencil_mat_int /mat_dim.
-  have HM1 : length M1_int = 42%nat by move: M1_int_dim'; unfold mat_dim.
-  have HM2 : length M2_int = 42%nat by move: M2_int_dim'; unfold mat_dim.
-  rewrite length_madd; rewrite /mscale !List.length_map; first by exact: HM1.
-  by rewrite HM1 HM2.
-Qed.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma pencil_mat_int_rows_42 :
+  forallb (fun row => Nat.eqb (List.length row) 42) pencil_mat_int = true.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma pencil_mat_int_wf : forall i, (i < length pencil_mat_int)%coq_nat ->
   length (List.nth i pencil_mat_int []) = 42%nat.
 Proof.
   intros i Hi.
-  have Hwf1 := M1_int_wf'.
-  have Hwf2 := M2_int_wf'.
-  have HM1_42 : length M1_int = 42%nat by move: M1_int_dim'; unfold mat_dim.
-  have HM2_42 : length M2_int = 42%nat by move: M2_int_dim'; unfold mat_dim.
-  have HmsM1_42 : length (mscale (BinInt.Z.mul 4 D_M2) M1_int) = 42%nat
-    by rewrite /mscale List.length_map HM1_42.
-  have HmsM2_42 : length (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int) = 42%nat
-    by rewrite /mscale List.length_map HM2_42.
-  have Hlen_eq : length (mscale (BinInt.Z.mul 4 D_M2) M1_int)
-               = length (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int)
-    by rewrite HmsM1_42 HmsM2_42.
-  have Hpenc_42 : length pencil_mat_int = 42%nat
-    by rewrite /pencil_mat_int (length_madd _ _ Hlen_eq) HmsM1_42.
-  rewrite /pencil_mat_int (nth_madd_eq _ _ _ Hlen_eq).
-  have Hi_M1 : (i < length M1_int)%coq_nat
-    by rewrite Hpenc_42 in Hi; rewrite HM1_42; exact Hi.
-  have Hi_M2 : (i < length M2_int)%coq_nat
-    by rewrite Hpenc_42 in Hi; rewrite HM2_42; exact Hi.
-  have HrowM1 : length (List.nth i (mscale (BinInt.Z.mul 4 D_M2) M1_int) nil) = 42%nat.
-  { rewrite /mscale.
-    rewrite (List.nth_indep _ nil (vscale (BinInt.Z.mul 4 D_M2) nil));
-      [|rewrite List.length_map; exact Hi_M1].
-    by rewrite List.map_nth length_vscale (Hwf1 i Hi_M1). }
-  have HrowM2 : length (List.nth i (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int) nil) = 42%nat.
-  { rewrite /mscale.
-    rewrite (List.nth_indep _ nil (vscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) nil));
-      [|rewrite List.length_map; exact Hi_M2].
-    by rewrite List.map_nth length_vscale (Hwf2 i Hi_M2). }
-  rewrite length_vadd_eq; first by exact: HrowM1.
-  by rewrite HrowM1 HrowM2.
+  pose proof (proj1 (List.forallb_forall _ _) pencil_mat_int_rows_42
+                    (List.nth i pencil_mat_int [])
+                    (List.nth_In _ _ Hi)) as H.
+  apply Nat.eqb_eq in H. exact H.
 Qed.
 
 (* char_poly_int *_neq_nil: FL produces a length-43 list, so non-empty. *)

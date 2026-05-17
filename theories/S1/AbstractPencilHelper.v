@@ -1,81 +1,116 @@
 (* ==================================================================
    AbstractPencilHelper.v
 
-   `abstract_pencil_scale`: the K-scaled rearrangement identity used
-   by `CertPencil.pencil_rat_eq_int_scaled`.  Pure rational-field
-   algebra over 'M[rat]_n; isolated into its own file so that
-   `CertPencil.v` doesn't have to load `mathcomp.algebra_tactics`
-   (~ adds several GB of RSS to CertPencil's compile via the `field`
-   tactic on concrete 'M[rat]_42 matrices).
+   Per-cell rational identity used by `CertPencil.pencil_rat_scaled_eq`
+   to lift the integer cross-multiplication
+       D_M1 * D_M2 * pencil_int_clean[i,j]
+         = D_pencil_clean * (4*D_M2*M1[i,j] - 105*D_M1*M2[i,j])
+   (shipped via `PencilCleanGrid.pencil_clean_match_Z`) into the
+   rat-matrix identity
+       K *: (lambda_q *: M1_rat - M2_rat) = mat_int_to_rat pencil_int_clean 1 42.
+
+   Isolated into its own file so that `CertPencil.v` doesn't have to
+   load `mathcomp.algebra_tactics` (which `field` requires) — using
+   `field` in the heavy 'M[rat]_42 context of CertPencil adds several
+   GB of RSS to the compile.  Here we prove the cell-level identity
+   over abstract `Z` integers, so `field` is invoked exactly once.
    ================================================================== *)
 
 From Stdlib Require Import ZArith.
 From mathcomp Require Import all_boot all_algebra.
 From mathcomp.algebra_tactics Require Import ring.
-From PrimeGapS1 Require Import CharPoly Bridge.   (* Z_to_int + Z_to_int_mul *)
+From PrimeGapS1 Require Import IntMat CharPoly Bridge.   (* Z_to_int + mat_get + mat_int_to_rat *)
 
 Import GRing.Theory.
 Local Open Scope ring_scope.
 
-(* Universally-quantified scalar identities, proved here so that
-   ssreflect's `rewrite intrM` walks ONLY the abstract `a, b, c : Z`
-   pattern — not the concrete 42×42 'M[rat]_42 cells in downstream
-   `CertPencil.v` goals (each `%:~R` match would branch combinatorially
-   through every matrix entry → >16 GB RSS / OOM). *)
+(* Z-level subtraction unfolded into add+opp at the rat level. *)
+Lemma Z_to_int_sub_intrR (a b : Z) :
+  ((Z_to_int (BinInt.Z.sub a b))%:~R : rat)
+  = (Z_to_int a)%:~R - (Z_to_int b)%:~R.
+Proof. by rewrite -BinInt.Z.add_opp_r Z_to_int_add Z_to_int_opp intrD intrN. Qed.
 
-Lemma Z_to_int_mul_mul_intrM_three (a b c : Z) :
-  ((Z_to_int (Z.mul (Z.mul a b) c))%:~R : rat) =
-  (Z_to_int a)%:~R * (Z_to_int b)%:~R * (Z_to_int c)%:~R.
-Proof. by rewrite !Z_to_int_mul !intrM. Qed.
-
-Lemma Z_to_int_mul_intrM_two (a b : Z) :
-  ((Z_to_int (Z.mul a b))%:~R : rat) =
-  (Z_to_int a)%:~R * (Z_to_int b)%:~R.
-Proof. by rewrite Z_to_int_mul intrM. Qed.
-
-(* Z_to_int distributes over Z.opp.  Proved here (outside the heavy
-   matrix context of CertPencil.v) to avoid the `case: ... => /=; first
-   by [].` timing out when goal context contains 'M[rat]_42 cells. *)
-Lemma Z_to_int_opp (z : Z) : Z_to_int (Z.opp z) = - Z_to_int z.
+(* The per-cell identity, purely scalar (no matrix cells in scope). *)
+Lemma pencil_cell_eq
+  (Mij Nij Pij d1 d2 Dpc : Z)
+  (Hd1 : (Z_to_int d1)%:~R != 0 :> rat)
+  (Hd2 : (Z_to_int d2)%:~R != 0 :> rat)
+  (Hxm : BinInt.Z.mul (BinInt.Z.mul d1 d2) Pij =
+         BinInt.Z.mul Dpc (BinInt.Z.sub (BinInt.Z.mul (BinInt.Z.mul 4 d2) Mij)
+                                        (BinInt.Z.mul (BinInt.Z.mul 105 d1) Nij))) :
+  let M := (Z_to_int Mij)%:~R : rat in
+  let N := (Z_to_int Nij)%:~R : rat in
+  let P := (Z_to_int Pij)%:~R : rat in
+  let D1 := (Z_to_int d1)%:~R : rat in
+  let D2 := (Z_to_int d2)%:~R : rat in
+  let DP := (Z_to_int Dpc)%:~R : rat in
+  let K  := ((Z_to_int (BinInt.Z.mul Dpc 105))%:~R : rat) in
+  let lq : rat := 4%:Q / 105%:Q in
+  K * (lq * (M / D1) - N / D2) = P / 1.
 Proof.
-  Transparent Z_to_int.
-  case: z => [|p|p] /=; first by rewrite oppr0.
-  - by rewrite NegzE;
-      congr (- _)%R;
-      case E: (Pos.to_nat p) => [|n];
-        [have := Pos2Nat.is_pos p; rewrite E => /Nat.nlt_0_r []
-        |rewrite subn1].
-  - by rewrite NegzE opprK;
-      case E: (Pos.to_nat p) => [|n];
-        [have := Pos2Nat.is_pos p; rewrite E => /Nat.nlt_0_r []
-        |rewrite subn1].
+move=> M N P D1 D2 DP K lq.
+have HK : K = DP * 105%:Q.
+{ rewrite /K /DP Z_to_int_mul intrM /=. by congr (_ * _). }
+have Hxm_rat :
+  D1 * D2 * P = DP * (4%:Q * D2 * M - 105%:Q * D1 * N).
+{ have HZ := f_equal (fun z => (Z_to_int z)%:~R : rat) Hxm.
+  cbv beta in HZ.
+  rewrite !Z_to_int_mul !intrM in HZ.
+  rewrite Z_to_int_sub_intrR !Z_to_int_mul !intrM /= in HZ.
+  by exact HZ. }
+rewrite HK.
+have H105 : (105%:Q : rat) != 0 by rewrite intr_eq0.
+rewrite divr1.
+have HD1D2 : D1 * D2 != 0 by rewrite mulf_neq0.
+apply: (mulfI HD1D2).
+rewrite mulrA Hxm_rat.
+rewrite /lq.
+field.
+by rewrite Hd1 Hd2.
 Qed.
 
-(* Negation form: (Z_to_int (-(a * b)))%:~R = - ((Z_to_int a)%:~R * (Z_to_int b)%:~R) *)
-Lemma Z_to_int_opp_mul_intrM (a b : Z) :
-  ((Z_to_int (Z.opp (Z.mul a b)))%:~R : rat) =
-  - ((Z_to_int a)%:~R * (Z_to_int b)%:~R).
-Proof. by rewrite Z_to_int_opp intrN Z_to_int_mul_intrM_two. Qed.
+(* ==================================================================
+   Generic matrix-level bridge: given the per-entry cross-check
+   `D1 * D2 * P[i,j] = Dpc * (4*D2*M[i,j] - 105*D1*N[i,j])`
+   for every (i, j), the rat-matrix identity
+   `K *: (lq *: (mat_int_to_rat M D1 n) - mat_int_to_rat N D2 n) =
+    mat_int_to_rat P 1 n`
+   holds, where K = (Dpc * 105)%:~R and lq = 4/105.
 
-Section AbstractPencilBridge.
-Variables (n : nat) (M1' M2' : 'M[rat]_n).
-Variables (cM1 cM2 c105 c4 : rat).
-Hypothesis HcM1 : cM1 != 0.
-Hypothesis HcM2 : cM2 != 0.
-Hypothesis Hc105 : c105 != 0.
+   We prove the bridge over abstract `'M[rat]_n` Variables so the
+   mathcomp matrix elaboration cost stays here (where there's no
+   concrete 'M[rat]_42 in scope) rather than in CertPencil.v.
+   ================================================================== *)
 
-Let K_abs : rat := c105 * cM1 * cM2.
+Section MatrixBridge.
 
-Lemma abstract_pencil_scale :
-  K_abs *: ((c4 / c105) *: (cM1^-1 *: M1') - cM2^-1 *: M2') =
-  (c4 * cM2) *: M1' - (c105 * cM1) *: M2'.
+Variable n : nat.
+Variables (Mmat Nmat Pmat : mat).
+Variables (d1 d2 Dpc : Z).
+Hypothesis Hd1 : (Z_to_int d1)%:~R != 0 :> rat.
+Hypothesis Hd2 : (Z_to_int d2)%:~R != 0 :> rat.
+
+Hypothesis Hcross :
+  forall (i j : 'I_n),
+    BinInt.Z.mul (BinInt.Z.mul d1 d2)
+      (mat_get Pmat (nat_of_ord i) (nat_of_ord j)) =
+    BinInt.Z.mul Dpc
+      (BinInt.Z.sub
+        (BinInt.Z.mul (BinInt.Z.mul 4 d2)
+          (mat_get Mmat (nat_of_ord i) (nat_of_ord j)))
+        (BinInt.Z.mul (BinInt.Z.mul 105 d1)
+          (mat_get Nmat (nat_of_ord i) (nat_of_ord j)))).
+
+Lemma pencil_matrix_bridge :
+  ((Z_to_int (BinInt.Z.mul Dpc 105))%:~R : rat) *:
+    ((4%:Q / 105%:Q : rat) *: mat_int_to_rat Mmat d1 n
+       - mat_int_to_rat Nmat d2 n) =
+  mat_int_to_rat Pmat 1 n.
 Proof.
-  rewrite /K_abs scalerBr !scalerA.
-  have E1 : c105 * cM1 * cM2 * (c4 / c105) * cM1^-1 = c4 * cM2.
-  { by field; rewrite Hc105 HcM1. }
-  have E2 : c105 * cM1 * cM2 * cM2^-1 = c105 * cM1.
-  { by field; exact HcM2. }
-  by rewrite E1 E2.
+apply/matrixP => i j.
+rewrite ![in LHS]mxE.
+rewrite [in RHS]mxE.
+exact: (pencil_cell_eq _ _ _ _ _ _ Hd1 Hd2 (Hcross i j)).
 Qed.
 
-End AbstractPencilBridge.
+End MatrixBridge.

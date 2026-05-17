@@ -2,12 +2,13 @@
    CRTPencilCheck.v
 
    Lift the 1-coefficient CRT per-prime agreement (proved in
-   `CRTPencilChecksProof.v` by ~12 min of vm_compute) to Z equality
-   between `det_M1_int` / `D_pencil_int` (computed via fl_loop on
-   M1_int and pencil_mat_int respectively) and the precomputed Z
-   literals shipped in `Witness_PencilDet.v`.
+   `CRTPencilChecksProof.v` by ~5 min of vm_compute on the CLEAN
+   pencil) to Z equality between `det_M1_int` / `D_pencil_int`
+   (computed via fl_loop on M1_int and pencil_mat_int respectively)
+   and the precomputed Z literals shipped in `Witness_PencilDet.v`
+   (M1) and `Witness_PencilClean.v` (pencil).
 
-   At each prime p in crt_primes_all:
+   At each prime p in crt_primes_all (the 710-prime mainline list):
 
      check_M_det_at p = true     (computational, cached)
    + char_poly_mod_sound          (CRTBridge.v)
@@ -28,6 +29,12 @@
    = det_M_int = det_M_value
 
    Then sign by `vm_compute` on the literal.
+
+   The CLEAN pencil's determinant is 2613 bits (vs. 31131 in the
+   inflated `4*D_M2*M1 - 105*D_M1*M2` form), and its Hadamard bound is
+   5830 bits (vs. 34348).  Both comfortably fit in the 710-prime CRT
+   product (~21300 bits), so no prime extension is required — the
+   same CRT product covers both M1 and the pencil.
    ================================================================== *)
 
 From Stdlib Require Import ZArith List Lia Znumtheory.
@@ -41,6 +48,7 @@ From PrimeGapS1 Require Import ModularArith CRTBridge CRTCheck CRTLift Fermat Pr
 From PrimeGapS1 Require Import AllRowsLenHelper.   (* forallb_all_rows_len *)
 From PrimeGapS1.CharPolyAgree Require Import Def.
 From PrimeGapS1 Require Import Witness_PencilDet.
+From PrimeGapS1 Require Import Witness_PencilClean.   (* D_pencil_int_value alias *)
 From PrimeGapS1 Require Import CertL2 CertPencilDef.
 From PrimeGapS1 Require Import CRTPencilChecksProof.
 
@@ -286,45 +294,23 @@ Qed.
 (* ================================================================== *)
 (*  Hadamard bounds — `2 * |det - shipped| < crt_product_710`.         *)
 (*                                                                      *)
-(*  The 710 Uint63 primes give a product of ~44730 bits.  The two       *)
-(*  determinants are 2044 and 31131 bits respectively; their            *)
-(*  values mod-equal the shipped literals (proved per-prime above),    *)
-(*  so |diff| <= 2 * max(|a|, |b|) is bounded by either's Hadamard      *)
-(*  bound + a tiny margin.                                              *)
-(*                                                                      *)
-(*  We give an explicit bound on |det_M_int| as a hard-coded             *)
-(*  literal (the value computed by FLINT, plus 1 to avoid off-by-one   *)
-(*  edge cases) and prove `|det_M_int - det_M_value| < bound` by       *)
-(*  vm_compute on the literal differences.                              *)
+(*  The 710 Uint63 primes give a product of ~21300 bits.  After the    *)
+(*  clean-pencil refactor:                                              *)
+(*    - det_M1_int    is 2044 bits, Hadamard bound ~ 6000  bits         *)
+(*    - D_pencil_int  is 2613 bits, Hadamard bound ~ 5830  bits         *)
+(*  so both fit comfortably under crt_product_710 with massive          *)
+(*  headroom — no prime extension is required.                          *)
 (* ================================================================== *)
-
-(* Numerical bound check: 2 * |diff_M1| < crt_product_710.
-   Since the per-prime check has already established that the two
-   values agree mod every prime, the diff is provably 0 once we have
-   the Hadamard bound below.  The bound is verified by vm_compute on
-   `Z.abs det_M1_int_value`, then compared to crt_product_710. *)
-
-Definition hadamard_check_M1 : bool :=
-  Z.ltb (2 * (Z.abs det_M1_int_value + 1)) crt_product_710.
-
-Lemma hadamard_check_M1_true : hadamard_check_M1 = true.
-Proof. vm_compute. reflexivity. Qed.
-
-(* NOTE: the pencil determinant is ~31131 bits, but the product of the
-   710 shipped Uint63 primes is only ~21300 bits, so 2*|D_pencil_int_value|
-   exceeds crt_product_710 and the 1-coefficient CRT lift cannot close
-   `D_pencil_int = D_pencil_int_value` with the current prime set.
-   Closing it requires ~330 additional primes (a ~25-min vm_compute
-   recompile of CRTPencilChecksProof.v + a new bound check).  The
-   det_M1_int side (2044 bits) closes cleanly below. *)
 
 (* M1_int Hadamard bound — split into a sibling file `CRTPencilM1Bound.v`
    because the Qed-time kernel re-verification of these lemmas in this
    compilation unit was non-terminating (>30 min and growing RAM).  In
    isolation in `CRTPencilM1Bound.v` it compiles in ~10 seconds.  The
    underlying cause is not yet diagnosed but reproduces consistently
-   here. *)
+   here.  Same applies to the pencil Hadamard bound, in
+   `CRTPencilPencilBound.v`. *)
 From PrimeGapS1 Require Import CRTPencilM1Bound.
+From PrimeGapS1 Require Import CRTPencilPencilBound.
 
 (* ================================================================== *)
 (*  Assembly: lift per-prime divisibility + Hadamard bound to Z.       *)
@@ -356,11 +342,29 @@ Proof.
     unfold a, b in *. lia.
 Qed.
 
-(* D_pencil_int_eq lives in CRTPencilCheckExt.v: it uses the
-   1210-prime extension `crt_primes_pencil` (710 mainline + 500
-   extras) to close the Hadamard bound, which the 710-prime product
-   alone cannot bound (D_pencil_int is ~31131 bits, crt_product_710
-   is only ~21300 bits). *)
+Theorem D_pencil_int_eq : D_pencil_int = D_pencil_int_value.
+Proof.
+  set (a := D_pencil_int).
+  set (b := D_pencil_int_value).
+  cut ((a - b)%Z = 0%Z); [unfold a, b; lia|].
+  apply (small_multiple_zero _ crt_product_710).
+  - unfold crt_product_710.
+    apply all_primes_divide_product.
+    + exact crt_primes_710_NoDup.
+    + exact crt_primes_710_all_prime.
+    + intros pz Hpz. apply List.in_map_iff in Hpz.
+      destruct Hpz as [p [Hpeq Hin]]. subst pz.
+      exact (per_prime_div_pencil p Hin).
+  - exact crt_product_710_pos.
+  - apply Z.le_lt_trans with
+      (2 * fl_coeff_bound 42 (max_abs_entry pencil_mat_int) +
+       2 * Z.abs D_pencil_int_value)%Z;
+      [|exact crt_bound_pencil_sufficient].
+    have HA := D_pencil_int_abs_bound.
+    have Hsub : (Z.abs (a - b) <= Z.abs a + Z.abs b)%Z.
+    { have := Z.abs_triangle a (-b). by rewrite Z.abs_opp -Z.add_opp_r. }
+    unfold a, b in *. lia.
+Qed.
 
 (* Restore expand strategy on names used by downstream files so that
    mathcomp elaboration (e.g. in CertPencil.v) can fold/unfold these

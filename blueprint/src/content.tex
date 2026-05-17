@@ -924,25 +924,37 @@ boilerplate).
 A second, independent proof of the eigenvalue bound is shipped on
 the \texttt{quad} git branch (headline theorem
 \texttt{maynard\_M105\_certified\_pencil} in
-\texttt{theories/S1/CertPencil.v}). Instead of comparing the full
-$43$-coefficient \texttt{charpoly\_int} against the FLINT-shipped
-polynomial via CRT (Chapter~\ref{ch:crt}), the alternative uses the
-\emph{pencil identity}
+\texttt{theories/S1/CertPencil.v}, $\sim 1800$ quad-specific lines
+of code across $\sim 12$ files, $\sim 30$--$45$~min fresh compile).
+Instead of comparing the full $43$-coefficient \texttt{charpoly\_int}
+against the FLINT-shipped polynomial via CRT
+(Chapter~\ref{ch:crt}), the alternative uses the \emph{pencil
+identity}
 \[
 \det(\lambda \cdot M_1 - M_2) =
 \det(M_1) \cdot \chi_{M_1^{-1}M_2}(\lambda)
 \]
 and a one-coefficient CRT lift on the two integer determinants
-$\det(M_1^{int})$ and $\det(4 \cdot D_{M_2} \cdot M_1^{int} -
-105 \cdot D_{M_1} \cdot M_2^{int})$. The signs of those two
+$\det(M_1^{int})$ and $\det(\texttt{pencil\_int\_clean})$, where
+\[
+\texttt{pencil\_int\_clean}[i,j] :=
+D_{\mathrm{pencil}}^{\mathrm{clean}}
+\cdot \bigl(4 \cdot M_{1,\mathrm{rat}}[i,j]
+       - 105 \cdot M_{2,\mathrm{rat}}[i,j]\bigr),
+\]
+with $D_{\mathrm{pencil}}^{\mathrm{clean}}$ the LCM of the
+denominators of $4 M_1 - 105 M_2$ (689~bits, roughly half of
+$D_{M_1} \cdot D_{M_2} = 1368$~bits). The resulting integer
+determinant is $\sim 2613$~bits, comfortably under the $\sim
+21300$~bit product of the same $710$-prime CRT set used for the
+$M_1$ determinant.  (The earlier $4 D_{M_2} M_1 - 105 D_{M_1} M_2$
+formulation produced a $\sim 31131$-bit determinant requiring a
+$1210$-prime extended product.)  The signs of those two
 determinants then give $\chi_{A_{\mathrm{rat}}}(4/105) < 0$ directly,
 and the same IVT / realalg closing step yields the eigenvalue. The
-alternative requires a 1210-prime CRT product (vs.\ 710 on the main
-route) but a single-coefficient comparison per prime, and runs in
-roughly twice the wall-clock time of the main route. The branch is
-kept as a worked demonstration that the pencil-determinant approach
-is mechanizable; the main-branch Sturm/IVT proof is the canonical
-one.
+branch is kept as a worked demonstration that the pencil-determinant
+approach is mechanizable; the main-branch Sturm/IVT proof is the
+canonical one.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

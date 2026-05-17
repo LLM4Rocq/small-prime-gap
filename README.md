@@ -73,22 +73,29 @@ needed by the IVT.
   realalg polynomial to localise the eigenvalue above `4/105`. About
   600 quad-specific LOC across 9 files, ~30-50 min fresh compile.
 * **`quad` branch (alternative)** -- uses Agent A's pencil identity
-  `det(λM₁ − M₂) = det(M₁) · char_poly(M₁⁻¹M₂)(λ)` and a 1210-prime CRT
+  `det(λM₁ − M₂) = det(M₁) · char_poly(M₁⁻¹M₂)(λ)` and a 710-prime CRT
   lift on the two integer determinants `det(M1_int)` and
-  `det(4·D_M2·M1_int − 105·D_M1·M2_int)` to derive
+  `det(pencil_int_clean)` (the **clean** integer pencil:
+  `pencil_int_clean := D_pencil_clean · (4·M1_rat − 105·M2_rat)` scaled
+  through the LCM `D_pencil_clean` of the denominators of
+  `4·M1_rat − 105·M2_rat`, ~half of `D_M1·D_M2`) to derive
   `(char_poly A_rat).[4/105] < 0` directly, then closes via IVT on the
   realalg lift.  Headline theorem: `maynard_M105_certified_pencil` in
-  `theories/S1/CertPencil.v`.  About 2400 quad-specific LOC across 18
-  files, ~50-85 min fresh compile.
+  `theories/S1/CertPencil.v`.  About 1800 quad-specific LOC across 12
+  files, ~30-45 min fresh compile.
 
 | Route | Headline | Files | LOC | Compile |
 |-------|----------|-------|-----|---------|
 | `main` | `maynard_M105_certified`        | 9 quad files  | ~600  | ~30-50 min |
-| `quad` | `maynard_M105_certified_pencil` | 18 quad files | ~2400 | ~50-85 min |
+| `quad` | `maynard_M105_certified_pencil` | 14 quad files | ~1800 | ~30-45 min |
 
 The `main` route is the canonical proof; the `quad` route demonstrates
-that the pencil-determinant approach is mechanizable but is roughly 4x
-larger and slower than the direct Sturm route.
+that the pencil-determinant approach is mechanizable.  After the
+clean-pencil refactor it is roughly 3× the size of the main route at
+comparable compile time; the original 1210-prime / `4·D_M2·M1 −
+105·D_M1·M2` formulation inflated the pencil determinant to 31131 bits
+(vs.\ 2613 in the clean form), which required a 1210-prime CRT product
+and ~50–85 min of compile.
 
 ## Repository layout and disclaimer
 Some proof scripts are still quite clumsy, and not yet on par with the expected standards of the libraries they are built upon. Here is the generated layout description:

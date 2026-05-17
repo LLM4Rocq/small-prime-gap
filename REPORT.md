@@ -269,21 +269,33 @@ Specialising `M1 := M1_rat`, `M2 := M2_rat`, `l := 4/105` and clearing
 denominators reduces the eigenvalue bound to the sign of two integer
 determinants:
 
-* `det(M1_int)` — 2044 bits, positive — closed via a 710-prime CRT
+* `det(M1_int)` — 2044 bits, positive — closed via the 710-prime CRT
   product (`crt_product_710` in `CRTLift.v`).
-* `det(4·D_M2·M1_int − 105·D_M1·M2_int)` — 31131 bits, negative —
-  closed via a 1210-prime extended product `crt_product_pencil`
-  (`CRTPencilExtraPrimes.v` + `CRTPencilExtraPrimesProof.v`).
+* `det(pencil_int_clean)` — 2613 bits, negative — closed via the
+  **same** 710-prime CRT product.  Here
+  `pencil_int_clean := D_pencil_clean · (4·M1_rat − 105·M2_rat)` is
+  the *clean* integer pencil: `D_pencil_clean` is the LCM of the
+  denominators of `4·M1_rat − 105·M2_rat` (689 bits, roughly half of
+  `D_M1·D_M2` = 1368 bits), so the resulting determinant is 2613 bits
+  rather than the 31131 bits of the naively scaled
+  `4·D_M2·M1 − 105·D_M1·M2`.  The per-entry cross-check
+  `D_M1·D_M2·pencil_int_clean[i,j] =
+  D_pencil_clean·(4·D_M2·M1_int[i,j] − 105·D_M1·M2_int[i,j])` is
+  closed by a single 1764-cell `vm_compute` Qed in
+  `PencilCleanGrid.v`.
 
-Both comparisons run a 1-coefficient `vm_compute` per prime (vs. the
-main route's 43-coefficient comparison) and a Hadamard-style bound on
-`|det|` (`CRTPencilHadamardGeneric.v` + the per-matrix
-specialisations). The remaining steps (IVT / realalg / eigenvalue)
-are identical to the main route.
+Both determinant comparisons run a 1-coefficient `vm_compute` per
+prime (vs. the main route's 43-coefficient comparison) and a
+Hadamard-style bound on `|det|` (`CRTPencilHadamardGeneric.v` + the
+per-matrix specialisations). The remaining steps (IVT / realalg /
+eigenvalue) are identical to the main route.
 
-Trade-offs: about 4× the LOC and ~2× the fresh compile time relative
-to the main route. The `quad` branch is kept as a worked alternative
-that demonstrates the pencil approach is mechanizable; it is not the
+Trade-offs: about 3× the LOC at comparable compile time relative to
+the main route, after the clean-pencil refactor.  The earlier
+`4·D_M2·M1 − 105·D_M1·M2` formulation required a 1210-prime CRT
+product (710 mainline + 500 extras) and roughly doubled the compile
+time.  The `quad` branch is kept as a worked alternative that
+demonstrates the pencil approach is mechanizable; it is not the
 canonical proof.
 
 ## 3. The Rocq tree, file by file

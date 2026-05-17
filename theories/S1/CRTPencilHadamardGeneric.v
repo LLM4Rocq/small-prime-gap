@@ -10,7 +10,9 @@
      - a `det_eq_nth` rewrite linking D to `nth 0 (char_poly_int M)`.
 
    The two specialisations (M = M1_int with crt_product_710,
-   M = pencil_mat_int with crt_product_pencil) then drop to ~10-line
+   M = pencil_mat_int with crt_product_710 — same product after the
+   clean-pencil refactor, since the clean pencil's 2613-bit determinant
+   fits in the 710-prime ~21300-bit headroom) then drop to ~10-line
    wrappers around `apply gen_*` + the shipped vm_compute equalities.
    ================================================================== *)
 

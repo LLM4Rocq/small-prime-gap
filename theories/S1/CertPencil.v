@@ -7,16 +7,15 @@
    Strategy:
      1. Take precomputed integer determinants
           det_M1_int_value  := det(M1_int)            (positive)
-          D_pencil_int_value := det(4*D_M2*M1_int - 105*D_M1*M2_int)
-                                                       (negative)
-        shipped as Z literals in Witness_PencilDet.v.
+          D_pencil_int_value := det(pencil_int_clean)  (negative,
+                          = D_pencil_clean * (4*M1_rat - 105*M2_rat)
+                          scaled to integers).
 
      2. Close `det_M1_int = det_M1_int_value` and
         `D_pencil_int = D_pencil_int_value` via per-prime CRT lifts
-        (CRTPencilCheck.v + CRTPencilCheckExt.v) over 710 / 1210
-        Uint63 primes plus the Hadamard coefficient bound
-        (CRTPencilM1Bound.v / CRTPencilPencilBound.v via the generic
-        CRTPencilHadamardGeneric.v).
+        over the SAME 710-prime CRT product (CRTPencilCheck.v) — no
+        prime extension needed thanks to the CLEAN pencil's small
+        determinant size (2613 bits vs. 31131 in the old form).
 
      3. Bridge via Agent A's `det_pencil`:
           \det (l *: M1 - M2) = \det M1 * (char_poly (M1^-1 *m M2)).[l]
@@ -45,11 +44,12 @@ From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge.
 From PrimeGapS1 Require Import CertL2.
 From PrimeGapS1 Require Import DetPencil.        (* Agent A's deliverable: det_pencil *)
 From PrimeGapS1 Require Import Cert.             (* M1_spec_eq_int, M2_spec_eq_int    *)
+From PrimeGapS1 Require Import Witness_PencilDet.       (* det_M1_int_value *)
+From PrimeGapS1 Require Import Witness_PencilClean.     (* pencil_int_clean, D_pencil_int_value *)
 From PrimeGapS1 Require Import CertPencilDef.    (* sealed det_M1_int, D_pencil_int, pencil_mat_int *)
-From PrimeGapS1 Require Import Witness_PencilDet.
-From PrimeGapS1 Require Import CRTPencilCheck.     (* det_M1_int_eq *)
-From PrimeGapS1 Require Import CRTPencilCheckExt.  (* D_pencil_int_eq via 1210-prime extension *)
-From PrimeGapS1 Require AbstractPencilHelper.      (* abstract_pencil_scale -- Require, NOT Import *)
+From PrimeGapS1 Require Import PencilCleanGrid.  (* per-entry cross-check pencil_clean_match_Z *)
+From PrimeGapS1 Require Import CRTPencilCheck.   (* det_M1_int_eq, D_pencil_int_eq -- both over 710 primes *)
+From PrimeGapS1 Require AbstractPencilHelper.    (* pencil_cell_eq -- Require, NOT Import *)
 
 Import GRing.Theory Num.Theory.
 Import order.Order.POrderTheory.
@@ -125,96 +125,10 @@ Qed.
 Lemma M1_int_dim_even : exists k, (42 = k.*2)%nat.
 Proof. by exists 21%nat. Qed.
 
-(* `abstract_pencil_scale` and the scalar `intrM` helper lemmas live in
-   AbstractPencilHelper.v -- separated so their proofs don't walk
-   M1_rat/M2_rat/pencil_mat_int cells (which combinatorially explode
-   memory at concrete 42x42). *)
-
-(* M2_int well-formedness, mirror of M1_int_dim'/wf'. *)
-Lemma M2_int_dim' : mat_dim M2_int = 42%nat.
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma M2_int_rows_42 : forallb (fun row => Nat.eqb (List.length row) 42) M2_int = true.
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma M2_int_wf' : forall i, (i < length M2_int)%coq_nat ->
-  length (List.nth i M2_int []) = 42%nat.
-Proof. by move=> i Hi; move: M2_int_rows_42; rewrite List.forallb_forall =>
-  /(_ _ (List.nth_In _ _ Hi)) /Nat.eqb_eq. Qed.
-
-(* List-level helpers used in pencil_mat_int_{dim,wf}. *)
-Lemma length_vadd_eq (xs ys : list Z) :
-  length xs = length ys -> length (vadd xs ys) = length xs.
-Proof.
-elim: xs ys => [|x xs IH] [|y ys] //= [Hlen]; rewrite IH //.
-Qed.
-
-Lemma length_vscale (c : Z) (xs : list Z) : length (vscale c xs) = length xs.
-Proof. by rewrite /vscale List.length_map. Qed.
-
-Lemma nth_madd_eq (A B : mat) (i : nat) :
-  length A = length B ->
-  List.nth i (madd A B) nil = vadd (List.nth i A nil) (List.nth i B nil).
-Proof.
-elim: A B i => [|a A IH] [|b B] [|i] //= Hlen.
-by apply: IH; lia.
-Qed.
-
-Lemma length_madd (A B : mat) :
-  length A = length B ->
-  length (madd A B) = length A.
-Proof.
-elim: A B => [|a A IH] [|b B] //= [Hlen]. by rewrite IH.
-Qed.
-
-(* pencil_mat_int has dim 42 since both summands do. *)
-Lemma pencil_mat_int_dim : mat_dim pencil_mat_int = 42%nat.
-Proof.
-  rewrite /pencil_mat_int /mat_dim.
-  have HM1 : length M1_int = 42%nat by move: M1_int_dim'; unfold mat_dim.
-  have HM2 : length M2_int = 42%nat by move: M2_int_dim'; unfold mat_dim.
-  rewrite length_madd; rewrite /mscale !List.length_map; first by exact: HM1.
-  by rewrite HM1 HM2.
-Qed.
-
-Lemma pencil_mat_int_wf : forall i, (i < length pencil_mat_int)%coq_nat ->
-  length (List.nth i pencil_mat_int []) = 42%nat.
-Proof.
-move=> i Hi.
-have Hwf1 := M1_int_wf'.
-have Hwf2 := M2_int_wf'.
-have HM1_42 : length M1_int = 42%nat by move: M1_int_dim'; unfold mat_dim.
-have HM2_42 : length M2_int = 42%nat by move: M2_int_dim'; unfold mat_dim.
-have HmsM1_42 : length (mscale (BinInt.Z.mul 4 D_M2) M1_int) = 42%nat
-  by rewrite /mscale List.length_map HM1_42.
-have HmsM2_42 : length (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int) = 42%nat
-  by rewrite /mscale List.length_map HM2_42.
-have Hlen_eq : length (mscale (BinInt.Z.mul 4 D_M2) M1_int)
-             = length (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int)
-  by rewrite HmsM1_42 HmsM2_42.
-have Hpenc_42 : length pencil_mat_int = 42%nat
-  by rewrite /pencil_mat_int (length_madd _ _ Hlen_eq) HmsM1_42.
-rewrite /pencil_mat_int (nth_madd_eq _ _ _ Hlen_eq).
-have Hi_M1 : (i < length M1_int)%coq_nat
-  by rewrite Hpenc_42 in Hi; rewrite HM1_42; exact Hi.
-have Hi_M2 : (i < length M2_int)%coq_nat
-  by rewrite Hpenc_42 in Hi; rewrite HM2_42; exact Hi.
-have HrowM1 : length (List.nth i (mscale (BinInt.Z.mul 4 D_M2) M1_int) nil) = 42%nat.
-{ rewrite /mscale.
-  rewrite (List.nth_indep _ nil (vscale (BinInt.Z.mul 4 D_M2) nil));
-    [|rewrite List.length_map; exact Hi_M1].
-  by rewrite List.map_nth length_vscale (Hwf1 i Hi_M1). }
-have HrowM2 : length (List.nth i (mscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) M2_int) nil) = 42%nat.
-{ rewrite /mscale.
-  rewrite (List.nth_indep _ nil (vscale (BinInt.Z.opp (BinInt.Z.mul 105 D_M1)) nil));
-    [|rewrite List.length_map; exact Hi_M2].
-  by rewrite List.map_nth length_vscale (Hwf2 i Hi_M2). }
-rewrite length_vadd_eq; first by exact: HrowM1.
-by rewrite HrowM1 HrowM2.
-Qed.
-
-Lemma char_poly_int_pencil_neq_nil : char_poly_int pencil_mat_int <> nil.
-Proof. unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. Qed.
+(* Note: M2_int_dim'/wf', pencil_mat_int_dim/wf, char_poly_int_*_neq_nil
+   all live in CertPencilDef.v -- vm_compute'd on the shipped 42x42
+   matrix literals (no list-induction proofs required after the move to
+   the clean integer pencil). *)
 
 (* The scaled pencil's det in terms of mat_int_to_rat pencil_mat_int.
    `rewrite D_pencil_int_eq_nth` exposes the nth-of-char_poly_int form
@@ -231,78 +145,61 @@ Proof.
     |exact: M1_int_dim_even].
 Qed.
 
-(* Bridge: K *: (lambda_q *: M1_rat - M2_rat) equals
-   mat_int_to_rat pencil_mat_int 1 42, where K := 105*D_M1*D_M2.
-   Uses [in RHS]/cbv beta zeta tricks to keep the rewrite engine from
-   walking the heavy concrete matrix cells. *)
+(* ==================================================================
+   Section 2b: the rat-level bridge between pencil_int_clean and
+   K *: (lambda_q *: M1_rat - M2_rat), where
+        K := (D_pencil_clean * 105)%:~R.
+   Per-entry consequence of the cross-multiplication identity
+        D_M1 * D_M2 * pencil_int_clean[i,j]
+          = D_pencil_clean * (4*D_M2*M1[i,j] - 105*D_M1*M2[i,j]),
+   shipped via `pencil_clean_match_Z` in PencilCleanGrid.v.
+
+   We work generically through a one-cell scalar identity (proved by
+   the `field` tactic on rationals) and then upgrade to matrices via
+   `apply/matrixP => i j`.  No mathcomp.algebra_tactics needed in this
+   file — the abstract helper lives below.
+   ================================================================== *)
+
+(* The integer scalar K (D_pencil_clean * 105) as a rational, plus a
+   per-cell algebraic identity proved at the scalar level. *)
+Definition K_clean : rat :=
+  (Z_to_int (BinInt.Z.mul D_pencil_clean 105))%:~R.
+
+(* The matrix-level bridge, derived from `AbstractPencilHelper.pencil_cell_eq`
+   cell-by-cell via the per-entry cross-check `pencil_clean_match_Z`. *)
 Lemma pencil_rat_scaled_eq :
-  let K : rat := (Z_to_int (Z.mul (Z.mul 105 D_M1) D_M2))%:~R in
-  K *: (lambda_q *: M1_rat - M2_rat) = mat_int_to_rat pencil_mat_int 1 42.
+  K_clean *: (lambda_q *: M1_rat - M2_rat) =
+  mat_int_to_rat pencil_mat_int 1 42.
 Proof.
-  intro K.
-  set cM1 : rat := (Z_to_int D_M1)%:~R.
-  set cM2 : rat := (Z_to_int D_M2)%:~R.
-  set c105 : rat := (Z_to_int 105)%:~R.
-  set c4 : rat := (Z_to_int 4)%:~R.
-  have HK : K = c105 * cM1 * cM2
-    := AbstractPencilHelper.Z_to_int_mul_mul_intrM_three 105 D_M1 D_M2.
-  have HcM1_ne : cM1 != 0
-    by rewrite /cM1 intr_eq0; apply: Z_to_int_neq0'; discriminate.
-  have HcM2_ne : cM2 != 0
-    by rewrite /cM2 intr_eq0; apply: Z_to_int_neq0'; discriminate.
-  have Hc105_ne : c105 != 0
-    by rewrite /c105 intr_eq0; apply: Z_to_int_neq0'; discriminate.
-  have Hlq : lambda_q = c4 / c105.
-  { rewrite /lambda_q /c4 /c105. reflexivity. }
-  set M1' : 'M[rat]_42 := mat_int_to_rat M1_int 1 42.
-  set M2' : 'M[rat]_42 := mat_int_to_rat M2_int 1 42.
-  have HM1 : M1_rat = cM1^-1 *: M1'.
-  { rewrite /M1_rat /cM1 /M1'. exact: mat_int_to_rat_scale_inv'. }
-  have HM2 : M2_rat = cM2^-1 *: M2'.
-  { rewrite /M2_rat /cM2 /M2'. exact: mat_int_to_rat_scale_inv'. }
-  rewrite HK HM1 HM2 Hlq.
-  rewrite (AbstractPencilHelper.abstract_pencil_scale 42 M1' M2' cM1 cM2 c105 c4
-             HcM1_ne HcM2_ne Hc105_ne).
-  rewrite /pencil_mat_int /M1' /M2'.
-  rewrite (mat_int_to_rat_madd
-             (mscale (Z.mul 4 D_M2) M1_int)
-             (mscale (Z.opp (Z.mul 105 D_M1)) M2_int) 42).
-  - rewrite !mat_int_to_rat_mscale.
-    rewrite /c4 /cM2 /c105 /cM1.
-    have ZM2 : (Z_to_int (4 * D_M2))%:~R = (Z_to_int 4)%:~R * (Z_to_int D_M2)%:~R :> rat
-      := AbstractPencilHelper.Z_to_int_mul_intrM_two _ _.
-    have ZM3 : (Z_to_int (- (105 * D_M1)))%:~R
-             = - ((Z_to_int 105)%:~R * (Z_to_int D_M1)%:~R) :> rat
-      := AbstractPencilHelper.Z_to_int_opp_mul_intrM _ _.
-    rewrite [in RHS]ZM2.
-    rewrite [in RHS]ZM3.
-    rewrite [X in _ = _ + X]scaleNr.
-    reflexivity.
-  - rewrite mat_dim_mscale_eq. exact: M1_int_dim'.
-  - rewrite mat_dim_mscale_eq. exact: M2_int_dim'.
-  - move=> i Hi. rewrite CRTLift.length_mscale in Hi.
-    rewrite (List.map_nth (vscale (4 * D_M2)) M1_int [::] i).
-    unfold vscale.
-    rewrite List.length_map. exact (M1_int_wf' i Hi).
-  - move=> i Hi. rewrite CRTLift.length_mscale in Hi.
-    rewrite (List.map_nth (vscale (- (105 * D_M1))) M2_int [::] i).
-    unfold vscale.
-    rewrite List.length_map. exact (M2_int_wf' i Hi).
+have HD1 : ((Z_to_int D_M1)%:~R : rat) != 0
+  by rewrite intr_eq0; apply: Z_to_int_neq0'; discriminate.
+have HD2 : ((Z_to_int D_M2)%:~R : rat) != 0
+  by rewrite intr_eq0; apply: Z_to_int_neq0'; discriminate.
+have Hcross : forall (i j : 'I_42),
+  BinInt.Z.mul (BinInt.Z.mul D_M1 D_M2)
+    (mat_get pencil_mat_int (nat_of_ord i) (nat_of_ord j)) =
+  BinInt.Z.mul D_pencil_clean
+    (BinInt.Z.sub
+      (BinInt.Z.mul (BinInt.Z.mul 4 D_M2) (mat_get M1_int (nat_of_ord i) (nat_of_ord j)))
+      (BinInt.Z.mul (BinInt.Z.mul 105 D_M1) (mat_get M2_int (nat_of_ord i) (nat_of_ord j)))).
+{ move=> i j. change pencil_mat_int with pencil_int_clean.
+  exact: pencil_clean_match_Z (ltn_ord i) (ltn_ord j). }
+exact: (AbstractPencilHelper.pencil_matrix_bridge 42 M1_int M2_int pencil_mat_int
+          D_M1 D_M2 D_pencil_clean HD1 HD2 Hcross).
 Qed.
 
 Lemma pencil_rat_eq_int_scaled :
   exists (c : rat), 0 < c
    /\ \det (lambda_q *: M1_rat - M2_rat) = c * (Z2rat D_pencil_int).
 Proof.
-  set K : rat := (Z_to_int (Z.mul (Z.mul 105 D_M1) D_M2))%:~R.
+  set K : rat := K_clean.
   have HK_pos : 0 < K.
-  { rewrite /K ltr0z; apply/ltP. by apply: (Pos2Nat.is_pos _). }
+  { rewrite /K /K_clean ltr0z; apply/ltP. by apply: (Pos2Nat.is_pos _). }
   have HK_neq0 : K != 0 by apply: lt0r_neq0.
   exists (K^-1 ^+ 42).
   split.
   - apply: exprn_gt0; rewrite invr_gt0; exact: HK_pos.
   - have Hscale := pencil_rat_scaled_eq.
-    cbv beta zeta in Hscale.
     have Hdet : \det (K *: (lambda_q *: M1_rat - M2_rat))
               = \det (mat_int_to_rat pencil_mat_int 1 42)
       by rewrite Hscale.
@@ -316,9 +213,6 @@ Proof.
     clear -HK_neq0 HK42_neq0.
     by rewrite mulrA mulrA -exprMn divff // expr1n mul1r.
 Qed.
-
-Lemma char_poly_int_M1_int_neq_nil : char_poly_int M1_int <> nil.
-Proof. unfold char_poly_int. destruct (fl_loop _ _ _ _ _ _ _); discriminate. Qed.
 
 Lemma det_M1_rat_aux :
   \det (mat_int_to_rat M1_int 1 42) = Z2rat det_M1_int.
