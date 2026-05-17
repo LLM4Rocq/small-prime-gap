@@ -39,7 +39,7 @@ Import ListNotations.
 From mathcomp Require Import all_boot all_algebra.
 From mathcomp.real_closed Require Import polyrcf realalg.
 
-From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly Bridge.
+From PrimeGapS1 Require Import IntMat IntPoly Witness CharPoly.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge.
 From PrimeGapS1 Require Import CertL2.
 From PrimeGapS1 Require Import DetPencil.        (* Agent A's deliverable: det_pencil *)

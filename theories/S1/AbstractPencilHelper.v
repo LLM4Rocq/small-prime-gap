@@ -19,7 +19,7 @@
 From Stdlib Require Import ZArith.
 From mathcomp Require Import all_boot all_algebra.
 From mathcomp.algebra_tactics Require Import ring.
-From PrimeGapS1 Require Import IntMat CharPoly Bridge.   (* Z_to_int + mat_get + mat_int_to_rat *)
+From PrimeGapS1 Require Import IntMat CharPoly.   (* Z_to_int + mat_get + mat_int_to_rat *)
 
 Import GRing.Theory.
 Local Open Scope ring_scope.

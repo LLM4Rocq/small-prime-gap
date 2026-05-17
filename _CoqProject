@@ -3,7 +3,6 @@ theories/S1/Recompose.v
 theories/S1/Witness.v
 theories/S1/IntPoly.v
 theories/S1/IntMat.v
-theories/S1/SignChain.v
 theories/S1/CharPoly.v
 theories/S1/ModularArith.v
 theories/S1/CharPolyAgree/Def.v
@@ -14,8 +13,6 @@ theories/S1/CharPolyAgree/Chunk_3.v
 theories/S1/CharPolyAgree/Chunk_4.v
 theories/S1/CharPolyAgree/Chunk_5.v
 theories/S1/CharPolyAgree.v
-theories/S1/Bridge.v
-theories/S1/CertL1.v
 theories/S1/CharPolyScale.v
 theories/S1/CRTCheck.v
 theories/S1/Fermat.v
