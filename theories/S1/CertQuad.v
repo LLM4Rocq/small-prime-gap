@@ -44,7 +44,7 @@ From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge Cert.
    to the mathcomp algebra hierarchy rather than to the stdlib's
    `Stdlib.Numbers.NatInt.NZRing` machinery (which the ZArith import
    above otherwise clobbers). *)
-From mathcomp.algebra_tactics Require Import ring lra.
+From mathcomp.algebra_tactics Require Import ring.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -56,7 +56,7 @@ Unset Printing Implicit Defensive.
 
 Local Open Scope Z_scope.
 
-(* The single positive denominator equals the lcm of all `v_witness` denominators. *)
+(* Positive denominator: lcm of all `v_witness` denominators. *)
 Definition v_den : Z :=
   List.fold_left (fun acc p => Z.lcm acc (snd p)) v_witness 1.
 
@@ -131,17 +131,6 @@ Definition quad_spec (M_spec : nat -> nat -> rat) : rat :=
 Notation quad_M1_spec := (quad_spec M1_spec_ij) (only parsing).
 Notation quad_M2_spec := (quad_spec M2_spec_ij) (only parsing).
 
-(* The strict Rayleigh-quotient bound at v_witness, against the
-   paper-form spec matrices.
-
-       4 * v^T M1 v  <  105 * v^T M2 v.
-
-   This is the alt branch's headline analytic statement (modulo
-   Maynard's Lemma 8.3, which is the paper-side step bridging
-   M_{105} > 4 to `sup_F 105 * J_{105}(F)/I_{105}(F) > 4`). *)
-Definition rayleigh_strict_bound : Prop :=
-  4%:Q * quad_spec M1_spec_ij  <  105%:Q * quad_spec M2_spec_ij.
-
 (* ================================================================= *)
 (*  Section 5 — Z->rat bridge for the Rayleigh-quotient sum           *)
 (* ================================================================= *)
@@ -166,7 +155,8 @@ Proof. by rewrite /Z2rat Z_to_int_0. Qed.
 Lemma Z2rat_row_dot_eq_sum (row v : list Z) (n : nat) :
   length v = n -> length row = n ->
   Z2rat (row_dot row v) =
-  \sum_(i < n) Z2rat (List.nth i row BinInt.Z0) * Z2rat (List.nth i v BinInt.Z0).
+  \sum_(i < n) Z2rat (List.nth i row BinInt.Z0)
+             * Z2rat (List.nth i v BinInt.Z0).
 Proof.
   elim: n row v => [|n IH] row v Hv Hr.
   - destruct row; destruct v; try discriminate.
@@ -215,12 +205,12 @@ Proof.
   rewrite /Mvec /mat_vec_mul.
   have Hr_len : length (List.nth (nat_of_ord i) M nil) = 42%nat.
   { apply: HM_cols. exact: (ltn_ord i). }
-  have Hnth_map : List.nth i (List.map (fun row => row_dot row v_num) M) BinInt.Z0 =
-                  row_dot (List.nth i M nil) v_num.
+  have Hnth_map :
+       List.nth i (List.map (fun row => row_dot row v_num) M) BinInt.Z0
+     = row_dot (List.nth i M nil) v_num.
   { rewrite (List.nth_indep _ BinInt.Z0 (row_dot nil v_num)); last by
       rewrite List.length_map HM_rows; apply/ltP; exact: (ltn_ord i).
-    rewrite (List.map_nth (fun row => row_dot row v_num) M nil i).
-    by []. }
+    by rewrite (List.map_nth (fun row => row_dot row v_num) M nil i). }
   rewrite Hnth_map.
   rewrite (Z2rat_row_dot_eq_sum (n := 42) Hv_len Hr_len).
   rewrite GRing.mulr_sumr.
@@ -269,12 +259,6 @@ Proof. by vm_compute. Qed.
 Lemma v_den_neq0_rat : Z2rat v_den != 0.
 Proof. by apply: Z_to_int_pos_rat_neq0; exact: v_den_pos. Qed.
 
-Lemma D_M1_neq0_rat : Z2rat D_M1 != 0.
-Proof. by apply: Z_to_int_pos_rat_neq0; exact: D_M1_pos. Qed.
-
-Lemma D_M2_neq0_rat : Z2rat D_M2 != 0.
-Proof. by apply: Z_to_int_pos_rat_neq0; exact: D_M2_pos. Qed.
-
 (* ================================================================= *)
 (*  Section 7 — Rayleigh-quotient identity for M_spec                 *)
 (* ================================================================= *)
@@ -286,10 +270,7 @@ Proof. by apply: Z_to_int_pos_rat_neq0; exact: D_M2_pos. Qed.
 Lemma quad_cell_identity (dm vd vi mij vj : rat) :
   vd != 0 -> dm != 0 ->
   dm * vd^+2 * (vi / vd * (mij / dm) * (vj / vd)) = vi * mij * vj.
-Proof.
-  move=> Hvd Hdm. rewrite GRing.expr2.
-  field. by apply/andP; split.
-Qed.
+Proof. by move=> Hvd Hdm; rewrite expr2; field; apply/andP. Qed.
 
 (* The full Rayleigh-quotient sum on M_spec_ij decomposes through the
    spec=Z bridge. *)
@@ -352,21 +333,19 @@ Qed.
 (* ================================================================= *)
 
 (* Z2rat is positive on positive Z. *)
-Lemma Z2rat_pos (a : Z) : BinInt.Z.lt BinInt.Z0 a -> (0 : rat) < Z2rat a.
+Lemma Z2rat_pos (a : Z) : BinInt.Z.lt 0 a -> (0 : rat) < Z2rat a.
 Proof.
-  case: a => [//|p _|p Hp]; last by exfalso; lia.
-  rewrite /Z2rat Z_to_int_pos_pos ltr0z.
-  by apply/ltP; apply: Pos2Nat.is_pos.
+  case: a => [//|p _|p Hp]; last by lia.
+  by rewrite /Z2rat Z_to_int_pos_pos ltr0z; apply/ltP; exact: Pos2Nat.is_pos.
 Qed.
 
 Lemma Z2rat_lt (a b : Z) : BinInt.Z.lt a b -> Z2rat a < Z2rat b.
 Proof.
-  move=> Hab.
-  rewrite -subr_gt0.
+  move=> Hab; rewrite -subr_gt0.
   have -> : Z2rat b - Z2rat a = Z2rat (BinInt.Z.sub b a).
-  { rewrite /Z2rat -intrB -Z_to_int_opp -Z_to_int_add.
-    by congr ((Z_to_int _)%:~R); lia. }
-  apply: Z2rat_pos; lia.
+    rewrite /Z2rat -intrB -Z_to_int_opp -Z_to_int_add.
+    by congr ((Z_to_int _)%:~R); lia.
+  by apply: Z2rat_pos; lia.
 Qed.
 
 Lemma rayleigh_witness_holds_rat :
@@ -386,33 +365,30 @@ Proof. by apply: Z2rat_lt; exact: rayleigh_witness_holds. Qed.
    variant). *)
 Section RayleighLift.
 
-Variables (d1Z d2Z : Z) (v q1 q2 : rat) (a b : Z).
-Hypothesis Hd1 : BinInt.Z.lt 0 d1Z.
-Hypothesis Hd2 : BinInt.Z.lt 0 d2Z.
-Hypothesis Hv  : (0 : rat) < v.
-Hypothesis Ha  : Z2rat d1Z * v ^+ 2 * q1 = Z2rat a.
-Hypothesis Hb  : Z2rat d2Z * v ^+ 2 * q2 = Z2rat b.
-Hypothesis Hab : Z2rat (BinInt.Z.mul (BinInt.Z.mul 4 d2Z) a)
-               < Z2rat (BinInt.Z.mul (BinInt.Z.mul 105 d1Z) b).
+Variables (d1Z d2Z a1Z a2Z : Z) (v q1 q2 : rat).
+Hypothesis Hd1  : BinInt.Z.lt 0 d1Z.
+Hypothesis Hd2  : BinInt.Z.lt 0 d2Z.
+Hypothesis Hv   : (0 : rat) < v.
+Hypothesis Ha1  : Z2rat d1Z * v ^+ 2 * q1 = Z2rat a1Z.
+Hypothesis Ha2  : Z2rat d2Z * v ^+ 2 * q2 = Z2rat a2Z.
+Hypothesis Hcmp : Z2rat (4 * d2Z * a1Z) < Z2rat (105 * d1Z * a2Z).
 
 Lemma rayleigh_lift_generic : 4%:Q * q1 < 105%:Q * q2.
 Proof.
-  have Hd1r : (0 : rat) < Z2rat d1Z by apply: Z2rat_pos.
-  have Hd2r : (0 : rat) < Z2rat d2Z by apply: Z2rat_pos.
-  have Hv2  : (0 : rat) < v ^+ 2 by rewrite expr2; exact: mulr_gt0.
-  have Hd12 : (0 : rat) < Z2rat d1Z * Z2rat d2Z by exact: mulr_gt0.
-  have HK   : (0 : rat) < Z2rat d1Z * Z2rat d2Z * v ^+ 2
-    by exact: mulr_gt0.
+  have Hd1r : (0 : rat) < Z2rat d1Z by exact: Z2rat_pos.
+  have Hd2r : (0 : rat) < Z2rat d2Z by exact: Z2rat_pos.
+  have HK   : (0 : rat) < Z2rat d1Z * Z2rat d2Z * v ^+ 2.
+    by rewrite expr2; do !apply: mulr_gt0.
   rewrite -(ltr_pM2r HK).
   have H4   : Z2rat 4   = 4%:Q   by rewrite /Z2rat /=.
   have H105 : Z2rat 105 = 105%:Q by rewrite /Z2rat /=.
   have HLHS : 4%:Q * q1 * (Z2rat d1Z * Z2rat d2Z * v ^+ 2)
-            = Z2rat (BinInt.Z.mul (BinInt.Z.mul 4 d2Z) a).
-    by rewrite !Z2rat_mul -Ha H4; ring.
+            = Z2rat (4 * d2Z * a1Z).
+    by rewrite !Z2rat_mul -Ha1 H4; ring.
   have HRHS : 105%:Q * q2 * (Z2rat d1Z * Z2rat d2Z * v ^+ 2)
-            = Z2rat (BinInt.Z.mul (BinInt.Z.mul 105 d1Z) b).
-    by rewrite !Z2rat_mul -Hb H105; ring.
-  by rewrite HLHS HRHS; exact: Hab.
+            = Z2rat (105 * d1Z * a2Z).
+    by rewrite !Z2rat_mul -Ha2 H105; ring.
+  by rewrite HLHS HRHS; exact: Hcmp.
 Qed.
 
 End RayleighLift.

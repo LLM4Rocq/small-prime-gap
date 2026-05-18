@@ -17,17 +17,16 @@
    downstream is the entry-by-entry `all_match_M{1,2}Z = true` check
    from `MaynardVerify/Def.v` + `MaynardVerify/M2_{0..5}.v`. *)
 
-From Stdlib Require Import ZArith List.
-Import ListNotations.
+From Stdlib Require Import ZArith.
 
 From mathcomp Require Import all_ssreflect all_algebra.
 Import GRing.Theory.
 
-From PrimeGapS1 Require Import IntMat CharPoly Witness.
+From PrimeGapS1 Require Import IntMat Witness.
 From PrimeGapS1 Require Import MaynardVerify MaynardSpec MaynardSpecBridge.
 From PrimeGapS1.MaynardVerify Require Import Def.
 
-Open Scope ring_scope.
+Local Open Scope ring_scope.
 
 Lemma D_M1_pos : Z.lt 0 D_M1. Proof. by vm_compute. Qed.
 Lemma D_M2_pos : Z.lt 0 D_M2. Proof. by vm_compute. Qed.
