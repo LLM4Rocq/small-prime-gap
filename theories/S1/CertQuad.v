@@ -304,8 +304,29 @@ Lemma quad_spec_eq_Z (M_spec : nat -> nat -> rat) (M_int : list (list Z))
                                                Z2rat D_M) :
   Z2rat D_M * Z2rat v_den ^+ 2 * quad_spec M_spec =
   Z2rat (quad M_int v_num).
-Proof. Admitted.  (* OOM-killed under kernel proof-term verification;
-   structurally the proof is: Z2rat_quad_eq_sum + per-cell quad_cell_identity. *)
+Proof.
+  (* The natural proof — `rewrite !mulr_sumr` then `field` on each
+     of the 42*42 cells — OOMs the kernel: the unfolded `field` proof
+     term is duplicated under each `eq_bigr` binder, blowing past the
+     16 GB cgroup limit.
+
+     The fix follows quad's AbstractPencilHelper pattern: factor the
+     per-cell algebraic identity (Section 7's `quad_cell_identity`,
+     already Qed-sealed) so the bigop walk references it by NAME
+     instead of inlining a fresh `field` proof term per cell.  We
+     also constrain the `mulr_sumr` rewrite to [LHS] to keep
+     unification cheap. *)
+  rewrite (Z2rat_quad_eq_sum HM_rows HM_cols v_num_length).
+  rewrite /quad_spec.
+  rewrite [LHS]mulr_sumr.
+  apply: eq_bigr => i _.
+  rewrite [LHS]mulr_sumr.
+  apply: eq_bigr => j _.
+  rewrite (Hbridge i j (ltn_ord i) (ltn_ord j)) /v_rat.
+  apply: quad_cell_identity.
+  - exact: v_den_neq0_rat.
+  - by apply: Z_to_int_pos_rat_neq0; exact: HD_M_pos.
+Qed.
 
 (* Specialised to M1, M2 with the explicit spec=Z bridge. *)
 Lemma quad_M1_spec_eq_Z :
@@ -352,14 +373,61 @@ Lemma rayleigh_witness_holds_rat :
   Z2rat (4 * D_M2 * num_M1) < Z2rat (105 * D_M1 * num_M2).
 Proof. by apply: Z2rat_lt; exact: rayleigh_witness_holds. Qed.
 
+(* Generic Rayleigh-quotient lift: from two scaled-quad identities
+   `Z2rat d_k * v^2 * q_k = Z2rat a_k` (k = 1, 2) and the integer
+   inequality `4*d2*a1 < 105*d1*a2`, deduce `4*q1 < 105*q2`.
+
+   This is the AbstractPencilHelper trick from the quad branch: we
+   abstract over `q1`, `q2`, `v`, the denominators, and the
+   numerators, so the heavy `ring` calls inside operate on tiny
+   abstract scalars instead of the concrete `quad_spec M{1,2}_spec_ij`
+   bigops.  The proof term stays small enough for kernel verification
+   (avoiding the 16 GB OOM that hit the inline `field`/`ring`
+   variant). *)
+Section RayleighLift.
+
+Variables (d1Z d2Z : Z) (v q1 q2 : rat) (a b : Z).
+Hypothesis Hd1 : BinInt.Z.lt 0 d1Z.
+Hypothesis Hd2 : BinInt.Z.lt 0 d2Z.
+Hypothesis Hv  : (0 : rat) < v.
+Hypothesis Ha  : Z2rat d1Z * v ^+ 2 * q1 = Z2rat a.
+Hypothesis Hb  : Z2rat d2Z * v ^+ 2 * q2 = Z2rat b.
+Hypothesis Hab : Z2rat (BinInt.Z.mul (BinInt.Z.mul 4 d2Z) a)
+               < Z2rat (BinInt.Z.mul (BinInt.Z.mul 105 d1Z) b).
+
+Lemma rayleigh_lift_generic : 4%:Q * q1 < 105%:Q * q2.
+Proof.
+  have Hd1r : (0 : rat) < Z2rat d1Z by apply: Z2rat_pos.
+  have Hd2r : (0 : rat) < Z2rat d2Z by apply: Z2rat_pos.
+  have Hv2  : (0 : rat) < v ^+ 2 by rewrite expr2; exact: mulr_gt0.
+  have Hd12 : (0 : rat) < Z2rat d1Z * Z2rat d2Z by exact: mulr_gt0.
+  have HK   : (0 : rat) < Z2rat d1Z * Z2rat d2Z * v ^+ 2
+    by exact: mulr_gt0.
+  rewrite -(ltr_pM2r HK).
+  have H4   : Z2rat 4   = 4%:Q   by rewrite /Z2rat /=.
+  have H105 : Z2rat 105 = 105%:Q by rewrite /Z2rat /=.
+  have HLHS : 4%:Q * q1 * (Z2rat d1Z * Z2rat d2Z * v ^+ 2)
+            = Z2rat (BinInt.Z.mul (BinInt.Z.mul 4 d2Z) a).
+    by rewrite !Z2rat_mul -Ha H4; ring.
+  have HRHS : 105%:Q * q2 * (Z2rat d1Z * Z2rat d2Z * v ^+ 2)
+            = Z2rat (BinInt.Z.mul (BinInt.Z.mul 105 d1Z) b).
+    by rewrite !Z2rat_mul -Hb H105; ring.
+  by rewrite HLHS HRHS; exact: Hab.
+Qed.
+
+End RayleighLift.
+
 (* The headline rat-level Rayleigh-quotient inequality:
        4 * v^T M1 v  <  105 * v^T M2 v
    on the paper-form spec matrices. *)
 Lemma rayleigh_lt_main : 4%:Q * quad_spec M1_spec_ij <
                          105%:Q * quad_spec M2_spec_ij.
-Proof. Admitted.  (* OOM-killed under kernel verification; structurally
-   the proof clears denominators against quad_M{1,2}_spec_eq_Z and
-   reduces to rayleigh_witness_holds_rat. *)
+Proof.
+  exact: (rayleigh_lift_generic D_M1_pos D_M2_pos
+                                (Z2rat_pos v_den_pos)
+                                quad_M1_spec_eq_Z quad_M2_spec_eq_Z
+                                rayleigh_witness_holds_rat).
+Qed.
 
 (* ================================================================= *)
 (*  Section 9 — headline theorem                                      *)
