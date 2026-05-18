@@ -77,17 +77,16 @@ not re-formalise this analytic step. The project's scope is exactly to
 replace the Mathematica computation, not to re-formalise Maynard's paper.
 
 \paragraph{Status.}
-On this branch the rat-level lift
-$\texttt{CertQuad.rayleigh\_lt\_main}$ (a thin algebraic shim that
-clears denominators against the bigop $\leftrightarrow$ Z bridge
-$\texttt{quad\_spec\_eq\_Z}$ and lifts the integer Rayleigh
-inequality $\texttt{rayleigh\_witness\_holds}$ via
-$\texttt{Z2rat\_lt}$) is currently \texttt{Admitted}, blocked by
-kernel proof-term verification under a 16~GB host cgroup limit; the
-underlying integer Rayleigh inequality and its positivity companion
-are both axiom-free \vmcompute{} \Qed{}s. See the auditor's
-checklist and \texttt{CertQuad.v}'s header comment for the refactor
-path.
+The headline theorem and every intermediate lemma is \Qed{} and
+\texttt{Print Assumptions} reports \emph{Closed under the global
+context}. The proof chain is axiom-free end-to-end: no
+\texttt{Admitted}, no \texttt{Axiom}, no \texttt{Parameter}
+anywhere in \texttt{theories/S1/}. Because every reduction is in
+$\Z$ arithmetic (\vmcompute{} on \texttt{list (list Z)} matrices
+and \texttt{list (Z * Z)} vectors), the headline does not even pull
+in the native 63-bit primitive-integer interface: no
+\texttt{PrimInt63}, no \texttt{Uint63Axioms}, no \texttt{CarryType}
+appear in the reported assumptions.
 
 \paragraph{How to read this blueprint.}
 Each chapter mirrors a Rocq source file or a small group of related
@@ -685,6 +684,7 @@ bigop in Lemma~\ref{lem:quad_spec_eq_Z}.
 
 \begin{lemma}[Bigop $\leftrightarrow$ Z bridge]\label{lem:quad_spec_eq_Z}
 \rocq{PrimeGapS1.CertQuad.quad_spec_eq_Z}
+\rocqok
 \uses{lem:Z2rat_quad, lem:quad_cell_identity,
       thm:M1_match, thm:M2_match,
       thm:M1_spec_rat_eq, thm:M2_spec_rat_eq, lem:M1_spec_eq_int,
@@ -701,23 +701,54 @@ $42 \times 42$ matrix,
    \texttt{Z2rat}(\texttt{quad}\,M_{\mathrm{int}}\,\vnum).
 \]
 \end{lemma}
-\begin{proof}
-\textbf{Status: currently \texttt{Admitted}.} Structurally the proof
-is a single application of Lemma~\ref{lem:Z2rat_quad} (to recast the
+\begin{proof}\rocqok
+A single application of Lemma~\ref{lem:Z2rat_quad} (to recast the
 right-hand side as the rat-level bigop on $\texttt{mat\_get}$ /
 $\vnum$) followed by two nested $\texttt{eq\_bigr}$ applications of
 Lemma~\ref{lem:quad_cell_identity} to clear the per-cell
-denominators $D_M$ and $\vden$. The Qed verification OOMs the
-kernel under a 16~GB host cgroup limit when the per-cell
-\texttt{field}-tactic proof term is unfolded under $42 \cdot 42 =
-1764$ nested binders; see \texttt{CertQuad.v} lines 1--32 for the
-refactor path.
+denominators $D_M$ and $\vden$. Qed-sealing the per-cell identity
+keeps the bigop walk referring to it by name instead of inlining a
+fresh \texttt{field} proof term under each of the $42 \cdot 42 =
+1764$ binders, so the proof term stays small for kernel
+verification. The outer $\texttt{mulr\_sumr}$ rewrite is
+restricted to $[LHS]$ to keep unification cheap. \texttt{Print
+Assumptions} reports \emph{Closed under the global context}.
+\end{proof}
+
+\begin{lemma}[Generic Rayleigh lift]\label{lem:rayleigh_lift_generic}
+\rocq{PrimeGapS1.CertQuad.rayleigh_lift_generic}
+\rocqok
+Let $d_1, d_2, a_1, a_2 \in \Z$ with $d_1, d_2 > 0$, $v \in \rat$
+with $v > 0$, and $q_1, q_2 \in \rat$. Suppose
+\[
+\texttt{Z2rat}(d_k) \cdot v^2 \cdot q_k
+   \;=\;
+   \texttt{Z2rat}(a_k)
+\quad\text{for } k = 1, 2,
+\]
+and the integer comparison
+$\texttt{Z2rat}(4 \cdot d_2 \cdot a_1) < \texttt{Z2rat}(105 \cdot d_1 \cdot a_2)$
+holds. Then $4 \cdot q_1 < 105 \cdot q_2$ in $\rat$.
+\end{lemma}
+\begin{proof}\rocqok
+Multiply both sides of the goal by the strictly positive scalar
+$\texttt{Z2rat}(d_1) \cdot \texttt{Z2rat}(d_2) \cdot v^2$
+(monotonicity of $<$ under positive multiplication, $\texttt{ltr\_pM2r}$);
+then $\texttt{ring}$ on the two scaled-quad hypotheses rewrites
+each side into $\texttt{Z2rat}(4 \cdot d_2 \cdot a_1)$ and
+$\texttt{Z2rat}(105 \cdot d_1 \cdot a_2)$ respectively, and the
+result is the integer comparison hypothesis. Abstracting over
+$q_1, q_2, v$ and the four $\Z$ scalars keeps the two \texttt{ring}
+calls operating on tiny abstract scalars rather than on the
+concrete \texttt{quad\_spec} bigops, so the proof term stays small.
+\texttt{Print Assumptions}: \emph{Closed under the global context}.
 \end{proof}
 
 \begin{theorem}[Strict Rayleigh-quotient bound at the witness]
 \label{thm:rayleigh_lt_main}
 \rocq{PrimeGapS1.CertQuad.rayleigh_lt_main}
-\uses{lem:quad_spec_eq_Z, thm:rayleigh_holds}
+\rocqok
+\uses{lem:quad_spec_eq_Z, lem:rayleigh_lift_generic, thm:rayleigh_holds, thm:rayleigh_pos}
 \[
    4 \cdot \texttt{quad\_spec}\,\texttt{M1\_spec\_ij}
    \;<\;
@@ -725,23 +756,25 @@ refactor path.
    \quad\text{in }\rat.
 \]
 \end{theorem}
-\begin{proof}
-\textbf{Status: currently \texttt{Admitted}.} The two specialisations
-of Lemma~\ref{lem:quad_spec_eq_Z} at $(M_{\mathrm{spec}},
+\begin{proof}\rocqok
+A one-line \texttt{exact:} application of
+Lemma~\ref{lem:rayleigh_lift_generic} to the two specialisations
+$\texttt{quad\_M\{1,2\}\_spec\_eq\_Z}$ of
+Lemma~\ref{lem:quad_spec_eq_Z} (at $(M_{\mathrm{spec}},
 M_{\mathrm{int}}, D_M) = (\texttt{M1\_spec\_ij}, M_1^{\mathrm{int}},
-\DMone)$ and the $M_2$ analogue (discharged by
-Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int}) let
-us clear the common denominator $\texttt{Z2rat}(\DMl) \cdot
-\texttt{Z2rat}(\vden)^2$ on both sides. The residual integer
-inequality is Theorem~\ref{thm:rayleigh_holds}, lifted to $\rat$ via
-$\texttt{Z2rat\_lt}$. This shim is Admitted under the same kernel
-proof-term verification block as Lemma~\ref{lem:quad_spec_eq_Z}.
+\DMone)$ and the $M_2$ analogue, discharged by
+Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int}),
+together with $\texttt{rayleigh\_witness\_holds\_rat}$ — the
+integer Rayleigh inequality of Theorem~\ref{thm:rayleigh_holds}
+lifted to $\rat$ by $\texttt{Z2rat\_lt}$. \texttt{Print
+Assumptions}: \emph{Closed under the global context}.
 \end{proof}
 
 \section{The headline}
 
 \begin{theorem}[End-to-end Rayleigh-quotient certification]\label{thm:M105}
 \rocq{PrimeGapS1.CertQuad.maynard_M105_certified_alt}
+\rocqok
 \uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:rayleigh_lt_main}
 The conjunction
 \[
@@ -762,14 +795,15 @@ The conjunction
 where $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin $\Z \to \rat$ embedding.
 \end{theorem}
-\begin{proof}
+\begin{proof}\rocqok
 A three-way \texttt{split}: the two composed per-matrix identities
 are discharged by Lemmas~\ref{lem:M1_spec_eq_int}
 and~\ref{lem:M2_spec_eq_int} (paper-form spec entry equals FLINT
 integer entry over the common denominator), and the third conjunct
 is Theorem~\ref{thm:rayleigh_lt_main} (the rat-level Rayleigh
-inequality, currently Admitted). Modulo Maynard's Lemma~8.3
-(paper-side), this entails $\Mk[105] > 4$.
+inequality). Modulo Maynard's Lemma~8.3 (paper-side), this entails
+$\Mk[105] > 4$. \texttt{Print Assumptions}: \emph{Closed under the
+global context}.
 \end{proof}
 
 \begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_eq_int}
@@ -813,14 +847,12 @@ place of their $\Mone$ counterparts.
 
 \paragraph{Reading.}
 A reviewer who trusts \emph{only Rocq's kernel} obtains, from
-Theorem~\ref{thm:M105} (plus the WIP $\rat$-level shim noted in
-Theorem~\ref{thm:rayleigh_lt_main}), a certified strict Rayleigh-
-quotient bound on the paper-form spec matrices at the shipped
-42-entry rational witness vector, together with the closed-form
-match of those matrices to Maynard's specification. A reviewer who
-additionally accepts Maynard's Lemma~8.3 (an Annals-published
-Rayleigh-quotient identity, paper-side) obtains $\Mk[105] > 4$
-end-to-end.
+Theorem~\ref{thm:M105}, a certified strict Rayleigh-quotient bound
+on the paper-form spec matrices at the shipped 42-entry rational
+witness vector, together with the closed-form match of those
+matrices to Maynard's specification. A reviewer who additionally
+accepts Maynard's Lemma~8.3 (an Annals-published Rayleigh-quotient
+identity, paper-side) obtains $\Mk[105] > 4$ end-to-end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Trust base}\label{ch:trust}
@@ -828,15 +860,12 @@ end-to-end.
 \section{What is a Qed and what is paper-side}
 
 \begin{itemize}
-\item All claims of the form $a = b$ in $\Z$ or $\Q$, $a < b$ in
+\item Every claim of the form $a = b$ in $\Z$ or $\Q$, $a < b$ in
   $\Z$ or $\Q$, or membership of a rational in an interval, that
-  appear in the dependency tree of Theorem~\ref{thm:M105} are \Qed{}
-  in the source tree, with one exception: the rat-level Rayleigh
-  shim Theorem~\ref{thm:rayleigh_lt_main} is currently
-  \texttt{Admitted}, blocked on kernel proof-term verification under
-  a 16~GB host cgroup limit. Its underlying integer-arithmetic
-  content (Theorems~\ref{thm:rayleigh_holds}
-  and~\ref{thm:rayleigh_pos}) is axiom-free.
+  appears in the dependency tree of Theorem~\ref{thm:M105} is
+  \Qed{} in the source tree. There are no \texttt{Admitted}, no
+  \texttt{Axiom}, and no \texttt{Parameter} declarations anywhere
+  in \texttt{theories/S1/}.
 \item The matrix entries themselves (Lemma~8.2 of Maynard) are
   \Qed{} via Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}:
   the $1764 + 1764$ kernel-checked cross-multiplications close the
@@ -856,16 +885,15 @@ end-to-end.
 
 \section{Reported assumptions}
 
-\texttt{Print Assumptions maynard\_M105\_certified\_alt} reports
-only the Rocq~9.1 kernel primitives for native 63-bit integers:
-things like $\texttt{Uint63.add}$, $\texttt{Uint63.mul}$,
-$\texttt{Uint63.to\_Z}$, and the $\texttt{CarryType}$ family.
-Plus, for the current alt-branch state, the single project-internal
-axiom \texttt{CertQuad.rayleigh\_lt\_main} noted above. The kernel
-primitives are not project-specific axioms; they are Rocq's
-declaration that the OCaml-implemented native-integer kernel
-primitives implement their stated specifications, and any proof
-that uses \vmcompute{} on $\Uintsf$ exposes the same set.
+\texttt{Print Assumptions maynard\_M105\_certified\_alt} reports a
+single line: \emph{Closed under the global context}. This is
+stronger than the typical \vmcompute{} footprint: because the
+matrices and the witness vector are encoded as \texttt{list (list
+Z)} and \texttt{list (Z * Z)} rather than as native 63-bit packed
+arrays, \vmcompute{} reduces through $\Z$ arithmetic instead of
+through the $\Uintsf$ kernel primitives. None of
+\texttt{PrimInt63}, \texttt{Uint63Axioms}, or \texttt{CarryType}
+appear in the reported assumptions.
 
 The project does not invoke \texttt{native\_compute} anywhere — a
 \texttt{grep -n native\_compute theories/S1} returns zero hits in
@@ -943,7 +971,7 @@ linear assembly tail.
 
 \paragraph{Project size.} $20$ \texttt{.v} files under
 \texttt{theories/S1/} ($13$ top-level plus $7$ in the
-\texttt{MaynardVerify/} parallel-chunk subdirectory), ${\sim}9{,}547$
+\texttt{MaynardVerify/} parallel-chunk subdirectory), ${\sim}9{,}590$
 lines total; \texttt{Witness.v} alone is ${\sim}5{,}700$ lines of
 autogenerated certificate data, and \texttt{Witness\_Quad.v} is
 ${\sim}80$ lines of $42$ $(\mathrm{num}, \mathrm{den})$ pairs.
@@ -967,8 +995,8 @@ Headline outputs: Theorems~\ref{thm:M1_match}, \ref{thm:M2_match},
 \paragraph{Rayleigh-witness backbone.}
 \texttt{Witness\_Quad} $\to$ \texttt{CertQuad}.
 Headline outputs: Theorems~\ref{thm:rayleigh_pos},
-\ref{thm:rayleigh_holds}, Lemma~\ref{lem:quad_spec_eq_Z},
-Theorem~\ref{thm:rayleigh_lt_main}.
+\ref{thm:rayleigh_holds}, Lemmas~\ref{lem:quad_spec_eq_Z},
+\ref{lem:rayleigh_lift_generic}, Theorem~\ref{thm:rayleigh_lt_main}.
 
 The two backbones merge at \texttt{CertQuad.v}, producing
 Theorem~\ref{thm:M105}. A single \texttt{Require Import

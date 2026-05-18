@@ -684,7 +684,7 @@ requires:
 (b) the trivial `sup ≥ value at any individual F`.
 
 Both are taken on the paper side (REPORT.md §1.4 makes the same
-disclosure). On this branch we do not formalise any eigenvalue
+disclosure). The development does not formalise any eigenvalue
 computation, characteristic polynomial, or IVT; the proof is the
 single-quotient strategy of Maynard's original Mathematica
 notebook, mechanised in pure-Z arithmetic by `vm_compute`.
