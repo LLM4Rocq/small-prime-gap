@@ -1,5 +1,5 @@
 (* CertL2.v -- structural lemmas surfaced by the pencil-determinant
-   route on the `quad` branch.
+   route on the `pencil` branch.
 
    Exports:
    - Dimension / well-formedness facts on M1_int (`M1_int_dim'`,
