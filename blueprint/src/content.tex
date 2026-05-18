@@ -7,8 +7,8 @@
 %   \label{...}                      -- unique label, prefixed by env type
 %
 % The Rocq logical name of every theory file is `PrimeGapS1.<File>` (see
-% `_CoqProject`), so e.g. `CertQuad.maynard_M105_certified_alt` becomes
-% `PrimeGapS1.CertQuad.maynard_M105_certified_alt`.
+% `_CoqProject`), so e.g. `CertRayleigh.maynard_M105_certified_rayleigh` becomes
+% `PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh`.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter*{Introduction}
@@ -45,14 +45,14 @@ at least the quotient at any individual choice).
 
 The end-to-end Rocq statement is
 \begin{verbatim}
-Theorem maynard_M105_certified_alt :
+Theorem maynard_M105_certified_rayleigh :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   4%:Q * quad_spec M1_spec_ij < 105%:Q * quad_spec M2_spec_ij.
 \end{verbatim}
-proven in \texttt{theories/S1/CertQuad.v}, where
+proven in \texttt{theories/S1/CertRayleigh.v}, where
 $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin embedding of $\Z$ into $\rat$. The first two conjuncts
 are each a single composed identity per matrix: the $\rat$-level
@@ -493,14 +493,14 @@ lifts that integer fact to the rat-level bigop the headline
 surfaces.
 
 The material lives in \texttt{Witness\_Quad.v} (the witness vector
-itself) and \texttt{CertQuad.v} (the integer Rayleigh inequality,
+itself) and \texttt{CertRayleigh.v} (the integer Rayleigh inequality,
 its positivity companion, and the rat-level lift to the bigop on
 the paper-form spec matrices).
 
 \section{The 42-entry rational witness vector}
 
 \begin{definition}[Rational witness $v_{\mathrm{witness}}$]\label{def:v_witness}
-\rocq{PrimeGapS1.Witness_Quad.v_witness}
+\rocq{PrimeGapS1.Witness_Rayleigh.v_witness}
 \rocqok
 \uses{def:maynard_basis}
 $v_{\mathrm{witness}} : \texttt{list }(\Z \times \Z)$ is a list of
@@ -534,7 +534,7 @@ witness, in exact rationals, is
 \section{Integer reduction of the witness}
 
 \begin{definition}[Common denominator]\label{def:v_den}
-\rocq{PrimeGapS1.CertQuad.v_den, PrimeGapS1.CertQuad.v_num}
+\rocq{PrimeGapS1.CertRayleigh.v_den, PrimeGapS1.CertRayleigh.v_num}
 \rocqok
 \uses{def:v_witness}
 $\vden := \mathrm{lcm}\,(d_0, \ldots, d_{41})$ is the LCM of the 42
@@ -551,8 +551,8 @@ clearing the matrix denominators $\DMone, \DMtwo$.
 \section{Integer Rayleigh inequality}
 
 \begin{definition}[Integer quadratic form]\label{def:quad}
-\rocq{PrimeGapS1.CertQuad.row_dot, PrimeGapS1.CertQuad.mat_vec_mul,
-      PrimeGapS1.CertQuad.quad}
+\rocq{PrimeGapS1.CertRayleigh.row_dot, PrimeGapS1.CertRayleigh.mat_vec_mul,
+      PrimeGapS1.CertRayleigh.quad}
 \rocqok
 For $M : \texttt{list (list }\Z\texttt{)}$ and $v : \texttt{list }\Z$,
 $\texttt{quad}\,M\,v := v^T \cdot M \cdot v$ (the standard quadratic
@@ -563,7 +563,7 @@ $\texttt{mat\_vec\_mul}$ (row-wise dot of $M$ with $v$).
 \end{definition}
 
 \begin{definition}[Integer numerators of the Rayleigh quotient]\label{def:num_M1M2}
-\rocq{PrimeGapS1.CertQuad.num_M1, PrimeGapS1.CertQuad.num_M2}
+\rocq{PrimeGapS1.CertRayleigh.num_M1, PrimeGapS1.CertRayleigh.num_M2}
 \rocqok
 \uses{def:quad, def:v_den}
 $\texttt{num\_M1} := \texttt{quad}\,M_1^{\mathrm{int}}\,\vnum$ and
@@ -576,7 +576,7 @@ $4 \cdot \DMtwo \cdot \texttt{num\_M1} < 105 \cdot \DMone \cdot \texttt{num\_M2}
 \end{definition}
 
 \begin{theorem}[Positivity of the integer numerator]\label{thm:rayleigh_pos}
-\rocq{PrimeGapS1.CertQuad.rayleigh_witness_M1_positive}
+\rocq{PrimeGapS1.CertRayleigh.rayleigh_witness_M1_positive}
 \rocqok
 \uses{def:num_M1M2}
 $0 < \texttt{num\_M1}$ in $\Z$.
@@ -588,7 +588,7 @@ context} — no $\Uintsf$ primitives.
 \end{proof}
 
 \begin{theorem}[Strict integer Rayleigh inequality]\label{thm:rayleigh_holds}
-\rocq{PrimeGapS1.CertQuad.rayleigh_witness_holds}
+\rocq{PrimeGapS1.CertRayleigh.rayleigh_witness_holds}
 \rocqok
 \uses{def:num_M1M2}
 \[
@@ -619,7 +619,7 @@ not in the trust base; only the resulting integer inequality is.
 \section{Lifting to the rat-level Rayleigh bound}
 
 \begin{definition}[Rat-level Rayleigh-quotient numerator]\label{def:quad_spec}
-\rocq{PrimeGapS1.CertQuad.v_rat, PrimeGapS1.CertQuad.quad_spec}
+\rocq{PrimeGapS1.CertRayleigh.v_rat, PrimeGapS1.CertRayleigh.quad_spec}
 \rocqok
 \uses{def:v_den}
 For an entry-wise spec $M_{\mathrm{spec}} : \nat \to \nat \to \rat$,
@@ -638,7 +638,7 @@ headline statement consumes).
 
 \begin{lemma}[Z $\to$ rat bridge for the Rayleigh-quotient sum]
 \label{lem:Z2rat_quad}
-\rocq{PrimeGapS1.CertQuad.Z2rat_quad_eq_sum}
+\rocq{PrimeGapS1.CertRayleigh.Z2rat_quad_eq_sum}
 \rocqok
 \uses{def:quad, def:v_den}
 For any well-formed $M : \texttt{list (list }\Z\texttt{)}$ of
@@ -663,7 +663,7 @@ inner sum.
 \end{proof}
 
 \begin{lemma}[Per-cell algebraic identity]\label{lem:quad_cell_identity}
-\rocq{PrimeGapS1.CertQuad.quad_cell_identity}
+\rocq{PrimeGapS1.CertRayleigh.quad_cell_identity}
 \rocqok
 For $\texttt{dm}, \texttt{vd}, v_i, m_{ij}, v_j : \rat$ with
 $\texttt{vd} \ne 0$ and $\texttt{dm} \ne 0$,
@@ -683,7 +683,7 @@ bigop in Lemma~\ref{lem:quad_spec_eq_Z}.
 \end{proof}
 
 \begin{lemma}[Bigop $\leftrightarrow$ Z bridge]\label{lem:quad_spec_eq_Z}
-\rocq{PrimeGapS1.CertQuad.quad_spec_eq_Z}
+\rocq{PrimeGapS1.CertRayleigh.quad_spec_eq_Z}
 \rocqok
 \uses{lem:Z2rat_quad, lem:quad_cell_identity,
       thm:M1_match, thm:M2_match,
@@ -716,7 +716,7 @@ Assumptions} reports \emph{Closed under the global context}.
 \end{proof}
 
 \begin{lemma}[Generic Rayleigh lift]\label{lem:rayleigh_lift_generic}
-\rocq{PrimeGapS1.CertQuad.rayleigh_lift_generic}
+\rocq{PrimeGapS1.CertRayleigh.rayleigh_lift_generic}
 \rocqok
 Let $d_1, d_2, a_1, a_2 \in \Z$ with $d_1, d_2 > 0$, $v \in \rat$
 with $v > 0$, and $q_1, q_2 \in \rat$. Suppose
@@ -746,7 +746,7 @@ concrete \texttt{quad\_spec} bigops, so the proof term stays small.
 
 \begin{theorem}[Strict Rayleigh-quotient bound at the witness]
 \label{thm:rayleigh_lt_main}
-\rocq{PrimeGapS1.CertQuad.rayleigh_lt_main}
+\rocq{PrimeGapS1.CertRayleigh.rayleigh_lt_main}
 \rocqok
 \uses{lem:quad_spec_eq_Z, lem:rayleigh_lift_generic, thm:rayleigh_holds, thm:rayleigh_pos}
 \[
@@ -773,7 +773,7 @@ Assumptions}: \emph{Closed under the global context}.
 \section{The headline}
 
 \begin{theorem}[End-to-end Rayleigh-quotient certification]\label{thm:M105}
-\rocq{PrimeGapS1.CertQuad.maynard_M105_certified_alt}
+\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}
 \rocqok
 \uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:rayleigh_lt_main}
 The conjunction
@@ -993,11 +993,11 @@ Headline outputs: Theorems~\ref{thm:M1_match}, \ref{thm:M2_match},
 \ref{lem:M2_spec_eq_int}).
 
 \paragraph{Rayleigh-witness backbone.}
-\texttt{Witness\_Quad} $\to$ \texttt{CertQuad}.
+\texttt{Witness\_Rayleigh} $\to$ \texttt{CertRayleigh}.
 Headline outputs: Theorems~\ref{thm:rayleigh_pos},
 \ref{thm:rayleigh_holds}, Lemmas~\ref{lem:quad_spec_eq_Z},
 \ref{lem:rayleigh_lift_generic}, Theorem~\ref{thm:rayleigh_lt_main}.
 
-The two backbones merge at \texttt{CertQuad.v}, producing
+The two backbones merge at \texttt{CertRayleigh.v}, producing
 Theorem~\ref{thm:M105}. A single \texttt{Require Import
-PrimeGapS1.CertQuad.} loads the entire proof.
+PrimeGapS1.CertRayleigh.} loads the entire proof.

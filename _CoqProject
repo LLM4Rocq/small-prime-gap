@@ -17,5 +17,5 @@ theories/S1/MaynardVerify/M2_5.v
 theories/S1/MaynardVerify.v
 theories/S1/MaynardSpecBridge.v
 theories/S1/Cert.v
-theories/S1/Witness_Quad.v
-theories/S1/CertQuad.v
+theories/S1/Witness_Rayleigh.v
+theories/S1/CertRayleigh.v

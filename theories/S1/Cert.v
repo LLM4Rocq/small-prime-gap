@@ -1,4 +1,4 @@
-(* theories/S1/Cert.v  (alt branch — slim, Rayleigh-quotient route)
+(* theories/S1/Cert.v  (rayleigh branch — slim, Rayleigh-quotient route)
 
    This file is the slim auditor's bridge from the paper-form spec
    `MaynardSpec.M{1,2}_spec_ij` to the FLINT-shipped integer matrices
@@ -7,8 +7,8 @@
        M_{i,j}_spec  =  Z2rat (mat_get M_int i j) / Z2rat D_M
                                           for all  i, j < 42.
 
-   On the alt branch, the headline theorem `maynard_M105_certified_alt`
-   in `CertQuad.v` combines this two-way identity (which gives auditor-
+   On the rayleigh branch, the headline theorem `maynard_M105_certified_rayleigh`
+   in `CertRayleigh.v` combines this two-way identity (which gives auditor-
    level parity with Maynard's paper formulas) with the strict Rayleigh-
    quotient bound on `(v_witness, M1, M2)`.
 

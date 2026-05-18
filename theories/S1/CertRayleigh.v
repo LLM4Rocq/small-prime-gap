@@ -1,9 +1,9 @@
 (* ==================================================================
-   CertQuad.v — Rayleigh-quotient witness route for M_{105} > 4.
+   CertRayleigh.v — Rayleigh-quotient witness route for M_{105} > 4.
 
    This file replaces the eigenvalue/char-poly closure of Cert.v with
    a single direct evaluation: a 42-dim rational vector `v_witness`
-   (shipped in Witness_Quad.v) satisfies
+   (shipped in Witness_Rayleigh.v) satisfies
 
          105 * v^T M2 v  >  4 * v^T M1 v
 
@@ -37,7 +37,7 @@ Import ListNotations.
 From mathcomp Require Import all_ssreflect all_algebra.
 Import GRing.Theory Num.Theory.
 
-From PrimeGapS1 Require Import IntMat CharPoly Witness Witness_Quad.
+From PrimeGapS1 Require Import IntMat CharPoly Witness Witness_Rayleigh.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge Cert.
 
 (* Loaded LAST so that the mathcomp `ring` / `field` tactics are bound
@@ -175,7 +175,7 @@ Qed.
    lifts to the bigop `\sum_(i<42) \sum_(j<42) v_num[i] * M[i][j] *
    v_num[j]` (all factors taken via Z2rat).
 
-   The hypotheses precisely characterise the alt-branch input shape:
+   The hypotheses precisely characterise the rayleigh-branch input shape:
    v_num has length 42, M has 42 rows, every row of M has length 42. *)
 Section QuadBridge.
 
@@ -409,7 +409,7 @@ Qed.
 (*  Section 9 — headline theorem                                      *)
 (* ================================================================= *)
 
-(* The alt-branch headline:
+(* The rayleigh-branch headline:
 
      1. The FLINT-shipped (M1_int, M2_int, D_M1, D_M2) matches the
         paper-form Maynard spec entry-wise.
@@ -422,9 +422,8 @@ Qed.
    paper-side), conclusion (2) entails M_{105} > 4: Lemma 8.3 says
    M_{105} is 105 times the sup of the Rayleigh quotient over an
    admissible function space, and the sup is at least any individual
-   quotient.  Lemma 8.3 is NOT formalised here (or on any branch of
-   this project); see AUDITOR_CHECKLIST.md row 7. *)
-Theorem maynard_M105_certified_alt :
+   quotient.  Lemma 8.3 is NOT formalised here; see AUDITOR_CHECKLIST.md. *)
+Theorem maynard_M105_certified_rayleigh :
   (forall i j, (i < 42)%nat -> (j < 42)%nat ->
      M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j, (i < 42)%nat -> (j < 42)%nat ->
