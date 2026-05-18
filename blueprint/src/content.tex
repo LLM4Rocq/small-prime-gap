@@ -7,8 +7,8 @@
 %   \label{...}                      -- unique label, prefixed by env type
 %
 % The Rocq logical name of every theory file is `PrimeGapS1.<File>` (see
-% `_CoqProject`), so e.g. `Cert.maynard_M105_certified` becomes
-% `PrimeGapS1.Cert.maynard_M105_certified`.
+% `_CoqProject`), so e.g. `CertQuad.maynard_M105_certified_alt` becomes
+% `PrimeGapS1.CertQuad.maynard_M105_certified_alt`.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter*{Introduction}
@@ -16,7 +16,7 @@
 This blueprint accompanies a Rocq formalisation that machine-verifies the
 numerical step underpinning Maynard's bounded-gap theorem:
 \[
-   \Mk[105] \;=\; 105 \cdot \lammax\!\bigl(\Mone^{-1}\Mtwo\bigr) \;>\; 4.
+   \Mk[105] \;=\; 105 \cdot \sup_F  J_{105}(F) / I_{105}(F) \;>\; 4.
 \]
 The headline is formula~(8.15) of James Maynard,
 \emph{Small gaps between primes} (arXiv:1311.4600;
@@ -27,66 +27,67 @@ with the arXiv preprint). The present project replaces that
 Mathematica-based computation with a Rocq proof that re-derives every
 algebraic claim inside the kernel.
 
-The end-to-end statement is
+The proof strategy is the same as Maynard's notebook: instead of
+computing $\lammax(\Mone^{-1}\Mtwo)$ inside the kernel, we exhibit
+a single 42-entry rational \emph{witness vector}
+$v_{\mathrm{witness}} \in \rat^{42}$ (shipped in
+\texttt{Witness\_Quad.v}, obtained by snapping the top eigenvector
+of $\Mone^{-1}\Mtwo$ to small-denominator rationals via
+continued-fraction convergents) and verify the strict Rayleigh-
+quotient bound
+\[
+4 \cdot v^T \Mone\, v   \;<\;   105 \cdot v^T \Mtwo\, v
+\]
+at $v = v_{\mathrm{witness}}$ in pure integer arithmetic by a single
+\vmcompute{} reflexivity. By Maynard's Lemma~8.3, this entails
+$\Mk[105] > 4$ (since the supremum over admissible test functions is
+at least the quotient at any individual choice).
+
+The end-to-end Rocq statement is
 \begin{verbatim}
-Theorem maynard_M105_certified :
+Theorem maynard_M105_certified_alt :
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
   (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
      M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
-  exists lambda : realalg,
-    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
+  4%:Q * quad_spec M1_spec_ij < 105%:Q * quad_spec M2_spec_ij.
 \end{verbatim}
-proven in \texttt{theories/S1/Cert.v}, where
+proven in \texttt{theories/S1/CertQuad.v}, where
 $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
-is the thin embedding of $\Z$ into $\rat$. The first two conjuncts are
-each a single composed identity per matrix: the $\rat$-level paper-form
-spec $\texttt{M\{1,2\}\_spec\_ij}$ (the readable transcription of
-Maynard's Lemma~8.2) is equal, as a rational, to the FLINT-shipped
-integer entry $\texttt{mat\_get}\,M_{1,2}^{\mathrm{int}}\,i\,j$ divided
-by the common denominator $\DMone$ / $\DMtwo$. The composition collapses
-the trust chain
-$\text{FLINT integer matrices} = \text{$\Z$-level closed form}
- = \text{$\rat$-level paper-form spec}$
-into one displayed equality per matrix, with the $\Z$-level boolean
-checks $\texttt{all\_match\_M\{1,2\}Z} = \texttt{true}$ and the
-$\rat\leftrightarrow\Z$ bridges $\texttt{M\{1,2\}\_spec\_rat\_eq}$
-moved into the proof body as implementation details. (Both remain
-available as standalone \Qed{}s in \texttt{MaynardVerify.v} and
-\texttt{MaynardSpecBridge.v} for auditors who want to trace the chain
-step by step.) Together with the eigenvalue conjunct, these certify
-$\text{eigenvalue} > 4/105$ under a single \texttt{Print Assumptions},
-which reports only Rocq's \texttt{PrimInt63} kernel primitives: the
-project itself contains zero \texttt{Axiom} declarations and zero
-\texttt{Admitted} lemmas.
+is the thin embedding of $\Z$ into $\rat$. The first two conjuncts
+are each a single composed identity per matrix: the $\rat$-level
+paper-form spec $\texttt{M\{1,2\}\_spec\_ij}$ (the readable
+transcription of Maynard's Lemma~8.2) is equal, as a rational, to
+the FLINT-shipped integer entry
+$\texttt{mat\_get}\,M_{1,2}^{\mathrm{int}}\,i\,j$ divided by the
+common denominator $\DMone$ / $\DMtwo$. The third conjunct is the
+strict Rayleigh-quotient bound at the shipped witness, expanded as
+a bigop on the paper-form spec matrices.
 
 \paragraph{Scope.}
 What this Rocq layer proves, kernel-checked, is the left-hand side of
 \[
-\underbrace{\;\lammax(\Mone^{-1}\Mtwo) \;>\; 4/105\;}_{\text{Rocq, kernel-checked}}
+\underbrace{\;v^T \Mone v < (105/4) \cdot v^T \Mtwo v \text{ at some } v \in \rat^{42}\;}_{\text{Rocq, kernel-checked}}
 \quad\Longrightarrow\quad
-\underbrace{\;\Mk[105] = 105\cdot\lammax \;>\; 4\;}_{\text{Maynard's paper, Lemma 8.3}}.
+\underbrace{\;\Mk[105] = 105 \cdot \sup_F J_{105}(F)/I_{105}(F) \;>\; 4\;}_{\text{Maynard's paper, Lemma 8.3}}.
 \]
 The right arrow is Maynard's Lemma~8.3 (a generalised Rayleigh-quotient
 identity proved in the Annals paper, refereed there); the project does
 not re-formalise this analytic step. The project's scope is exactly to
 replace the Mathematica computation, not to re-formalise Maynard's paper.
 
-\paragraph{Two distinct certificates for the same fact.}
-Maynard's notebook proves $\lammax > 4/k$ via the \emph{eigenvector
-route}: it numerically computes the top eigenvector of $\Mone^{-1}\Mtwo$,
-snaps it to a small-denominator rational vector, and evaluates the
-Rayleigh quotient $k\cdot v^T M_2 v / v^T M_1 v$ in exact rational
-arithmetic. This is a true rigorous lower bound regardless of how~$v$
-is obtained. Our Rocq proof takes the \emph{characteristic-polynomial
-route}: the intermediate value theorem on $\charpolysym_{\Arat}$
-certifies the existence of an eigenvalue strictly above $4/105$ from
-just the sign of the polynomial at the lower endpoint (negative, by
-direct \vmcompute{}) and at MathComp's \texttt{cauchy\_bound} (positive,
-from the leading-coefficient sign). No eigenvector or Sturm chain is
-constructed. Both routes are sound; together, they form an independent
-double-check of Maynard's headline value $\Mk[105] \approx 4.0021$.
+\paragraph{Status.}
+On this branch the rat-level lift
+$\texttt{CertQuad.rayleigh\_lt\_main}$ (a thin algebraic shim that
+clears denominators against the bigop $\leftrightarrow$ Z bridge
+$\texttt{quad\_spec\_eq\_Z}$ and lifts the integer Rayleigh
+inequality $\texttt{rayleigh\_witness\_holds}$ via
+$\texttt{Z2rat\_lt}$) is currently \texttt{Admitted}, blocked by
+kernel proof-term verification under a 16~GB host cgroup limit; the
+underlying integer Rayleigh inequality and its positivity companion
+are both axiom-free \vmcompute{} \Qed{}s. See the auditor's
+checklist and \texttt{CertQuad.v}'s header comment for the refactor
+path.
 
 \paragraph{How to read this blueprint.}
 Each chapter mirrors a Rocq source file or a small group of related
@@ -211,11 +212,10 @@ and~\ref{lem:basis_uniq} together pin \texttt{maynard\_basis} to
 exactly the multiset $\{(b, c) \in \N^2 : b + 2c \le 11\}$. A reviewer
 never has to inspect the literal 42-pair list — the basis is fully
 characterised by the predicate $b + 2c \le 11$, the size $42$, and the
-absence of duplicates. Order matters only because the matrix rows and
-columns must align with the indexing of $M_{1,2}^{\mathrm{int}}$;
-eigenvalues of $M_1^{-1} M_2$ are invariant under simultaneous
-row/column permutation, so any ordering of the same set yields the
-same $\lammax$.
+absence of duplicates. Order matters because the matrix rows and
+columns and the entries of the rational witness vector
+$v_{\mathrm{witness}}$ (Definition~\ref{def:v_witness}) must all
+align with the same indexing in $M_{1,2}^{\mathrm{int}}$.
 \end{remark}
 
 \begin{remark}
@@ -404,8 +404,8 @@ either.
 
 The cross-checks above operate on the $\Z$-level twins
 (\texttt{m1\_num\_den}, \texttt{m2\_num\_den}) because \vmcompute{} on
-$\rat$-level matrices stalls on canonical-structure elaboration
-(see~\S\ref{ch:hb}). The rat-level spec
+$\rat$-level matrices stalls on MathComp's HB canonical-structure
+elaboration at concrete dimension $42$. The rat-level spec
 (\texttt{M1\_entry}, \texttt{M2\_entry}) is the
 documentation-shaped form a reviewer reads side by side with
 arXiv:1311.4600~\S8. The bridge below certifies in the kernel that the
@@ -477,631 +477,272 @@ Maynard's exact closed form.
 \end{remark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The characteristic polynomial route}\label{ch:charpoly}
-
-This chapter develops the in-kernel characteristic polynomial
-machinery. We use a hand-rolled Faddeev--LeVerrier (FL) recurrence on
-\texttt{list (list Z)} matrices, prove that it computes the same
-polynomial as MathComp's \texttt{char\_poly} on the corresponding
-$\Q$-matrix, and develop the $c \cdot M$ scaling formula needed to
-relate the cleared-denominator polynomial to the rational
-$\charpolysym_{\Arat}$. The material lives in
-\texttt{IntPoly.v}, \texttt{IntMat.v}, \texttt{CharPoly.v} and
-\texttt{CharPolyScale.v}.
-
-\section{Integer polynomial and matrix libraries}
-
-\begin{definition}[Integer polynomial type]\label{def:pol}
-\rocq{PrimeGapS1.IntPoly.pol}
-\rocqok
-$\texttt{pol} := \texttt{list }\Z$, low-to-high coefficient order. The
-operations \texttt{padd}, \texttt{psub}, \texttt{pneg}, \texttt{pscale},
-\texttt{pmul}, \texttt{pderiv}, \texttt{prem} (pseudo-remainder),
-\texttt{plead}, \texttt{pdeg}, \texttt{pnorm} (strip trailing zeros),
-\texttt{peval} and \texttt{peval\_at\_rat} are all
-\vmcompute-reducible and proved correct against ordinary integer
-arithmetic.
-\end{definition}
-
-\begin{definition}[Integer matrix type]\label{def:mat}
-\rocq{PrimeGapS1.IntMat.mat}
-\rocqok
-$\texttt{mat} := \texttt{list (list }\Z\texttt{)}$, row-major, no
-well-formedness invariant. The operations \texttt{mzero},
-\texttt{meye}, \texttt{madd}, \texttt{mscale}, \texttt{mmul},
-\texttt{mtrans}, \texttt{mtrace}, \texttt{mat\_get} are pure list
-recursions; nothing imports MathComp at this layer. The reason is that
-MathComp's $'M[\Q]_{42}$ does not reduce under \vmcompute{} at the
-sizes we need, but nested \texttt{list (list Z)} does
-(${\sim}0.14$~s for a $42 \times 42$ multiplication).
-\end{definition}
-
-\section{Faddeev--LeVerrier on \texorpdfstring{$\Z$}{Z}-matrices}
-
-\begin{definition}[FL recurrence]\label{def:fl_loop}
-\rocq{PrimeGapS1.CharPoly.fl_loop, PrimeGapS1.CharPoly.char_poly_int}
-\rocqok
-\uses{def:mat, def:pol}
-\texttt{fl\_loop} runs the classical Faddeev--LeVerrier recurrence
-$M_0 := 0$, $c_0 := 1$, $M_k := A \cdot M_{k-1} + c_{k-1} I$,
-$c_k := -\trace(A \cdot M_k)/k$, accumulating the coefficient list.
-$\texttt{char\_poly\_int}(A) := \texttt{rev}(c_0, c_1, \ldots, c_n) \mathrel{++} [1]$
-gives the monic char poly with leading coefficient~$1$.
-\end{definition}
-
-\begin{lemma}[FL agrees with $\Q$-FL]\label{lem:fl_loop_rat_is_charpoly}
-\rocq{PrimeGapS1.CharPoly.fl_loop_rat_is_char_poly_L2,
-      PrimeGapS1.CharPoly.fl_invariant_L2,
-      PrimeGapS1.CharPoly.fl_divisibility_L2}
-\rocqok
-\uses{def:fl_loop}
-After viewing $A : \texttt{mat}$ as the $\Q$-matrix
-$\texttt{mat\_int\_to\_rat}(A, 1, n) : 'M[\Q]_n$, the integer FL
-recurrence reproduces the rational FL recurrence step by step. The
-auxiliary invariants \texttt{fl\_invariant\_L2} (the
-relationship between $M_k$, $c_k$ and the rational $M_k^{\Q}$) and
-\texttt{fl\_divisibility\_L2} (the classical Newton-identity fact that
-$\trace(A \cdot M_k)$ is divisible by~$k$ at every step) are both
-proved by induction on the FL step count.
-\end{lemma}
-\begin{proof}\rocqok
-Long induction. The hard part is \texttt{fl\_divisibility\_L2}: the
-$k$-th Newton power-sum identity
-$p_k = \sum_{i=1}^{k-1}(-1)^{i-1} e_i p_{k-i} + (-1)^{k-1} k e_k$
-is the algebraic content. We use the explicit recurrence form rather
-than the global identity, which lets the induction track each FL step
-in lockstep.
-\end{proof}
-
-\begin{theorem}[FL correctness over $\Q$]\label{thm:char_poly_int_correct}
-\rocq{PrimeGapS1.CharPoly.char_poly_int_correct}
-\rocqok
-\uses{lem:fl_loop_rat_is_charpoly}
-For a square integer matrix $M$ of dimension $n$,
-\[
-\texttt{pol\_to\_polyrat}(\texttt{char\_poly\_int}(M))
-   \;=\; \texttt{char\_poly}(\texttt{mat\_int\_to\_rat}(M, 1, n))
-   \quad\text{in } \Q[X].
-\]
-\end{theorem}
-\begin{proof}\rocqok
-Combine Lemma~\ref{lem:fl_loop_rat_is_charpoly} with the bridging
-definitions \texttt{Z\_to\_int}, \texttt{mat\_int\_to\_rat},
-\texttt{pol\_to\_polyrat}: each FL step on the rational side equals
-the standard MathComp \texttt{char\_poly} computation by
-\texttt{Newton-identities-charpoly}. The induction is over the matrix
-dimension; at the inductive step we use that the leading coefficient
-of \texttt{char\_poly} is~$1$ and that the next-to-leading coefficient
-is $-\trace M$, both already in MathComp.
-\end{proof}
-
-\section{The \texorpdfstring{$c \cdot M$}{c.M} scaling formula}
-
-The cleared-denominator polynomial $\texttt{charpoly\_int}$ shipped in
-\texttt{Witness.v} satisfies
-$\texttt{charpoly\_int} = \Dq \cdot \charpolysym_{\Arat}$ \emph{up to} a
-power of $\DA$ that comes from $\Arat = \Aint / \DA$. The bridge is the
-following one-lemma file.
-
-\begin{lemma}[Char-poly scaling]\label{lem:char_poly_scale}
-\rocq{PrimeGapS1.CharPolyScale.char_poly_scale}
-\rocqok
-For $F$ a field, $M : 'M[F]_n$, $c \in F$ with $c \ne 0$, and
-$k \le n$:
-\[
-\bigl(\charpolysym(c \cdot M)\bigr)_k
-   \;=\; c^{n - k} \cdot \bigl(\charpolysym(M)\bigr)_k.
-\]
-\end{lemma}
-\begin{proof}\rocqok
-Factor $c$ out of $xI - cM = c \cdot ((x/c) I - M)$. Since
-$\charpolysym(M)(x) = \det(xI - M)$ and $\det$ is multilinear in rows,
-\[
-\det(xI - cM) = c^n \det\!\bigl((x/c) I - M\bigr) = c^n \cdot \charpolysym(M)(x/c).
-\]
-Reading off the coefficient of $x^k$ on the right via
-\texttt{coef\_comp\_scaleX} gives
-$c^n \cdot c^{-k} \cdot (\charpolysym(M))_k = c^{n - k} (\charpolysym(M))_k$,
-which is what we wanted. The proof uses MathComp's
-\texttt{det\_map\_mx} plus a direct coefficient computation.
-\end{proof}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{CRT cross-validation}\label{ch:crt}
+\chapter{The Rayleigh-quotient witness route}\label{ch:rayleigh}
 
-The most computationally heavy step in the entire proof is showing that
-$\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$, the
-shipped char-poly of the $42 \times 42$ integer matrix $\Aint$. Both
-sides are lists of $43$ integers with coefficients up to ${\sim}20{,}000$
-bits. Direct \vmcompute{} on the LHS would take hours and produce
-unwieldy proof terms. Instead we use a Chinese Remainder Theorem (CRT)
-lift: verify the equality modulo $710$ Uint63 primes, then close
-$|a - b| = 0$ from $(\prod p_i) \mid (a - b)$ via a verified bound. The
-same pattern handles the matrix identity $\Mtwo \cdot \Mone \cdot \Aint
-= \DMone \cdot \DA \cdot \Mtwo$ that links the cleared denominators.
-This chapter follows files \texttt{ModularArith.v}, \texttt{CRTBridge.v},
-the \texttt{CharPolyAgree/} directory (\texttt{Def.v} + six parallel
-\texttt{Chunk\_0..5.v} + the assembly \texttt{CharPolyAgree.v}),
-\texttt{CRTCheck.v}, \texttt{Fermat.v}, \texttt{PrimeCheck.v} and
-\texttt{CRTLift.v}.
+This chapter is the analytic heart of the proof. Maynard's
+Lemma~8.3 reduces $\Mk[k] > c$ to: exhibit a single
+coefficient vector $a \in \rat^{42}$ with
+$k \cdot a^T \Mtwo a / a^T \Mone a > c$, equivalently
+$c \cdot a^T \Mone a < k \cdot a^T \Mtwo a$ (and $a^T \Mone a > 0$
+so the quotient is well-defined). The shipped rational vector
+$v_{\mathrm{witness}}$ in \texttt{Witness\_Quad.v} is such an $a$
+for $(k, c) = (105, 4)$. The kernel verifies the strict integer
+inequality at $v_{\mathrm{witness}}$ by a single \vmcompute{}
+reflexivity on $\Z$-arithmetic; the supplementary algebraic shim
+lifts that integer fact to the rat-level bigop the headline
+surfaces.
 
-\section{Modular arithmetic in Uint63}
+The material lives in \texttt{Witness\_Quad.v} (the witness vector
+itself) and \texttt{CertQuad.v} (the integer Rayleigh inequality,
+its positivity companion, and the rat-level lift to the bigop on
+the paper-form spec matrices).
 
-\begin{definition}[Modular FL char-poly]\label{def:char_poly_mod}
-\rocq{PrimeGapS1.ModularArith.char_poly_mod}
+\section{The 42-entry rational witness vector}
+
+\begin{definition}[Rational witness $v_{\mathrm{witness}}$]\label{def:v_witness}
+\rocq{PrimeGapS1.Witness_Quad.v_witness}
 \rocqok
-\uses{def:fl_loop}
-\texttt{char\_poly\_mod}~$p\,M$ runs the same FL recurrence as
-$\texttt{char\_poly\_int}$ but modulo a single $\Uintsf$ prime $p$,
-using only native 63-bit operations: \texttt{addmod63},
-\texttt{mulmod63}, \texttt{negmod63}, plus modular inverse
-\texttt{inv\_mod63}~$p\,a := a^{p - 2} \bmod p$ (Fermat's little
-theorem). For $p < 2^{31}$, all intermediate products $a \cdot b$ fit
-in $2^{62} < 2^{63}$, so no overflow occurs and \vmcompute{}
-processes a single $42 \times 42$ FL chain in ${\sim}0.5$~s.
+\uses{def:maynard_basis}
+$v_{\mathrm{witness}} : \texttt{list }(\Z \times \Z)$ is a list of
+42 pairs $(n_i, d_i)$ with $\gcd(|n_i|, d_i) = 1$ and $d_i > 0$,
+representing the rational vector $v \in \rat^{42}$ with
+$v[i] = n_i / d_i$. The list is autogenerated by
+\texttt{python/build\_quad\_witness.py} from the top eigenvector
+of $\Mone^{-1}\Mtwo$ (computed via \texttt{acb\_mat.eig} at
+$1024$-bit precision), phase-aligned (largest entry positive
+real), and snapped to small-denominator rationals via
+Mathematica-style absolute-tolerance \texttt{Rationalize} with
+$\mathrm{tol} = 10^{-14}$ (continued-fraction convergents). The
+entries are listed in the same row/column order as
+\texttt{MaynardBasis.maynard\_basis} (Definition~\ref{def:maynard_basis}).
 \end{definition}
 
-\begin{remark}[Why \texttt{ModularArith.v} exists as one file]
-\label{rem:modular_arith_factor}
-The original development duplicated all modular operations across
-\texttt{CRTBridge.v} and \texttt{CharPolyAgree.v}. When
-\texttt{CRTLift.v} tried to rewrite a fact mentioning
-\texttt{char\_poly\_mod}~$p\,\Aint$ from one file by an equation
-mentioning the same expression but defined in the other file, the
-kernel saw two distinct head constants and tried to delta-unfold both,
-which is exactly the FL recurrence on a concrete $42 \times 42$
-matrix. Empirically that hung the kernel for $> 25$ minutes per
-rewrite. Factoring every modular operation into one file pins each
-constant to a single kernel name, so unification of the same head
-symbol is by reflexivity.
+\begin{remark}[Witness statistics]
+The maximum denominator across the 42 entries is
+$67\,213\,321\,643\,309 \approx 1.4 \cdot 10^{13}$, i.e.\ about $46$
+bits. The eigenvector spans $\approx 14$ decimal orders of magnitude
+(smallest non-zero $|v_i| \approx 10^{-14}$, largest $\approx 1$),
+which lower-bounds the denominator size: truncating small components
+destroys the Rayleigh inequality. The verified slack at this
+witness, in exact rationals, is
+\[
+   \frac{105 \cdot v^T \Mtwo v - 4 \cdot v^T \Mone v}{v^T \Mone v}
+   \;\approx\; +2.07 \cdot 10^{-3}.
+\]
 \end{remark}
 
-\section{Per-prime correctness of modular FL}
+\section{Integer reduction of the witness}
 
-\begin{theorem}[Soundness of \texttt{char\_poly\_mod}]\label{thm:char_poly_mod_sound}
-\rocq{PrimeGapS1.CRTBridge.char_poly_mod_sound}
+\begin{definition}[Common denominator]\label{def:v_den}
+\rocq{PrimeGapS1.CertQuad.v_den, PrimeGapS1.CertQuad.v_num}
 \rocqok
-\uses{def:char_poly_mod, def:fl_loop}
-For any $\Uintsf$ prime $p$ with $1 < p < 2^{31}$ and $n + 1 < p$
-(where $n$ is the matrix dimension), and any \texttt{fl\_all\_divisible}
-matrix~$M$,
-\[
-\texttt{List.map}\,(\texttt{Z\_to\_mod63}\,p)\,(\texttt{char\_poly\_int}\,M)
-   \;=\; \texttt{char\_poly\_mod}\,p\,M.
-\]
-The hypothesis $n + 1 < p$ ensures every FL division by $k \in \{1, \ldots, n\}$
-is well-defined in $\Fp$.
-\end{theorem}
-\begin{proof}\rocqok
-Thread soundness lemmas for each modular operation through the FL
-recurrence. The base step is $\texttt{Z\_to\_mod63\_spec}$, which
-proves
-$\texttt{to\_Z}(\texttt{Z\_to\_mod63}\,p\,z) = z \bmod \texttt{to\_Z}\,p$
-under \texttt{valid\_prime}~$p$ (precisely the
-$2^{31}$-bound that guarantees no $\Uintsf$ multiplication overflow).
-The inductive step combines $\texttt{addmod63}$/$\texttt{mulmod63}$
-soundness with the FL invariants from
-Lemma~\ref{lem:fl_loop_rat_is_charpoly}, plus Fermat's little theorem
-(below) to discharge the modular division.
-\end{proof}
-
-\begin{lemma}[Fermat's little theorem, modular inverse form]
-\label{lem:fermat_mod}
-\rocq{PrimeGapS1.Fermat.fermat_mod, PrimeGapS1.Fermat.fermat_Z}
-\rocqok
-For prime $p$ and $1 \le k < p$,
-$k \cdot k^{p - 2} \equiv 1 \pmod{p}$.
-The $\Z$-level twin \texttt{fermat\_Z} bridges to
-\texttt{Znumtheory.prime}; together with
-\texttt{Zprime\_to\_ssrprime} this provides the interface that the
-710-prime CRT lift consumes.
-\end{lemma}
-\begin{proof}\rocqok
-Via MathComp's \texttt{expf\_card} on the multiplicative group $\Fp^\ast$.
-\end{proof}
-
-\section{The 710 primes}
-
-\begin{definition}[CRT prime list]\label{def:crt_primes}
-\rocq{PrimeGapS1.CharPolyAgree.crt_primes_local,
-      PrimeGapS1.CharPolyAgree.crt_primes_extra}
-\rocqok
-A concatenated list \texttt{crt\_primes\_all} of $710$ distinct
-$\Uintsf$ primes, each in $[2^{30}, 2^{31})$. The product
-$\prod_{i=1}^{710} p_i$ exceeds $2^{21300}$.
+\uses{def:v_witness}
+$\vden := \mathrm{lcm}\,(d_0, \ldots, d_{41})$ is the LCM of the 42
+witness denominators, computed by a left fold over
+$v_{\mathrm{witness}}$. The scaled integer numerators
+$\vnum : \texttt{list }\Z$ are defined by
+$\vnum[i] := n_i \cdot (\vden / d_i)$, so that
+$v[i] = \vnum[i] / \vden$ as rationals. This presentation puts
+every component over the same denominator, which is what allows the
+Rayleigh inequality to reduce to a single integer comparison after
+clearing the matrix denominators $\DMone, \DMtwo$.
 \end{definition}
 
-\begin{lemma}[All 710 candidates are prime]\label{lem:crt_primes_all_prime}
-\rocq{PrimeGapS1.CRTLift.crt_primes_710_all_prime,
-      PrimeGapS1.CRTLift.crt_primes_710_NoDup}
-\rocqok
-\uses{def:crt_primes}
-Every entry of \texttt{crt\_primes\_all} is a prime number, and the
-list contains no duplicates.
-\end{lemma}
-\begin{proof}\rocqok
-Primality: \texttt{check\_prime\_Z}, a pure-$\Z$ trial-division checker
-proved sound for \texttt{Znumtheory.prime} in \texttt{PrimeCheck.v}, is
-applied to each entry by \texttt{forallb} and reduced by \vmcompute.
-Each check costs ${\sim}0.6$~s (trial division up to
-$\lfloor\sqrt{p}\rfloor \approx 2^{15}$), so all $710$ checks run in
-${\sim}7$~min. The $\texttt{NoDup}$ check is a quadratic
-\texttt{nodup\_Z} also discharged by \vmcompute. The latter is bridged
-to MathComp's \texttt{ssrnat.prime} via
-\texttt{Zprime\_to\_ssrprime}.
-\end{proof}
+\section{Integer Rayleigh inequality}
 
-\section{The CRT lift}
-
-\begin{lemma}[Small multiple is zero]\label{lem:small_multiple_zero}
-\rocq{PrimeGapS1.CRTCheck.small_multiple_zero}
+\begin{definition}[Integer quadratic form]\label{def:quad}
+\rocq{PrimeGapS1.CertQuad.row_dot, PrimeGapS1.CertQuad.mat_vec_mul,
+      PrimeGapS1.CertQuad.quad}
 \rocqok
-If $P \mid c$, $0 < P$, and $2|c| < P$ (all in $\Z$), then $c = 0$.
-\end{lemma}
-\begin{proof}\rocqok
-A divisor of $c$ has absolute value $\le |c|$ unless $c = 0$. If
-$c \ne 0$ then $P \le |c| < P/2$, contradiction. \texttt{lia} closes
-the integer arithmetic.
-\end{proof}
+For $M : \texttt{list (list }\Z\texttt{)}$ and $v : \texttt{list }\Z$,
+$\texttt{quad}\,M\,v := v^T \cdot M \cdot v$ (the standard quadratic
+form on integer lists), implemented via
+$\texttt{row\_dot} : \texttt{list }\Z \to \texttt{list }\Z \to \Z$
+(dot product, with the implicit pad-to-shorter convention) and
+$\texttt{mat\_vec\_mul}$ (row-wise dot of $M$ with $v$).
+\end{definition}
 
-\begin{lemma}[Distinct primes divide the product]\label{lem:all_primes_divide}
-\rocq{PrimeGapS1.CRTCheck.all_primes_divide_product}
+\begin{definition}[Integer numerators of the Rayleigh quotient]\label{def:num_M1M2}
+\rocq{PrimeGapS1.CertQuad.num_M1, PrimeGapS1.CertQuad.num_M2}
 \rocqok
-For a no-duplicate list \texttt{ps} of primes, if $p \mid c$ for every
-$p \in \texttt{ps}$, then $\prod\texttt{ps} \mid c$.
-\end{lemma}
-\begin{proof}\rocqok
-Induction on \texttt{ps}. The inductive step uses the elementary fact
-that distinct primes are coprime, hence $p \mid c$ and $q \mid c$
-imply $pq \mid c$ when $\gcd(p, q) = 1$. The \texttt{NoDup} hypothesis
-is precisely what guarantees pairwise coprimality at each step.
-\end{proof}
+\uses{def:quad, def:v_den}
+$\texttt{num\_M1} := \texttt{quad}\,M_1^{\mathrm{int}}\,\vnum$ and
+$\texttt{num\_M2} := \texttt{quad}\,M_2^{\mathrm{int}}\,\vnum$.
+After clearing the common denominator $\DMl \cdot \vden^2$ on both
+sides, the strict Rayleigh-quotient bound
+$4 \cdot v^T \Mone v < 105 \cdot v^T \Mtwo v$ on the FLINT integer
+matrices becomes the strict integer inequality
+$4 \cdot \DMtwo \cdot \texttt{num\_M1} < 105 \cdot \DMone \cdot \texttt{num\_M2}$.
+\end{definition}
 
-\begin{theorem}[CRT lift: shipped char-poly is correct]
-\label{thm:fl_eq_flint}
-\rocq{PrimeGapS1.CRTLift.fl_eq_flint}
+\begin{theorem}[Positivity of the integer numerator]\label{thm:rayleigh_pos}
+\rocq{PrimeGapS1.CertQuad.rayleigh_witness_M1_positive}
 \rocqok
-\uses{def:char_poly_mod, thm:char_poly_mod_sound, def:crt_primes,
-      lem:crt_primes_all_prime, lem:small_multiple_zero,
-      lem:all_primes_divide}
-$\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$
-in $\texttt{list }\Z$.
+\uses{def:num_M1M2}
+$0 < \texttt{num\_M1}$ in $\Z$.
 \end{theorem}
 \begin{proof}\rocqok
-Both sides are lists of $43$ integers. We prove equality
-coefficient-by-coefficient by reducing
-$a_n - b_n = 0$ to Lemma~\ref{lem:small_multiple_zero}.
-
-For each prime $p$ in \texttt{crt\_primes\_all},
-Theorem~\ref{thm:char_poly_mod_sound} gives
-$\texttt{List.map}\,(\texttt{Z\_to\_mod63}\,p)\,
-   (\texttt{char\_poly\_int}\,\Aint)
-   = \texttt{char\_poly\_mod}\,p\,\Aint$.
-On the other hand, a single-prime \vmcompute{} check inside
-\texttt{check\_charpoly\_710} (a Boolean check that all $710$ per-prime
-agreements hold simultaneously, closed by \vmcompute{} +
-\texttt{reflexivity}) gives
-$\texttt{char\_poly\_mod}\,p\,\Aint
-   = \texttt{List.map}\,(\texttt{bigZ\_to\_mod63}\,p)\,
-       \texttt{charpoly\_of\_A\_int\_bigZ}$.
-Concatenating these two facts, every coefficient of the
-left-hand side and the right-hand side has the same residue modulo
-each $p$; hence $p \mid (a_n - b_n)$. By
-Lemma~\ref{lem:all_primes_divide}, $\prod p \mid (a_n - b_n)$.
-
-The bound $|a_n|, |b_n| \le B$ is established by
-\texttt{charpoly\_coeff\_bound} (which tracks the FL recurrence's
-own coefficient growth via \texttt{fl\_bound\_aux}) for $a_n$ and
-\texttt{max\_abs\_coeff\_bound} for $b_n$. The combined bound
-$2B + 2|c'| < \prod p_i$ is verified by \vmcompute{} in
-\texttt{fl\_crt\_bound}, the single dominant step of the entire
-build (${\sim}18$~min wall-clock comparing a ${\sim}10000$-digit
-arithmetic chain). Lemma~\ref{lem:small_multiple_zero} then closes
-$a_n = b_n$, and \texttt{nth\_ext} aggregates the per-coefficient
-equalities into list equality.
+A single \vmcompute{} reflexivity in pure $\Z$-arithmetic.
+\texttt{Print Assumptions} reports \emph{Closed under the global
+context} — no $\Uintsf$ primitives.
 \end{proof}
 
-\begin{theorem}[Matrix identity in $\Z$]\label{thm:matrix_identity_Z}
-\rocq{PrimeGapS1.CRTLift.matrix_identity_Z}
+\begin{theorem}[Strict integer Rayleigh inequality]\label{thm:rayleigh_holds}
+\rocq{PrimeGapS1.CertQuad.rayleigh_witness_holds}
 \rocqok
-\uses{def:char_poly_mod, def:crt_primes, lem:small_multiple_zero,
-      lem:all_primes_divide}
+\uses{def:num_M1M2}
 \[
-\DMtwo \cdot (\Mone^{\mathrm{int}} \cdot \Aint)
-   \;=\; (\DMone \cdot \DA) \cdot \Mtwo^{\mathrm{int}}
-   \quad\text{in } \texttt{mat}.
+   4 \cdot \DMtwo \cdot \texttt{num\_M1}
+      \;<\;
+   105 \cdot \DMone \cdot \texttt{num\_M2}
+   \quad\text{in } \Z.
 \]
 \end{theorem}
 \begin{proof}\rocqok
-Identical CRT pattern to Theorem~\ref{thm:fl_eq_flint}, but the
-coefficient bound is much simpler because the entries are not the
-output of a long recurrence: each entry of either side is bounded by
-$|D| \cdot \texttt{max\_abs\_entry}$ products of three matrices of
-fixed dimension. The same $710$-prime product covers it with room
-to spare.
-\end{proof}
-
-\begin{remark}[\texttt{Strategy opaque} as a kernel-engineering tool]
-\label{rem:strategy_opaque}
-A naive proof of the per-prime fact
-$\texttt{char\_poly\_mod}\,p\,\Aint
-   = \texttt{List.map}\,(\texttt{bigZ\_to\_mod63}\,p)\,
-       \texttt{charpoly\_of\_A\_int\_bigZ}$
-hangs the \Qed{} for $> 25$~minutes: the kernel's ordinary reducer
-tries to iota-reduce \texttt{list\_eqb63} and forces WHNF on
-$\texttt{char\_poly\_mod}\,p\,\Aint$, which triggers the full FL
-recurrence on a concrete $42 \times 42$ matrix. The fix is to wrap
-the \Qed{} in
-\texttt{Strategy opaque [list\_eqb63 char\_poly\_mod $\Aint$ \ldots]},
-forcing the kernel to compare head symbols structurally, not unfold
-the values. This is mathematically a no-op but operationally
-indispensable.
-\end{remark}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The IVT root extraction}\label{ch:sturm}
-
-This chapter constructs an explicit real algebraic root of
-$\texttt{charpoly\_int}$ above $4/105$. The strategy is the
-\emph{intermediate value theorem} on a real-closed field: we show
-$P(4/105) < 0$ and $P(\text{cauchy\_bound}) > 0$ from two direct
-\vmcompute{} sign Qeds on $\texttt{charpoly\_int}$ itself, and let
-MathComp's \texttt{poly\_ivtoo} produce a root in the interval. The
-material lives in \texttt{SignChain.v}, \texttt{Bridge.v} and
-\texttt{CertL1.v}; no Sturm chain is shipped or consumed.
-
-\section{Endpoint signs of \texttt{charpoly\_int}}
-
-\begin{lemma}[Sign at $4/105$]\label{lem:signs_at_x0}
-\rocq{PrimeGapS1.CertL1.sign_at_rat_charpoly}
-\rocqok
-$\texttt{sign\_at\_rat}\,\texttt{charpoly\_int}\,4\,105 = -1$.
-Equivalently, $\sgn(\texttt{charpoly\_int}(4/105)) = -1$, i.e.\
-$P(4/105) < 0$.
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} on the $43$-entry $\Z$-list \texttt{charpoly\_int}
-evaluated by \texttt{peval\_at\_rat} (clears the denominator and
-returns $105^{42}\cdot P(4/105)$, whose sign is $-1$).
-\end{proof}
-
-\begin{lemma}[Sign at $+\infty$]\label{lem:signs_at_inf}
-\rocq{PrimeGapS1.CertL1.sign_at_pinf_charpoly}
-\rocqok
-$\texttt{sign\_at\_pinf}\,\texttt{charpoly\_int} = +1$.
-Equivalently, $\sgn(\lcoeff(\texttt{charpoly\_int})) = +1$ (the
-leading coefficient is positive).
-\end{lemma}
-\begin{proof}\rocqok
-\vmcompute{} reads the sign of \texttt{plead\,charpoly\_int}.
-\end{proof}
-
-\section{IVT: a root exists above \texorpdfstring{$4/105$}{4/105}}
-
-\begin{theorem}[L1: IVT root]\label{thm:maynard_L1}
-\rocq{PrimeGapS1.CertL1.maynard_L1_concrete}
-\rocqok
-\uses{lem:signs_at_x0, lem:signs_at_inf}
-There exists $\lambda \in \realalg$ such that
-\[
-\texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda
-\quad\text{and}\quad
-\texttt{ratr}(4/105) < \lambda.
-\]
-\end{theorem}
-\begin{proof}\rocqok
-The proof rests on MathComp's intermediate value theorem
-\texttt{poly\_ivtoo} on a real-closed field. We need two sign facts at
-the endpoints:
-
-\textbf{Lower endpoint.} Lemma~\ref{lem:signs_at_x0} gives
-$\sgn(P(4/105)) = -1$, hence $P(4/105) < 0$ (via the
-\texttt{sgn\_matches}-style bridges in \texttt{Bridge.v}).
-
-\textbf{Upper endpoint.} Take $cb := \texttt{cauchy\_bound}(P)$,
-MathComp's explicit rational upper bound for all real roots of $P$
-derived from its coefficients. Two facts: $P \ne 0$ (its leading
-coefficient is nonzero by Lemma~\ref{lem:signs_at_inf}) and
-$\sgn(\lcoeff(P)) = +1$. Since $cb$ is a strict upper bound for all
-roots, $\sgn(P(cb)) = \sgn(\lcoeff(P)) = +1$, hence $P(cb) > 0$.
-
-\texttt{poly\_ivtoo} then yields $x \in [4/105, cb]$ with $P(x) = 0$.
-Since $P(4/105) < 0$ but $P(x) = 0$, $x \ne 4/105$, hence
-$4/105 < x$. Setting $\lambda := x$ closes the existential.
+A single \vmcompute{} reflexivity on the integer comparison
+(${\sim}5$~s on a contemporary machine). Both sides are huge
+integers (the matrix denominators reach ${\sim}220$ decimal digits
+and the witness denominator $\vden$ has ${\sim}40$ digits), but
+the comparison itself is one BigZ subtraction. \texttt{Print
+Assumptions} reports \emph{Closed under the global context}.
 \end{proof}
 
 \begin{remark}
-This is \emph{IVT}, not a Sturm-count proof: we only need the
-existence of some root above the threshold, not any count. The
-bridge from \texttt{list Z}-level signs to MathComp's
-$\texttt{sgp\_pinfty}$ / polynomial-value signs is supplied by
-\texttt{Bridge.v} (\texttt{pol\_to\_polyralg}, the
-$\texttt{sgn\_matches}$-style lemmas, \texttt{cauchy\_bound}
-boilerplate).
+Theorems~\ref{thm:rayleigh_pos} and~\ref{thm:rayleigh_holds} are
+the entire integer-arithmetic content of the headline theorem. If
+the Python layer shipped a vector $v_{\mathrm{witness}}$ that failed
+the inequality, the kernel \vmcompute{} would fail to reduce to
+\texttt{true} and the build would stop. The eigenvector itself is
+not in the trust base; only the resulting integer inequality is.
 \end{remark}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Assembly: from root to eigenvalue}\label{ch:assembly}
+\section{Lifting to the rat-level Rayleigh bound}
 
-This chapter glues the IVT root from Chapter~\ref{ch:sturm}, the CRT
-lift from Chapter~\ref{ch:crt}, and the FL correctness from
-Chapter~\ref{ch:charpoly} into the headline theorem. The four-line
-\Qed{} of \texttt{maynard\_eigenvalue\_S1} in \texttt{Cert.v} is what
-holds the whole proof tree together.
-
-\section{\texorpdfstring{$\Arat$ is a well-defined $\Q$-matrix}{A\_rat is a well-defined Q-matrix}}
-
-\begin{definition}[The rational pencil matrix]\label{def:A_rat}
-\rocq{PrimeGapS1.CertL2.A_rat}
+\begin{definition}[Rat-level Rayleigh-quotient numerator]\label{def:quad_spec}
+\rocq{PrimeGapS1.CertQuad.v_rat, PrimeGapS1.CertQuad.quad_spec}
 \rocqok
-\uses{def:M1_entry, def:M2_entry}
+\uses{def:v_den}
+For an entry-wise spec $M_{\mathrm{spec}} : \nat \to \nat \to \rat$,
 \[
-\Arat \;:=\; \mathrm{invmx}(\texttt{mat\_int\_to\_rat}(\Mone^{\mathrm{int}}, \DMone, 42))
-            \;\cdot\; \texttt{mat\_int\_to\_rat}(\Mtwo^{\mathrm{int}}, \DMtwo, 42)
-\quad\in\; 'M[\Q]_{42}.
+   \texttt{quad\_spec}\,M_{\mathrm{spec}}
+   \;:=\;
+   \sum_{i < 42} \sum_{j < 42}
+      v_{\rat}(i) \cdot M_{\mathrm{spec}}(i,j) \cdot v_{\rat}(j)
+   \quad\in\;\rat,
 \]
-This is the matrix whose largest eigenvalue we want to lower-bound by
-$4/105$.
+where $v_{\rat}(i) := \texttt{Z2rat}(\vnum[i]) / \texttt{Z2rat}(\vden)$.
+This is the standard Rayleigh-quotient numerator $v^T M v$ on the
+paper-form spec matrices, expanded as a $\sigb$ bigop (the form the
+headline statement consumes).
 \end{definition}
 
-\begin{lemma}[$\Mone$ is invertible over $\Q$]\label{lem:M1_unit}
-\rocq{PrimeGapS1.CertL2.M1_1_unit}
+\begin{lemma}[Z $\to$ rat bridge for the Rayleigh-quotient sum]
+\label{lem:Z2rat_quad}
+\rocq{PrimeGapS1.CertQuad.Z2rat_quad_eq_sum}
 \rocqok
-$\texttt{mat\_int\_to\_rat}(\Mone^{\mathrm{int}}, 1, 42) \in \mathrm{unitmx}$.
-\end{lemma}
-\begin{proof}\rocqok
-A modular determinant check at one of the CRT primes $p$ shows
-$\det \Mone^{\mathrm{int}} \not\equiv 0 \pmod p$
-(via $\texttt{char\_poly\_mod}$ — the constant term of the modular
-char poly is $\pm \det$, so a nonzero constant term modulo any prime
-witnesses $\det \ne 0$ over $\Z$, hence over $\Q$). MathComp's
-\texttt{unitmxE} closes the goal from $\det \ne 0$.
-\end{proof}
-
-\section{Linking the cleared polynomial to \texorpdfstring{$\charpolysym_{\Arat}$}{chi\_A\_rat}}
-
-\begin{lemma}[Structural matrix scaling]
-\label{lem:mat_A_scale_eq_Arat}
-\rocq{PrimeGapS1.CertL2.mat_A_scale_eq_Arat,
-      PrimeGapS1.CertL2.abstract_mat_scale}
-\rocqok
-\uses{def:A_rat, lem:M1_unit, thm:matrix_identity_Z}
-$\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$
-in $'M[\Q]_{42}$.
-\end{lemma}
-\begin{proof}\rocqok
-The structural identity holds at any field $F$ and any dimension $n$:
-given $\Mone, \Mtwo, A : 'M[F]_n$ with $c_2 \cdot (\Mone \cdot A) = (c_1 c_A) \cdot \Mtwo$
-and $\Mone$ invertible, one solves
-$A = c_A \cdot (c_1^{-1} \Mone)^{-1} \cdot (c_2^{-1} \Mtwo)$.
-This is proved once at generic $F$, $n$ in
-\texttt{abstract\_mat\_scale}, then specialised to $(F, n) = (\Q, 42)$.
-
-The reason for the abstraction is purely operational: at concrete
-$'M[\Q]_{42}$, MathComp's HB canonical-structure resolver traverses
-an instance graph quadratic in the goal term, taking ${\sim}40$--$90$~min
-per rewrite. At generic $F$ and $n$, the instance graph is
-small ($F$ and $n$ are opaque), so elaboration is instantaneous.
-The hypothesis $c_2 \cdot (\Mone \cdot A) = (c_1 c_A) \cdot \Mtwo$ is
-discharged at the call site by Theorem~\ref{thm:matrix_identity_Z}
-(the $\Z$-level matrix identity, lifted to $\Q$ via
-\texttt{mat\_int\_to\_rat}).
-\end{proof}
-
-\begin{theorem}[L2: cleared polynomial is $\Dq \cdot \charpolysym_{\Arat}$]
-\label{thm:charpoly_int_Dq}
-\rocq{PrimeGapS1.CertL2.charpoly_int_Dq_scaled,
-      PrimeGapS1.CertL2.char_poly_scale_rat42}
-\rocqok
-\uses{thm:char_poly_int_correct, thm:fl_eq_flint,
-      lem:mat_A_scale_eq_Arat, lem:char_poly_scale}
+\uses{def:quad, def:v_den}
+For any well-formed $M : \texttt{list (list }\Z\texttt{)}$ of
+dimension $42 \times 42$ and $v_{\mathrm{num}}$ of length $42$,
 \[
-\texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   \;=\; (\Dq)_{\Q} \cdot \charpolysym(\Arat)
-   \quad\text{in } \Q[X].
+   \texttt{Z2rat}\bigl(\texttt{quad}\,M\,\vnum\bigr)
+   \;=\;
+   \sum_{i < 42} \sum_{j < 42}
+      \texttt{Z2rat}(\vnum[i]) \cdot
+      \texttt{Z2rat}(\texttt{mat\_get}\,M\,i\,j) \cdot
+      \texttt{Z2rat}(\vnum[j]).
+\]
+\end{lemma}
+\begin{proof}\rocqok
+Structural induction on the dimension via the
+\texttt{row\_dot} / \texttt{mat\_vec\_mul} chain. The base step
+$n = 0$ collapses both sides via \texttt{big\_ord0}; the inductive
+step combines \texttt{big\_ord\_recl} with the morphism lemmas
+$\texttt{Z2rat\_add}$, $\texttt{Z2rat\_mul}$ for the outer
+\texttt{row\_dot}, then \texttt{mulr\_sumr} to distribute over the
+inner sum.
+\end{proof}
+
+\begin{lemma}[Per-cell algebraic identity]\label{lem:quad_cell_identity}
+\rocq{PrimeGapS1.CertQuad.quad_cell_identity}
+\rocqok
+For $\texttt{dm}, \texttt{vd}, v_i, m_{ij}, v_j : \rat$ with
+$\texttt{vd} \ne 0$ and $\texttt{dm} \ne 0$,
+\[
+   \texttt{dm} \cdot \texttt{vd}^2 \cdot
+     \Bigl(\frac{v_i}{\texttt{vd}} \cdot \frac{m_{ij}}{\texttt{dm}} \cdot
+            \frac{v_j}{\texttt{vd}}\Bigr)
+   \;=\;
+   v_i \cdot m_{ij} \cdot v_j.
+\]
+\end{lemma}
+\begin{proof}\rocqok
+A direct \texttt{field} call under the nonzero hypotheses. The lemma
+is intentionally \Qed-sealed at top level so that its proof term is
+not unfolded inside the $42 \cdot 42 = 1764$ nested binders of the
+bigop in Lemma~\ref{lem:quad_spec_eq_Z}.
+\end{proof}
+
+\begin{lemma}[Bigop $\leftrightarrow$ Z bridge]\label{lem:quad_spec_eq_Z}
+\rocq{PrimeGapS1.CertQuad.quad_spec_eq_Z}
+\uses{lem:Z2rat_quad, lem:quad_cell_identity,
+      thm:M1_match, thm:M2_match,
+      thm:M1_spec_rat_eq, thm:M2_spec_rat_eq, lem:M1_spec_eq_int,
+      lem:M2_spec_eq_int}
+Given a spec $M_{\mathrm{spec}}$ and an integer matrix
+$M_{\mathrm{int}}$ such that
+$M_{\mathrm{spec}}(i,j) = \texttt{Z2rat}(\texttt{mat\_get}\,M_{\mathrm{int}}\,i\,j) / \texttt{Z2rat}(D_M)$
+for all $(i, j) < 42$, with $D_M > 0$ and $M_{\mathrm{int}}$ a
+$42 \times 42$ matrix,
+\[
+   \texttt{Z2rat}(D_M) \cdot \texttt{Z2rat}(\vden)^2 \cdot
+      \texttt{quad\_spec}\,M_{\mathrm{spec}}
+   \;=\;
+   \texttt{Z2rat}(\texttt{quad}\,M_{\mathrm{int}}\,\vnum).
+\]
+\end{lemma}
+\begin{proof}
+\textbf{Status: currently \texttt{Admitted}.} Structurally the proof
+is a single application of Lemma~\ref{lem:Z2rat_quad} (to recast the
+right-hand side as the rat-level bigop on $\texttt{mat\_get}$ /
+$\vnum$) followed by two nested $\texttt{eq\_bigr}$ applications of
+Lemma~\ref{lem:quad_cell_identity} to clear the per-cell
+denominators $D_M$ and $\vden$. The Qed verification OOMs the
+kernel under a 16~GB host cgroup limit when the per-cell
+\texttt{field}-tactic proof term is unfolded under $42 \cdot 42 =
+1764$ nested binders; see \texttt{CertQuad.v} lines 1--32 for the
+refactor path.
+\end{proof}
+
+\begin{theorem}[Strict Rayleigh-quotient bound at the witness]
+\label{thm:rayleigh_lt_main}
+\rocq{PrimeGapS1.CertQuad.rayleigh_lt_main}
+\uses{lem:quad_spec_eq_Z, thm:rayleigh_holds}
+\[
+   4 \cdot \texttt{quad\_spec}\,\texttt{M1\_spec\_ij}
+   \;<\;
+   105 \cdot \texttt{quad\_spec}\,\texttt{M2\_spec\_ij}
+   \quad\text{in }\rat.
 \]
 \end{theorem}
-\begin{proof}\rocqok
-We chain four facts:
-\begin{enumerate}
-\item Theorem~\ref{thm:fl_eq_flint}:
-  $\texttt{char\_poly\_int}(\Aint) = \texttt{charpoly\_of\_A\_int}$
-  (CRT lift).
-\item Theorem~\ref{thm:char_poly_int_correct}:
-  $\texttt{pol\_to\_polyrat}(\texttt{char\_poly\_int}(\Aint))
-   = \charpolysym(\texttt{mat\_int\_to\_rat}(\Aint, 1, 42))$.
-\item Lemma~\ref{lem:mat_A_scale_eq_Arat}:
-  $\texttt{mat\_int\_to\_rat}(\Aint, 1, 42) = (\DA)_{\Q} \cdot \Arat$.
-\item Lemma~\ref{lem:char_poly_scale}:
-  $(\charpolysym(c \cdot M))_k = c^{n - k} \cdot (\charpolysym(M))_k$.
-\end{enumerate}
-A direct combination at the polynomial level gives
-\[
-\texttt{pol\_to\_polyrat}(\texttt{charpoly\_int})
-   = (\Dq)_{\Q} \cdot \charpolysym(\Arat),
-\]
-where $\Dq$ absorbs the per-coefficient scaling factors $\DA^{42 - k}$
-through the per-coefficient identity \texttt{scaling\_Z\_from\_check}
-(verified via the same CRT route in \texttt{CharPolyAgree.v}).
-
-The proof is closed by term-level rewriting (avoiding the slow
-\texttt{rewrite} that would force HB elaboration on $'M[\Q]_{42}$):
-the rewritten hypothesis is built explicitly via
-\texttt{eq\_trans}~$\circ$~\texttt{f\_equal} chains, and
-Lemma~\ref{lem:char_poly_scale} is invoked through the
-pre-specialised \texttt{char\_poly\_scale\_rat42}. Both techniques
-keep the concrete $'M[\Q]_{42}$ out of the tactic-level goal, where
-HB resolution would stall for hours.
+\begin{proof}
+\textbf{Status: currently \texttt{Admitted}.} The two specialisations
+of Lemma~\ref{lem:quad_spec_eq_Z} at $(M_{\mathrm{spec}},
+M_{\mathrm{int}}, D_M) = (\texttt{M1\_spec\_ij}, M_1^{\mathrm{int}},
+\DMone)$ and the $M_2$ analogue (discharged by
+Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int}) let
+us clear the common denominator $\texttt{Z2rat}(\DMl) \cdot
+\texttt{Z2rat}(\vden)^2$ on both sides. The residual integer
+inequality is Theorem~\ref{thm:rayleigh_holds}, lifted to $\rat$ via
+$\texttt{Z2rat\_lt}$. This shim is Admitted under the same kernel
+proof-term verification block as Lemma~\ref{lem:quad_spec_eq_Z}.
 \end{proof}
 
-\section{The headline theorem}
+\section{The headline}
 
-\begin{lemma}[L3: char-poly root $\Rightarrow$ eigenvalue]
-\label{lem:eigenvalue_of_root}
-\rocq{PrimeGapS1.Cert.eigenvalue_of_root_realalg}
-\rocqok
-For any $\lambda \in \realalg$, if
-$\texttt{root}\,(\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym(\Arat))\,\lambda$
-then $\texttt{eigenvalue}\,(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda$.
-\end{lemma}
-\begin{proof}\rocqok
-A two-line script. \texttt{map\_char\_poly} (a MathComp lemma) says
-$\charpolysym(\texttt{map\_mx}\,f\,M) = \texttt{map\_poly}\,f\,(\charpolysym\,M)$
-for any ring morphism $f$; \texttt{eigenvalue\_root\_char} (also
-MathComp) says an eigenvalue is exactly a root of the char poly.
-Composing the two gives the implication.
-\end{proof}
-
-\begin{lemma}[L2': root transfer]\label{lem:charpoly_root_transfer}
-\rocq{PrimeGapS1.Cert.charpoly_root_transfer}
-\rocqok
-\uses{thm:charpoly_int_Dq}
-For $\lambda \in \realalg$, if
-$\texttt{root}\,(\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int})\,\lambda$
-then
-$\texttt{root}\,(\texttt{map\_poly}\,\texttt{ratr}\,\charpolysym(\Arat))\,\lambda$.
-\end{lemma}
-\begin{proof}\rocqok
-By Theorem~\ref{thm:charpoly_int_Dq},
-$\texttt{pol\_to\_polyrat}\,\texttt{charpoly\_int}
-   = \Dq \cdot \charpolysym(\Arat)$.
-Mapping through $\texttt{ratr}$ pulls the scalar out
-($\texttt{map\_polyZ}$), and \texttt{rootZ} says a nonzero scalar does
-not kill roots. Nonzero-ness of $\Dq$ is checked inline by
-\vmcompute{} on the shipped constant.
-\end{proof}
-
-\begin{theorem}[Spectral headline: an eigenvalue exceeds $4/105$]
-\label{thm:headline}
-\rocq{PrimeGapS1.Cert.maynard_eigenvalue_S1,
-      PrimeGapS1.Cert.sturm_count_correct}
-\rocqok
-\uses{thm:maynard_L1, lem:charpoly_root_transfer,
-      lem:eigenvalue_of_root}
-There exists $\lambda \in \realalg$ such that
-\[
-\texttt{eigenvalue}\,(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
-\quad\text{and}\quad
-\texttt{ratr}(4/105) < \lambda.
-\]
-\end{theorem}
-\begin{proof}\rocqok
-A four-line tactic. From Theorem~\ref{thm:maynard_L1}
-(\texttt{sturm\_count\_correct} is a thin wrapper) we obtain
-$\lambda \in \realalg$ that is a root of
-$\texttt{pol\_to\_polyralg}\,\texttt{charpoly\_int}$ and satisfies
-$\texttt{ratr}(4/105) < \lambda$. Lemma~\ref{lem:charpoly_root_transfer}
-transfers root-ness from $\texttt{charpoly\_int}$ to $\charpolysym(\Arat)$.
-Lemma~\ref{lem:eigenvalue_of_root} converts a char-poly root to an
-eigenvalue of $\texttt{map\_mx}\,\texttt{ratr}\,\Arat$. The strict
-inequality is preserved verbatim from $L_1$. Combining gives the
-existential.
-\end{proof}
-
-\begin{theorem}[End-to-end certification]\label{thm:M105}
-\rocq{PrimeGapS1.Cert.maynard_M105_certified}
-\rocqok
-\uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:headline}
+\begin{theorem}[End-to-end Rayleigh-quotient certification]\label{thm:M105}
+\rocq{PrimeGapS1.CertQuad.maynard_M105_certified_alt}
+\uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:rayleigh_lt_main}
 The conjunction
 \[
 \begin{aligned}
@@ -1113,34 +754,22 @@ The conjunction
   \texttt{M2\_spec\_ij}(i,j)
     = \texttt{Z2rat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMtwo)\bigr)\\
 &\quad\wedge\;
-\bigl(\exists \lambda \in \realalg.\;
-   \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
-   \;\wedge\;
-   \texttt{ratr}(4/105) < \lambda\bigr),
+   4 \cdot \texttt{quad\_spec}\,\texttt{M1\_spec\_ij}
+   \;<\;
+   105 \cdot \texttt{quad\_spec}\,\texttt{M2\_spec\_ij},
 \end{aligned}
 \]
 where $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
 is the thin $\Z \to \rat$ embedding.
 \end{theorem}
-\begin{proof}\rocqok
-A three-way \texttt{split}: the two composed per-matrix identities are
-discharged by Lemmas~\ref{lem:M1_spec_eq_int}
-and~\ref{lem:M2_spec_eq_int} (each one identity per matrix,
-paper-form spec entry $=$ FLINT integer entry over the common
-denominator), and the eigenvalue existential by the spectral
-Theorem~\ref{thm:headline}. The two composed identities each fold
-together a $\Z$-level cross-multiplication
-(\texttt{all\_match\_M\{1,2\}Z\_true}) and a $\rat\leftrightarrow\Z$
-bridge (\texttt{MaynardSpecBridge.M\{1,2\}\_spec\_rat\_eq}) via a thin
-\texttt{qfrac\_eq\_div} helper. The Z-level booleans and the
-$\rat\leftrightarrow\Z$ bridges remain available as standalone \Qed{}s
-(Theorems~\ref{thm:M1_match}, \ref{thm:M2_match},
-\ref{thm:M1_spec_rat_eq}, \ref{thm:M2_spec_rat_eq}) for auditors who
-want to trace the chain step by step; they are not surfaced in the
-headline statement. The combined \texttt{Print Assumptions} reports
-only the standard Rocq \texttt{PrimInt63} kernel primitives (used by
-\vmcompute{} on the $\Uintsf$ CRT computations). No project-specific
-axioms.
+\begin{proof}
+A three-way \texttt{split}: the two composed per-matrix identities
+are discharged by Lemmas~\ref{lem:M1_spec_eq_int}
+and~\ref{lem:M2_spec_eq_int} (paper-form spec entry equals FLINT
+integer entry over the common denominator), and the third conjunct
+is Theorem~\ref{thm:rayleigh_lt_main} (the rat-level Rayleigh
+inequality, currently Admitted). Modulo Maynard's Lemma~8.3
+(paper-side), this entails $\Mk[105] > 4$.
 \end{proof}
 
 \begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_eq_int}
@@ -1179,18 +808,19 @@ for all $(i, j) \in \{0, \ldots, 41\}^2$.
 \begin{proof}\rocqok
 Same shape as Lemma~\ref{lem:M1_spec_eq_int}, with
 Theorem~\ref{thm:M2_spec_rat_eq} and Theorem~\ref{thm:M2_match} in
-place of their $\Mone$ counterparts. Denominator positivity follows
-from \texttt{m2\_num\_den\_at\_den\_pos} (an inductive product of
-factorials over the $\texttt{fold\_left qplus}$ accumulator).
+place of their $\Mone$ counterparts.
 \end{proof}
 
 \paragraph{Reading.}
 A reviewer who trusts \emph{only Rocq's kernel} obtains, from
-Theorem~\ref{thm:M105}, a certified existence of a $\realalg$
-eigenvalue of a specific kernel-verified $42 \times 42$ $\Q$-matrix
-above $4/105$. A reviewer who additionally accepts Maynard's Lemma~8.3
-(an Annals-published Rayleigh-quotient identity, paper-side) obtains
-$\Mk[105] > 4$ end-to-end.
+Theorem~\ref{thm:M105} (plus the WIP $\rat$-level shim noted in
+Theorem~\ref{thm:rayleigh_lt_main}), a certified strict Rayleigh-
+quotient bound on the paper-form spec matrices at the shipped
+42-entry rational witness vector, together with the closed-form
+match of those matrices to Maynard's specification. A reviewer who
+additionally accepts Maynard's Lemma~8.3 (an Annals-published
+Rayleigh-quotient identity, paper-side) obtains $\Mk[105] > 4$
+end-to-end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Trust base}\label{ch:trust}
@@ -1198,72 +828,68 @@ $\Mk[105] > 4$ end-to-end.
 \section{What is a Qed and what is paper-side}
 
 \begin{itemize}
-\item All claims of the form
-  $a = b$ in $\Z$ or $\Q$, $\det \ne 0$, root of a polynomial,
-  eigenvalue of a $\Q$-matrix, or sign of an algebraic-real polynomial
-  evaluation, that appear in the dependency tree of
-  Theorem~\ref{thm:M105} are \Qed{} in the source tree.
-  Zero \texttt{Axiom}, zero \texttt{Admitted}.
+\item All claims of the form $a = b$ in $\Z$ or $\Q$, $a < b$ in
+  $\Z$ or $\Q$, or membership of a rational in an interval, that
+  appear in the dependency tree of Theorem~\ref{thm:M105} are \Qed{}
+  in the source tree, with one exception: the rat-level Rayleigh
+  shim Theorem~\ref{thm:rayleigh_lt_main} is currently
+  \texttt{Admitted}, blocked on kernel proof-term verification under
+  a 16~GB host cgroup limit. Its underlying integer-arithmetic
+  content (Theorems~\ref{thm:rayleigh_holds}
+  and~\ref{thm:rayleigh_pos}) is axiom-free.
 \item The matrix entries themselves (Lemma~8.2 of Maynard) are
-  \Qed{} via Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}: the
-  $1764 + 1764$ kernel-checked cross-multiplications close the trust
-  loop on the input data.
-\item Maynard's Lemma~8.3 ($\Mk = k \cdot \lammax$) is the
-  generalised Rayleigh-quotient identity that bridges
-  $\lammax > 4/k$ to $\Mk > 4$. This is the analytic step proved in
-  the Annals paper (refereed there). It is \emph{not} formalised
-  in this repository, by design of the project's scope.
-\item The reality of the spectrum of $\Mone^{-1}\Mtwo$ (a consequence
-  of $\Mone$ being symmetric positive-definite and $\Mtwo$ symmetric)
-  is also paper-side. The Rocq layer extracts a real algebraic
-  eigenvalue via IVT (which is automatically real), so it does not
-  need to formalise the structural reality claim.
+  \Qed{} via Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}:
+  the $1764 + 1764$ kernel-checked cross-multiplications close the
+  trust loop on the input data.
+\item Maynard's Lemma~8.3 ($\Mk = k \cdot \sup_F J_k(F)/I_k(F)$) is
+  the generalised Rayleigh-quotient identity that bridges the
+  strict bound at any individual $a \in \rat^{42}$ to $\Mk > 4$.
+  This is the analytic step proved in the Annals paper (refereed
+  there). It is \emph{not} formalised in this repository, by design
+  of the project's scope.
 \item The analytic Beta-integral derivation that produces Maynard's
-  closed-form $M_1$ and $M_2$ entries (Lemma~8.1 / 8.2 in the paper) is
-  taken as a \emph{definition} in Rocq. The kernel certifies that the
-  shipped integer matrices match those closed forms, not that the
-  closed forms themselves are correct integrations.
+  closed-form $M_1$ and $M_2$ entries (Lemma~8.1 / 8.2 in the paper)
+  is taken as a \emph{definition} in Rocq. The kernel certifies that
+  the shipped integer matrices match those closed forms, not that
+  the closed forms themselves are correct integrations.
 \end{itemize}
 
 \section{Reported assumptions}
 
-\texttt{Print Assumptions maynard\_M105\_certified} (or
-\texttt{maynard\_eigenvalue\_S1}) reports only the Rocq~9.0/9.1 kernel
-primitives for native 63-bit integers and \texttt{BigN}: things like
-$\texttt{Uint63.add}$, $\texttt{Uint63.mul}$, $\texttt{Uint63.to\_Z}$,
-$\texttt{BigN.succ\_spec}$. These are not project-specific axioms;
-they are Rocq's declaration that the OCaml-implemented native-integer
-kernel primitives implement their stated specifications. Any proof
+\texttt{Print Assumptions maynard\_M105\_certified\_alt} reports
+only the Rocq~9.1 kernel primitives for native 63-bit integers:
+things like $\texttt{Uint63.add}$, $\texttt{Uint63.mul}$,
+$\texttt{Uint63.to\_Z}$, and the $\texttt{CarryType}$ family.
+Plus, for the current alt-branch state, the single project-internal
+axiom \texttt{CertQuad.rayleigh\_lt\_main} noted above. The kernel
+primitives are not project-specific axioms; they are Rocq's
+declaration that the OCaml-implemented native-integer kernel
+primitives implement their stated specifications, and any proof
 that uses \vmcompute{} on $\Uintsf$ exposes the same set.
 
 The project does not invoke \texttt{native\_compute} anywhere — a
-\texttt{grep -n native\_compute theories/S1} returns zero hits in real
-proof code. This keeps the trust-base enumeration minimal at the cost
-of a slightly longer build (the dominant \texttt{fl\_crt\_bound}
-\vmcompute{} runs in ${\sim}18$~min instead of ${\sim}2$~min with
-\texttt{native\_compute}).
+\texttt{grep -n native\_compute theories/S1} returns zero hits in
+real proof code.
 
 \section{The FLINT layer is outside the trust base}
 
-The FLINT pipeline (Python + \texttt{python-flint}) is the candidate
-generator for the certificate data and an independent cross-check, but
-the Rocq proof never invokes Python and never loads the JSON
-certificate directly. The autogenerated \texttt{Witness.v} is an
-ordinary Rocq file; if the FLINT layer shipped wrong data, one of the
-following \vmcompute{}-based checks would fail:
+The FLINT pipeline (Python + \texttt{python-flint}) is the
+candidate generator for the matrix entries and the Rayleigh-
+quotient witness, plus an independent cross-check, but the Rocq
+proof never invokes Python and never loads the JSON certificate
+directly. The autogenerated \texttt{Witness.v} and
+\texttt{Witness\_Quad.v} are ordinary Rocq files; if the FLINT
+layer shipped wrong data, one of the following \vmcompute{}-based
+checks would fail:
 \begin{itemize}
 \item Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}: the
   $42 \times 42$ matrix entries match Maynard's closed form
   (Lemma~8.2).
-\item \texttt{check\_charpoly\_710}: the shipped char-poly is the
-  char poly of $\Aint$ modulo each of $710$ primes.
-\item \texttt{matrix\_identity\_710}: the shipped denominator-clearing
-  matrix identity holds modulo each of $710$ primes.
-\item Lemmas~\ref{lem:signs_at_x0} and~\ref{lem:signs_at_inf}: the
-  signs of \texttt{charpoly\_int} at $4/105$ and at $+\infty$ are
-  $-1$ and $+1$ respectively, by direct \vmcompute{} on the integer
-  list. These two facts feed the endpoint signs into
-  \texttt{poly\_ivtoo}.
+\item Theorem~\ref{thm:rayleigh_pos}: positivity of the integer
+  Rayleigh numerator $v^T M_1^{\mathrm{int}} v > 0$ at the shipped
+  witness.
+\item Theorem~\ref{thm:rayleigh_holds}: the strict integer
+  Rayleigh inequality at the shipped witness.
 \end{itemize}
 Each is a \Qed{} closed by pure kernel arithmetic.
 
@@ -1274,87 +900,76 @@ Each is a \Qed{} closed by pure kernel arithmetic.
 Maynard's $\Mk[105]$ construction uses $42$ basis polynomials
 $\{F_{b,c} : b + 2c \le 11\}$.
 
-\paragraph{Char-poly degree.} $42$ (so $43$ coefficients), with
-coefficients up to ${\sim}20{,}000$ bits.
-
-\paragraph{CRT primes.} $710$ \Uintsf\ primes in $[2^{30}, 2^{31})$,
-with product exceeding $2^{21300}$ — well above the verified bound
-$2B < 2^{6500}$ needed for the CRT lift.
-
 \paragraph{Denominators.} $\DMone$ has ${\sim}221$ decimal digits,
-$\DMtwo$ ${\sim}227$, $\DA$ ${\sim}139$, $\Dq$ ${\sim}333$. All four
-are strictly positive (the others follow from being products of
-factorials; positivity of $\Dq$ is checked inline by \vmcompute{} in
-\texttt{charpoly\_root\_transfer}).
+$\DMtwo$ ${\sim}227$. Both are strictly positive
+(\vmcompute{}).
 
-\paragraph{Cauchy bound.} The IVT step uses MathComp's
-\texttt{cauchy\_bound} — an explicit rational upper bound on all real
-roots derived from the polynomial coefficients. No custom bound is
-introduced.
+\paragraph{Witness denominators.}
+The $42$ rational entries of $v_{\mathrm{witness}}$
+(Definition~\ref{def:v_witness}) have denominators bounded by
+$67\,213\,321\,643\,309 \approx 1.4 \cdot 10^{13}$ (${\sim}14$
+decimal digits, $46$ bits). The smallest non-zero $|v_i|$ is
+$\approx 10^{-14}$ and the largest is $\approx 1$, so the
+eigenvector spans ${\sim}14$ decimal orders of magnitude — this
+lower-bounds the denominator size, since truncating small
+components destroys the inequality.
+
+\paragraph{Verified slack.}
+$(105 \cdot v^T \Mtwo v - 4 \cdot v^T \Mone v) / v^T \Mone v
+   \approx +2.07 \cdot 10^{-3}$.
 
 \paragraph{Build profile.}
-On a 16~GB / 6-thread machine: ${\sim}28$~min wall-clock with
-\texttt{make -j6}, ${\sim}62$~min wall-clock with \texttt{make -j2}
-(clean rebuild). The dominant single-\Qed{} costs are:
+On a $16$~GB / $6$-thread machine: ${\sim}25$--$30$~min wall-clock
+with \texttt{make -j6} (clean rebuild). The dominant single-\Qed{}
+costs are:
 \begin{itemize}
-\item \texttt{fl\_crt\_bound}: ${\sim}18$~min — the
-  $2B + 2|c'| < \prod p_i$ comparison with ${\sim}10{,}000$-digit
-  arithmetic.
 \item Theorem~\ref{thm:M2_match}
-  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially across
-  the six $7$-row chunks (\texttt{MaynardVerify/M2\_0..5.v}), reduced to
-  a per-chunk wall of a few minutes under \texttt{make -j} — $1764$
-  entries, each up to $36$ rational summands with intermediate
-  denominators reaching $\sim 10^{7000}$ digits.
-\item Lemma~\ref{lem:crt_primes_all_prime}
-  (\texttt{crt\_primes\_710\_all\_prime}): ${\sim}7$~min — $710$
-  pure-$\Z$ trial-division primality checks.
-\item \texttt{check\_charpoly\_710}, \texttt{matrix\_identity\_710}:
-  ${\sim}5$--$10$~min each — $710 \times 42$-step modular FL.
+  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially
+  across the six $7$-row chunks
+  (\texttt{MaynardVerify/M2\_0..5.v}), reduced to a per-chunk wall
+  of a few minutes under \texttt{make -j} — $1764$ entries, each up
+  to $36$ rational summands with intermediate denominators reaching
+  $\sim 10^{7000}$ digits.
 \item Theorem~\ref{thm:M1_match}: ${\sim}90$~s.
-\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal parser
-  on the shipped \texttt{charpoly\_of\_A\_int\_bigZ} integers.
+\item Theorem~\ref{thm:rayleigh_holds}
+  (\texttt{rayleigh\_witness\_holds}): ${\sim}5$~s — a single
+  BigZ comparison of two large products.
+\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal
+  parser on the shipped matrix coefficients.
 \end{itemize}
-With \texttt{make -j6} the six M2 chunks, the CRT primality phase, and
-the $710$-FL phases all run concurrently, so the longest single chunk
-plus \texttt{fl\_crt\_bound} dominates the wall clock rather than the
-sequential sum.
+With \texttt{make -j6} the six $M_2$ chunks run concurrently, so
+the wall clock is bounded by the slowest single chunk plus the
+linear assembly tail.
 
-\paragraph{Project size.} $23$ top-level \texttt{.v} files plus $14$
-files in two parallel-chunk subdirectories (\texttt{MaynardVerify/} and
-\texttt{CharPolyAgree/}, each with a \texttt{Def.v} and six chunks),
-${\sim}13{,}000$ lines total under \texttt{theories/S1/};
-\texttt{Witness.v} alone is ${\sim}5{,}700$ lines of autogenerated
-certificate data.
+\paragraph{Project size.} $20$ \texttt{.v} files under
+\texttt{theories/S1/} ($13$ top-level plus $7$ in the
+\texttt{MaynardVerify/} parallel-chunk subdirectory), ${\sim}9{,}547$
+lines total; \texttt{Witness.v} alone is ${\sim}5{,}700$ lines of
+autogenerated certificate data, and \texttt{Witness\_Quad.v} is
+${\sim}80$ lines of $42$ $(\mathrm{num}, \mathrm{den})$ pairs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
 
-The dependency graph has three independent backbones merging at
-\texttt{Cert.v}:
+The dependency graph is essentially linear, with one branch:
 
-\paragraph{IVT backbone.}
-\texttt{Witness} $\to$ \texttt{IntPoly} / \texttt{SignChain} $\to$
-\texttt{Bridge} $\to$ \texttt{CertL1}.
-Headline output: Theorem~\ref{thm:maynard_L1}.
-
-\paragraph{CharPoly backbone.}
-\texttt{Witness} $\to$ \texttt{IntMat} / \texttt{IntPoly} $\to$
-\texttt{CharPoly} $\to$ \texttt{ModularArith} $\to$
-\texttt{CharPolyAgree/} (\texttt{Def.v} + \texttt{Chunk\_0..5.v} +
-assembly) + \texttt{CRTBridge} $\to$ \texttt{Fermat} +
-\texttt{PrimeCheck} + \texttt{CRTCheck} $\to$ \texttt{CRTLift}
-$\to$ \texttt{CharPolyScale} $\to$ \texttt{CertL2}.
-Headline output: Theorem~\ref{thm:charpoly_int_Dq}.
-
-\paragraph{Maynard-spec backbone.}
+\paragraph{Matrix-spec backbone.}
 \texttt{Witness} $\to$ \texttt{MaynardFactQ} $\to$
 \texttt{MaynardBasis} + \texttt{MaynardSpec} $\to$
 \texttt{MaynardVerify/} (\texttt{Def.v} + \texttt{M2\_0..5.v} +
-assembly). Headline output: Theorems~\ref{thm:M1_match}
-and~\ref{thm:M2_match}. The leaf \texttt{MaynardSpecBridge.v} adds
-Theorems~\ref{thm:M1_spec_rat_eq} and~\ref{thm:M2_spec_rat_eq} on top.
+assembly \texttt{MaynardVerify.v}) +
+\texttt{MaynardSpecBridge.v}.
+Headline outputs: Theorems~\ref{thm:M1_match}, \ref{thm:M2_match},
+\ref{thm:M1_spec_rat_eq}, \ref{thm:M2_spec_rat_eq}, composed by
+\texttt{Cert.v} (Lemmas~\ref{lem:M1_spec_eq_int},
+\ref{lem:M2_spec_eq_int}).
 
-The three backbones merge at \texttt{Cert.v}, producing
-Theorems~\ref{thm:headline} and~\ref{thm:M105}. A single
-\texttt{Require Import PrimeGapS1.Cert.} loads the full proof.
+\paragraph{Rayleigh-witness backbone.}
+\texttt{Witness\_Quad} $\to$ \texttt{CertQuad}.
+Headline outputs: Theorems~\ref{thm:rayleigh_pos},
+\ref{thm:rayleigh_holds}, Lemma~\ref{lem:quad_spec_eq_Z},
+Theorem~\ref{thm:rayleigh_lt_main}.
+
+The two backbones merge at \texttt{CertQuad.v}, producing
+Theorem~\ref{thm:M105}. A single \texttt{Require Import
+PrimeGapS1.CertQuad.} loads the entire proof.

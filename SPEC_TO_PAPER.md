@@ -121,9 +121,10 @@ Lemma M{1,2}_spec_eq_int i j :
 ```
 
 where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
-`maynard_M105_certified` exposes this composed identity directly (one
-conjunct per matrix), not the Z-level bool match and the rat<->Z bridge
-as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
+`CertQuad.maynard_M105_certified_alt` exposes this composed identity
+directly (one conjunct per matrix), not the Z-level bool match and
+the rat<->Z bridge as separate conjuncts. The Z-level bool checks
+`all_match_M{1,2}Z_true`
 and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
 `Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
 individually `Print Assumptions`-able — they just no longer appear as
@@ -516,16 +517,18 @@ M_k = sup_F  Σ_m J_k^{(m)}(F) / I_k(F)
 ```
 
 where `M_2` is **per-coordinate** `J_k^{(1)}` (what `M2_entry` computes).
-Equivalently, the Cert.v threshold
+Equivalently, the inequality
 
 ```
-λ_max( M_1^{-1} · M_2 )  >  4 / k  =  4 / 105
+sup_a  a^T M_2 a / a^T M_1 a   >   4 / k   =   4 / 105
 ```
 
-is what gives `M_k > 4`. The Rocq layer proves the existence of *some*
-real eigenvalue of `M_1^{-1} M_2` strictly above `4 / 105`, which is
-≤ `λ_max` (max ≥ any). The factor `k = 105` is paid in the threshold
-`4 / 105`, *not* in the matrix entries.
+is what gives `M_k > 4`. The Rocq layer proves the strict Rayleigh-
+quotient bound `a^T M_2 a / a^T M_1 a > 4 / 105` at a specific
+42-entry rational witness `a = v_witness` (shipped in
+`Witness_Quad.v` and consumed by `CertQuad.v`); the supremum is at
+least the value at any individual `a`. The factor `k = 105` is paid
+in the threshold `4 / 105`, *not* in the matrix entries.
 
 ### PART B twin
 
@@ -587,10 +590,9 @@ the *predicate* (one line: `b + 2c ≤ 11`) and trust the three Qed lemmas.
 
 The order of `maynard_basis` matches `Witness.basis` (the FLINT-shipped
 matrix indexing) by `maynard_basis_eq_witness` (`vm_compute`-Qed). Order
-matters only because matrix rows/columns must align with the entries in
-`M{1,2}_int`; eigenvalues of `M_1^{-1} M_2` are invariant under
-simultaneous row/column permutation, so any ordering of the same set
-yields the same `λ_max`.
+matters because matrix rows/columns and the entries of the witness
+vector `v_witness` (in `Witness_Quad.v`) must all align with the same
+indexing in `M{1,2}_int`.
 
 ### What this restriction is and is not
 
@@ -601,7 +603,7 @@ The supremum of a Rayleigh quotient over a subspace is `≤` the
 unrestricted supremum. So:
 
 ```
-M_{105}  =  sup over full space  ≥  k · λ_max( M_1^{-1} M_2 )  on this 42-dim subspace.
+M_{105}  =  sup over full space  ≥  k · sup_{a in Q^42}  a^T M_2 a / a^T M_1 a  on this 42-dim subspace.
 ```
 
 Because we are proving a *lower bound* `M_{105} > 4`, the subspace
@@ -668,29 +670,36 @@ of digits before `qplus` collapses it.
 
 ## 9. What is NOT verified inside Rocq
 
-### 9.1 Lemma 8.3 (`M_k = k · λ_max(M_1^{-1} M_2)`) — *paper-side only*
+### 9.1 Lemma 8.3 (`M_k = k · sup_F J_k(F)/I_k(F)`) — *paper-side only*
 
-The Rocq layer proves "there exists a real algebraic eigenvalue of
-`M_1^{-1} M_2` strictly above `4/105`" (`Cert.maynard_eigenvalue_S1`).
-Bridging this to `M_{105} > 4` requires:
+The Rocq layer proves the strict Rayleigh-quotient bound
+`4 · a^T M_1 a < 105 · a^T M_2 a` (with `a^T M_1 a > 0`) at the
+specific 42-entry rational witness `a = v_witness` in
+`Witness_Quad.v`, by `CertQuad.rayleigh_witness_holds` (lifted to
+rat via `CertQuad.rayleigh_lt_main`). Bridging this to `M_{105} > 4`
+requires:
 
-(a) Lemma 8.3's identity `M_k = k · λ_max(M_1^{-1} M_2)`
+(a) Lemma 8.3's identity `M_k = k · sup_F J_k(F)/I_k(F)`
     (Lagrange multipliers over a positive-definite Gram matrix), and
-(b) the trivial `λ_max ≥ any real eigenvalue`.
+(b) the trivial `sup ≥ value at any individual F`.
 
 Both are taken on the paper side (REPORT.md §1.4 makes the same
-disclosure).
+disclosure). On this branch we do not formalise any eigenvalue
+computation, characteristic polynomial, or IVT; the proof is the
+single-quotient strategy of Maynard's original Mathematica
+notebook, mechanised in pure-Z arithmetic by `vm_compute`.
 
-### 9.2 Reality of the spectrum of `M_1^{-1} M_2`
+### 9.2 Positivity of `M_1` and the supremum / max equivalence
 
-Inside Rocq we work in `realalg`, the real algebraic closure of `ℚ`,
-so any eigenvalue we extract via IVT is automatically real. We do not
-formalise the structural claim "the spectrum of `M_1^{-1} M_2` is real
-because `M_1` is symmetric PD and `M_2` is symmetric" (Sylvester's law /
-generalised eigenvalue problem). This is correct on the paper side:
-`M_1`, `M_2` are Gram matrices of `L^2` inner products on a 42-dimensional
-subspace of polynomials, hence symmetric; `M_1` is PD because
-`aᵀ M_1 a = ∫ F² ≥ 0` with equality only at `F = 0`.
+Maynard's Lemma 8.3 is the analytic statement
+`M_k = k · sup_F J_k(F)/I_k(F)` for the quadratic forms `J_k`, `I_k`
+defined by `M_2`, `M_1` (paper). The strict Rayleigh-quotient bound
+at *any* fixed `a` is a lower bound on this supremum so long as
+`a^T M_1 a > 0`, which `CertQuad.rayleigh_witness_M1_positive`
+checks for `a = v_witness`. Positivity of `M_1` as a whole (so that
+`a^T M_1 a > 0` is automatic for any nonzero `a`) is not used by
+the Rocq proof — the per-witness positivity is what we need and
+what we verify.
 
 ### 9.3 The Beta-integral derivation `J_k(F)/I_k(F) → closed form`
 
@@ -703,8 +712,8 @@ proof in Maynard. We do not reproduce this analytic step inside Rocq.
 What Rocq *does* certify is that the resulting closed-form rational
 matches the shipped integer matrix `M1_int / D_M1`, `M2_int / D_M2`
 entry-for-entry. So if a reviewer accepts Maynard's Lemma 8.1 / 8.2
-on paper, the kernel guarantees the matrices `Cert.v` consumes are
-exactly the Maynard matrices.
+on paper, the kernel guarantees the matrices `CertQuad.v` consumes
+are exactly the Maynard matrices.
 
 ---
 
@@ -725,5 +734,8 @@ exactly the Maynard matrices.
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
 | `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_eq_int`) |
 | `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_eq_int`) |
-| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified` |
-| `maynard_M105_certified` | `Cert.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |
+| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `CertQuad.maynard_M105_certified_alt` |
+| `maynard_M105_certified_alt` | `CertQuad.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus the strict Rayleigh-quotient bound `4 * quad_spec M1_spec_ij < 105 * quad_spec M2_spec_ij` at the shipped witness vector |
+| `rayleigh_witness_holds` | `CertQuad.v` | integer Rayleigh inequality `4 * D_M2 * v_num^T M1_int v_num < 105 * D_M1 * v_num^T M2_int v_num` at the shipped scaled-integer witness, `vm_compute` Qed, *Closed under the global context* |
+| `rayleigh_witness_M1_positive` | `CertQuad.v` | integer positivity `v_num^T M1_int v_num > 0`, `vm_compute` Qed, *Closed under the global context* |
+| `v_witness` | `Witness_Quad.v` | 42-entry rational witness vector as `list (Z * Z)`; autogenerated by `python/build_quad_witness.py`; verified slack `≈ +2.07e-3` |

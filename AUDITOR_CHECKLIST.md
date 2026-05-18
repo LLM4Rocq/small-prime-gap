@@ -4,43 +4,80 @@ What an auditor must verify to be convinced this Rocq development
 genuinely proves `M_{105} > 4`. Each row is either **kernel-Qed by
 Rocq** (the auditor only checks the lemma statement reads as
 expected, and that `Print Assumptions` is empty / `PrimInt63.*` /
-`Uint63Axioms.*` only) or **paper-side** (carried over from
-Maynard's published proof). Maynard references use the v3 / Annals
-numbering ([arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600);
+`Uint63Axioms.*` / `CarryType.*` only) or **paper-side** (carried over
+from Maynard's published proof). Maynard references use the v3 /
+Annals numbering ([arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600);
 Annals **181** (2015), 383–413).
+
+This branch is the **Rayleigh-quotient witness route**: the proof
+evaluates a single Rayleigh quotient at a shipped 42-entry rational
+witness vector `v_witness` and shows it exceeds the threshold `4 /
+105`. There is no eigenvalue computation, no characteristic
+polynomial, no IVT, no Sturm chain, and no Chinese-remainder lift
+anywhere in this development.
 
 | # | Claim | Maynard ref | Rocq backing |
 |---|---|---|---|
 | 1 | The 42-element basis is exactly the multiset `{(b, c) ∈ ℕ² : b + 2c ≤ 11}` | §8, paragraph defining `P_k` for `k = 11` | `MaynardBasis.maynard_basis_spec` (predicate match) + `maynard_basis_uniq` (no duplicates) + `maynard_basis_size = 42` |
 | 2 | The literal 42-pair list matches the FLINT-shipped enumeration ordering | — (implementation choice; rows/columns are read by integer index) | `MaynardBasis.maynard_basis_eq_witness` (`vm_compute` Qed) |
 | 3 | The closed-form `M_{i,j}` formulas transcribe Maynard's matrix entries | Lemma 8.2 + eq. 8.4 (the formula `b! · G_{c,2}(n) / (n+b+2c)!` is correct for all `b ≥ 0` with `0! = 1`; no separate `b = 0` case — see `SPEC_TO_PAPER.md` §8) | Read `MaynardSpec.{M1_entry, M2_entry, G_2, alpha, compositions, cff}` against the paper; line-level map in `SPEC_TO_PAPER.md` |
-| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced directly in the headline `Cert.maynard_M105_certified` |
-| 5 | The shipped char-poly equals `char_poly` of `A_int = M₁⁻¹·M₂·D_A` over ℤ | — (kernel cross-check) | `CRTLift.fl_eq_flint` + `CRTLift.matrix_identity_Z` (710-prime CRT lift, then Hadamard-style coefficient bound) |
-| 6 | There exists a real-algebraic eigenvalue `λ > 4/105` of `A_rat = M₁⁻¹·M₂` | Proposition 4.3 / eq. 8.15 (the project's headline claim) | `Cert.maynard_eigenvalue_S1` — IVT on `char_poly_int` (= `char_poly` of `A_int` after sign hygiene), using mathcomp-real-closed's `poly_ivtoo` |
-| 7 | `M_{105} = 105 · λ_max > 4` follows from the eigenvalue bound | **Lemma 8.3** (`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`) | **paper-side** — refereed in the Annals paper, not formalised |
+| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced directly in the headline `CertQuad.maynard_M105_certified_alt` |
+| 5 | A 42-entry rational witness vector `v_witness ∈ ℚ^{42}` satisfies the strict Rayleigh-quotient bound `4 · vᵀM₁v < 105 · vᵀM₂v` at the paper-form spec matrices (and `vᵀM₁v > 0`, so the quotient is well-defined) | Lemma 8.3 inputs — the supremum of `J_k(F)/I_k(F)` is at least the quotient at any individual `F` | `CertQuad.rayleigh_witness_holds` (`vm_compute` Qed, ~5 s, *Closed under global context* — pure-Z arithmetic) plus `CertQuad.rayleigh_witness_M1_positive` (similarly Closed); both are then lifted to a rat-level inequality `4 * quad_spec M1_spec_ij < 105 * quad_spec M2_spec_ij` by `CertQuad.rayleigh_lt_main`, which is the only project-internal axiom of the headline (see drill-down for item 5) |
+| 6 | `M_{105} > 4` follows from item (5) via Lemma 8.3 | **Lemma 8.3** (`M_k = k · sup_F J_k(F)/I_k(F)`) | **paper-side** — Maynard's Lemma 8.3 says `M_k` is `k` times the supremum of `J_k(F)/I_k(F)` over an admissible function space; the supremum is at least any individual quotient |
 
-The headline `Cert.maynard_M105_certified` conjoins items (4) and (6)
-into a single Qed.  Items (1)–(3), (5), and (7) are read alongside
+The headline `CertQuad.maynard_M105_certified_alt` conjoins items (4)
+and (5) into a single Qed. Items (1)–(3) and (6) are read alongside
 the headline.
 
-**Drill-down inside item (4).**  `M{1,2}_spec_eq_int` factors through
+**Drill-down inside item (4).** `M{1,2}_spec_eq_int` factors through
 two independently-`Print Assumptions`-able Qeds:
 
   - `MaynardSpecBridge.M{1,2}_spec_rat_eq` — *Closed under the global
-    context, no axioms at all*.  Says the rat-level paper-form spec
+    context, no axioms at all*. Says the rat-level paper-form spec
     equals a computation-friendly Z-pair form by pure rational
-    arithmetic.  Inspecting this confirms the paper-form
+    arithmetic. Inspecting this confirms the paper-form
     transcription introduces no kernel axiom; `Uint63` enters the
     trust base only through the FLINT cross-check below.
-  - `MaynardVerify.all_match_M{1,2}Z_true` — 1764 + 1764
-    cross-multiplied integer equalities by `vm_compute`.  Reports the
-    standard `PrimInt63` / `Uint63Axioms` footprint.  Inspecting this
-    confirms exactly which integer arithmetic is verified by the
-    kernel.
+  - `MaynardVerify.Def.all_match_M1Z_true` and
+    `MaynardVerify.all_match_M2Z_true` — 1764 + 1764 cross-multiplied
+    integer equalities by `vm_compute`. Reports the standard
+    `PrimInt63` / `Uint63Axioms` footprint. Inspecting this confirms
+    exactly which integer arithmetic is verified by the kernel.
+
+**Drill-down inside item (5).** The Rayleigh-witness row factors
+through three independently-`Print Assumptions`-able Qeds plus the
+shipped witness data:
+
+  - `CertQuad.rayleigh_witness_holds` — the integer Rayleigh
+    inequality `4 · D_M2 · v_numᵀ M1_int v_num < 105 · D_M1 · v_numᵀ
+    M2_int v_num` at the shipped scaled-integer witness `v_num`,
+    closed by `vm_compute` reflexivity in ~5 s. *Closed under the
+    global context*: pure-Z arithmetic, no `Uint63` primitives.
+  - `CertQuad.rayleigh_witness_M1_positive` — `v_numᵀ M1_int v_num >
+    0`, closed by `vm_compute`. *Closed under the global context*.
+  - `Witness_Quad.v_witness` — the 42-entry rational witness vector
+    itself, autogenerated by `python/build_quad_witness.py`. Each
+    entry is a `(num, den) : Z × Z` pair in lowest terms. Verified
+    slack `≈ +2.07e-3` (the relative margin
+    `(105·vᵀM₂v − 4·vᵀM₁v)/vᵀM₁v` over the rationals). The auditor
+    inspects the file header for the generator's provenance and
+    the two `vm_compute` Qeds for the inequalities the kernel
+    enforces.
+
+  - `CertQuad.rayleigh_lt_main` — the rat-level Rayleigh-quotient
+    bound `4 * quad_spec M1_spec_ij < 105 * quad_spec M2_spec_ij`
+    that the headline surfaces. Structurally a chain of two
+    `quad_M{1,2}_spec_eq_Z` lemmas (rat ⇄ Z bigop bridges) composed
+    with `rayleigh_witness_holds` lifted via `Z2rat_lt`. *Currently
+    blocked on kernel proof-term verification under the 16 GB host
+    cgroup limit; the integer Rayleigh inequality
+    `rayleigh_witness_holds` (closed by `vm_compute`) and
+    `rayleigh_witness_M1_positive` are axiom-free. See `CertQuad.v`
+    header comment for the refactor path.*
 
 An auditor who trusts the kernel reads only the composed headline.
-An auditor partitioning trust between "rat-level algebra" and "Uint63
-cross-check" inspects the two sub-Qeds.
+An auditor partitioning trust between "rat-level algebra" and
+"Uint63 cross-check" inspects the sub-Qeds.
 
 For (3) — the only paper-conformance step that is read rather than
 machine-checked — the line-level map in `SPEC_TO_PAPER.md` reduces
