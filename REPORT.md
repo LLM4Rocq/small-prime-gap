@@ -30,7 +30,7 @@ trace the closed-form match step-by-step.
 
 > **A short history note.**  The git history shows two earlier
 > incarnations of this development (a Sturm/IVT route on `main`, and a
-> first 1210-prime pencil-determinant draft on `quad`).  Both were
+> first 1210-prime pencil-determinant draft on this branch (then named `quad`)).  Both were
 > retired during the Phase A/B cleanup that produced the current tree:
 > the proof on disk is the standalone pencil-determinant proof
 > described below.  No "alternative route" remains in the repository.
