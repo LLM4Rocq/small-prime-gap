@@ -1,27 +1,24 @@
-(* ============================================================== *)
-(*  MaynardSpecBridge.v                                             *)
-(*                                                                  *)
-(*  Bridge between PART A (rat-level) and PART B (Z-level) of       *)
-(*  MaynardSpec.v.  Each operation in PART A has a directly         *)
-(*  corresponding operation in PART B, so each bridge is a small    *)
-(*  structural induction.                                           *)
-(*                                                                  *)
-(*  Headlines:                                                      *)
-(*    M1_spec_rat_eq i j  :  M1_spec_ij i j = qfrac (m1_num_den_at i j)*)
-(*    M2_spec_rat_eq i j  :  M2_spec_ij i j = qfrac (m2_num_den_at i j)*)
-(*                                                                  *)
-(*  This file is a leaf in the dependency DAG (Cert.v does not      *)
-(*  import it) and is independent of MaynardVerify.v's load-bearing *)
-(*  Z-level cross-check.  Its purpose is to certify in the kernel   *)
-(*  that the rat-level paper-form spec and the Z-level computational*)
-(*  spec encode the same closed forms.                              *)
-(* ============================================================== *)
+(**md**************************************************************************)
+(* # MaynardSpecBridge                                                        *)
+(*                                                                            *)
+(* Bridge between PART A (rat-level) and PART B (Z-level) of MaynardSpec.v.   *)
+(* Each operation in PART A has a directly corresponding operation in PART B, *)
+(* so each bridge is a small structural induction.                            *)
+(*                                                                            *)
+(* Headlines:                                                                 *)
+(*   M1_spec_rat_eq i j : M1_spec_ij i j = qfrac (m1_num_den_at i j)          *)
+(*   M2_spec_rat_eq i j : M2_spec_ij i j = qfrac (m2_num_den_at i j)          *)
+(*                                                                            *)
+(* This file is a leaf in the dependency DAG (Cert.v does not import it) and  *)
+(* is independent of MaynardVerify.v's load-bearing Z-level cross-check.  Its *)
+(* purpose is to certify in the kernel that the rat-level paper-form spec and *)
+(* the Z-level computational spec encode the same closed forms.               *)
+(******************************************************************************)
 
 From Stdlib Require Import ZArith List Lia Znumtheory.
 Import ListNotations.
 
-From mathcomp Require Import all_ssreflect all_algebra.
-Import GRing.Theory.
+From mathcomp Require Import all_boot all_order all_algebra.
 
 From PrimeGapS1 Require Import
   MaynardFactQ MaynardBasis MaynardSpec CharPoly.
@@ -29,6 +26,7 @@ From PrimeGapS1 Require Import
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+Import GRing.Theory Num.Theory.
 
 Local Open Scope ring_scope.
 
@@ -38,11 +36,10 @@ Local Open Scope ring_scope.
 
 (* `factZ n = Z.of_nat n!`.  Pure structural induction. *)
 Lemma factZ_eq_Z_of_nat (n : nat) :
-  factZ n = BinInt.Z.of_nat n`!.
+  factZ n = Z.of_nat n`!.
 Proof.
   elim: n => [//|n IH] /=.
-  rewrite IH factS.
-  by rewrite -multE Nat2Z.inj_mul.
+  by rewrite IH factS -multE Nat2Z.inj_mul.
 Qed.
 
 (* `Z_to_int (factZ n) = Posz n!`. *)
@@ -57,7 +54,7 @@ Proof. by rewrite Z_to_int_factZ /factQ. Qed.
 
 (* nat-level: m! divides n! when m <= n.  Standard induction. *)
 Lemma fact_dvd_fact (m n : nat) :
-  (m <= n)%nat -> (m`! %| n`!)%nat.
+  (m <= n)%N -> (m`! %| n`!)%N.
 Proof.
   elim: n => [|n IH] H.
   - by rewrite leqn0 in H; rewrite (eqP H).
@@ -70,15 +67,16 @@ Qed.
 
 (* Z.of_nat preserves divisibility from nat to Z. *)
 Lemma Z_of_nat_dvd (a b : nat) :
-  (a %| b)%nat -> (Z.of_nat a | Z.of_nat b)%Z.
+  (a %| b)%N -> (Z.of_nat a | Z.of_nat b)%Z.
 Proof.
-  move=> /dvdnP[k Hk]. exists (Z.of_nat k).
+  move=> /dvdnP[k Hk].
+  exists (Z.of_nat k).
   by rewrite Hk -multE Nat2Z.inj_mul Z.mul_comm.
 Qed.
 
 (* Z-level: factZ x divides factZ (2*x) for any nat x. *)
 Lemma factZ_dvd_double (x : nat) :
-  (factZ x | factZ (2 * x)%nat)%Z.
+  (factZ x | factZ (2 * x)%N)%Z.
 Proof.
   rewrite !factZ_eq_Z_of_nat.
   apply: Z_of_nat_dvd; apply: fact_dvd_fact.
@@ -90,7 +88,7 @@ Lemma factZ_pos (n : nat) : Z.lt 0 (factZ n).
 Proof.
   rewrite factZ_eq_Z_of_nat.
   have /ltP H := fact_gt0 n.
-  lia.
+  by lia.
 Qed.
 
 (* `Z_to_int` of a strictly-positive Z is nonzero in int. *)
@@ -142,16 +140,13 @@ Lemma prod_dblratZ_to_rat (a : list nat) :
 Proof.
   elim: a => [|x a IH] /=.
   - by rewrite Z_to_int_1_rat big_nil.
-  - rewrite Z_to_int_mul intrM dblratZ_to_rat IH.
-    by rewrite big_cons.
+  - by rewrite Z_to_int_mul intrM dblratZ_to_rat IH big_cons.
 Qed.
 
 (* `cffZ a = prod_dblratZ a` definitionally; bridge is direct. *)
 Lemma cffZ_to_rat (a : list nat) :
   ((Z_to_int (cffZ a))%:~R : rat) = cff a.
-Proof.
-  by rewrite /cffZ /cff prod_dblratZ_to_rat.
-Qed.
+Proof. by rewrite /cffZ /cff prod_dblratZ_to_rat. Qed.
 
 (* ============================================================== *)
 (*  Layer 2: binZ                                                   *)
@@ -160,39 +155,44 @@ Qed.
 (* nat-level: k! * (n-k)! divides n! when k <= n.  Standard via
    bin_fact: 'C(n,k) * (k! * (n-k)!) = n!. *)
 Lemma bin_dvd_fact (n k : nat) :
-  (k <= n)%nat -> (k`! * (n - k)`! %| n`!)%nat.
+  (k <= n)%N -> (k`! * (n - k)`! %| n`!)%N.
 Proof.
-  move=> Hkn. apply/dvdnP. exists 'C(n,k).
+  move=> Hkn.
+  apply/dvdnP.
+  exists 'C(n,k).
   by rewrite -(bin_fact Hkn).
 Qed.
 
 (* Z-level lift: factZ k * factZ (n-k) divides factZ n. *)
 Lemma factZ_factZ_dvd (n k : nat) :
-  (k <= n)%nat ->
-  (factZ k * factZ (n - k)%nat | factZ n)%Z.
+  (k <= n)%N ->
+  (factZ k * factZ (n - k)%N | factZ n)%Z.
 Proof.
   move=> Hkn.
   rewrite !factZ_eq_Z_of_nat -Nat2Z.inj_mul.
-  apply: Z_of_nat_dvd. exact: bin_dvd_fact.
+  apply: Z_of_nat_dvd.
+  exact: bin_dvd_fact.
 Qed.
 
 Lemma factZ_factZ_pos (n k : nat) :
-  Z.lt 0 (factZ k * factZ (n - k)%nat).
+  Z.lt 0 (factZ k * factZ (n - k)%N).
 Proof.
   apply: Z.mul_pos_pos; exact: factZ_pos.
 Qed.
 
 (* binQ n k = factQ n / (factQ k * factQ (n-k)) when k <= n. *)
 Lemma binQ_factQ (n k : nat) :
-  (k <= n)%nat ->
-  binQ n k = factQ n / (factQ k * factQ (n - k)%nat).
+  (k <= n)%N ->
+  binQ n k = factQ n / (factQ k * factQ (n - k)%N).
 Proof.
   move=> Hkn.
-  have Hnz : factQ k * factQ (n - k)%nat != 0
+  have Hnz : factQ k * factQ (n - k)%N != 0
     by rewrite mulf_neq0 ?factQ_neq0.
   apply: (canRL (mulfK Hnz)).
   rewrite /binQ /factQ -natrM -natrM.
-  apply/eqP. rewrite Num.Theory.eqr_nat. apply/eqP.
+  apply/eqP.
+  rewrite eqr_nat.
+  apply/eqP.
   exact: bin_fact.
 Qed.
 
@@ -225,15 +225,15 @@ Qed.
    `iota`, `flatten` and `[seq _ | _ <- _]` are conv-equal to
    Stdlib's `List.seq`, `List.concat` and `List.map`. *)
 Lemma iota_seq_eq (m n : nat) : iota m n = List.seq m n.
-Proof. exact: erefl. Qed.
+Proof. by []. Qed.
 
 Lemma flatten_concat T (s : seq (seq T)) :
   flatten s = List.concat s.
-Proof. exact: erefl. Qed.
+Proof. by []. Qed.
 
 Lemma seq_map_eq T1 T2 (f : T1 -> T2) (l : seq T1) :
   [seq f x | x <- l] = List.map f l.
-Proof. exact: erefl. Qed.
+Proof. by []. Qed.
 
 Lemma flat_map_concat_map T1 T2 (f : T1 -> list T2) (l : list T1) :
   List.flat_map f l = List.concat (List.map f l).
@@ -273,7 +273,7 @@ Lemma fold_left_Zadd_sum (xs : list Z) :
   \sum_(z <- xs) ((Z_to_int z)%:~R).
 Proof.
   elim: xs => [|x xs IH] /=.
-  - rewrite big_nil. by [].
+  - by rewrite big_nil.
   - rewrite fold_left_Zadd_acc /=.
     rewrite Z_to_int_add intrD IH big_cons.
     by rewrite addrC.
@@ -291,7 +291,8 @@ Proof.
     apply: eq_big_seq => r Hr.
     rewrite Z_to_int_mul intrM binZ_to_rat.
     congr (_ * _).
-    rewrite fold_left_Zadd_sum -seq_map_eq -compositionsZ_eq_compositions big_map.
+    rewrite fold_left_Zadd_sum -seq_map_eq.
+    rewrite -compositionsZ_eq_compositions big_map.
     apply: eq_big_seq => a Ha.
     by rewrite cffZ_to_rat.
 Qed.
@@ -348,15 +349,13 @@ Lemma m1_num_den_to_rat (bi ci bj cj : nat) :
   qfrac (m1_num_den bi ci bj cj) = M1_entry bi ci bj cj.
 Proof.
   rewrite /qfrac /m1_num_den /M1_entry.
-  rewrite Z_to_int_mul intrM !factZ_to_rat G2Z_to_rat.
-  by rewrite mulrAC.
+  by rewrite Z_to_int_mul intrM !factZ_to_rat G2Z_to_rat mulrAC.
 Qed.
 
 Lemma M1_spec_rat_eq (i j : nat) :
   M1_spec_ij i j = qfrac (m1_num_den_at i j).
 Proof.
-  rewrite /M1_spec_ij /m1_num_den_at.
-  by rewrite m1_num_den_to_rat.
+  by rewrite /M1_spec_ij /m1_num_den_at m1_num_den_to_rat.
 Qed.
 
 (* ============================================================== *)
@@ -364,7 +363,7 @@ Qed.
 (* ============================================================== *)
 
 Lemma Z_to_int_factZ_neq0 (n : nat) : Z_to_int (factZ n) != 0.
-Proof. apply: Z_to_int_pos_neq0. exact: factZ_pos. Qed.
+Proof. apply: Z_to_int_pos_neq0; exact: factZ_pos. Qed.
 
 Lemma Z_to_int_qplus_den_neq0 (a b : Z * Z) :
   Z_to_int a.2 != 0 -> Z_to_int b.2 != 0 ->
@@ -384,7 +383,7 @@ Qed.
 
 Lemma Z_to_int_alphaZ_den_neq0 (b c cp : nat) :
   Z_to_int (alphaZ b c cp).2 != 0.
-Proof. by rewrite /alphaZ /=; exact: Z_to_int_factZ_neq0. Qed.
+Proof. by rewrite /alphaZ /=; apply: Z_to_int_factZ_neq0. Qed.
 
 Lemma Z_to_int_m2_term_den_neq0 bi ci bj cj cp1 cp2 :
   Z_to_int (m2_term_num_den bi ci bj cj cp1 cp2).2 != 0.
@@ -430,7 +429,9 @@ Proof.
     + rewrite qfrac_qplus //.
       by rewrite big_cons addrA.
     + by apply: Z_to_int_qplus_den_neq0.
-    + move=> t' Ht'. apply: Hl. by right.
+    + move=> t' Ht'.
+      apply: Hl.
+      by right.
 Qed.
 
 Lemma fold_left_qplus_den_neq0 (l : list (Z * Z)) (acc : Z * Z) :
@@ -440,11 +441,16 @@ Lemma fold_left_qplus_den_neq0 (l : list (Z * Z)) (acc : Z * Z) :
 Proof.
   elim: l acc => [|x l IH] acc Hacc Hl //=.
   apply: IH.
-  - apply: Z_to_int_qplus_den_neq0 => //. apply: Hl. by left.
-  - move=> t Ht. apply: Hl. by right.
+  - apply: Z_to_int_qplus_den_neq0 => //.
+    apply: Hl.
+    by left.
+  - move=> t Ht.
+    apply: Hl.
+    by right.
 Qed.
 
-Lemma fold_left_inner_to_map (T : Type) (l : list T) (g : T -> Z * Z) (acc : Z * Z) :
+Lemma fold_left_inner_to_map (T : Type) (l : list T) (g : T -> Z * Z)
+    (acc : Z * Z) :
   List.fold_left (fun acc' x => qplus acc' (g x)) l acc =
   List.fold_left qplus (List.map g l) acc.
 Proof. by elim: l acc => [|x l IH] acc //=; rewrite IH. Qed.
@@ -460,8 +466,7 @@ Qed.
 
 Lemma qfrac_init : qfrac (Z0, Zpos xH) = (0 : rat).
 Proof.
-  rewrite /qfrac /=.
-  by rewrite mul0r.
+  by rewrite /qfrac /= mul0r.
 Qed.
 
 (* Sum bridge for the inner row. *)
@@ -487,21 +492,25 @@ Lemma m2_outer_qfrac (outer : list nat) (acc : Z * Z) bi ci bj cj :
 Proof.
   elim: outer acc => [|cp1 outer IH] acc Hacc /=.
   - by rewrite big_nil addr0.
-  - have Hin : forall t,
-      List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) ->
+  - have Hin : forall t, List.In t
+        (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) ->
       Z_to_int t.2 != 0.
-      move=> t /List.in_map_iff[cp2 [<- _]]. exact: Z_to_int_m2_term_den_neq0.
+      move=> t /List.in_map_iff[cp2 [<- _]].
+      exact: Z_to_int_m2_term_den_neq0.
     have Hnext : Z_to_int (List.fold_left qplus
-      (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj))) acc).2 != 0
+      (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 0 (S cj)))
+      acc).2 != 0
       by apply: fold_left_qplus_den_neq0.
     have Hterm0 : Z_to_int (m2_term_num_den bi ci bj cj cp1 0).2 != 0
       by exact: Z_to_int_m2_term_den_neq0.
     have Hacc' : Z_to_int (qplus acc (m2_term_num_den bi ci bj cj cp1 0)).2 != 0
       by apply: Z_to_int_qplus_den_neq0.
-    have Hrest : forall t : Z * Z,
-        List.In t (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 1 cj)) ->
+    have Hrest : forall t : Z * Z, List.In t
+        (List.map (m2_term_num_den bi ci bj cj cp1) (List.seq 1 cj)) ->
         Z_to_int t.2 != 0.
-      move=> t Ht. apply: Hin. by right.
+      move=> t Ht.
+      apply: Hin.
+      by right.
     rewrite IH //.
     rewrite fold_left_qplus_qfrac //.
     rewrite qfrac_qplus //.
@@ -533,8 +542,7 @@ Qed.
 Lemma M2_spec_rat_eq (i j : nat) :
   M2_spec_ij i j = qfrac (m2_num_den_at i j).
 Proof.
-  rewrite /M2_spec_ij /m2_num_den_at.
-  by rewrite m2_num_den_to_rat.
+  by rewrite /M2_spec_ij /m2_num_den_at m2_num_den_to_rat.
 Qed.
 
 (* ============================================================== *)
@@ -604,7 +612,7 @@ Definition Z2rat (z : Z) : rat := (Z_to_int z)%:~R.
 
 Lemma qfrac_eq_div (a b c d : Z) :
   Z.lt 0 b -> Z.lt 0 d ->
-  BinInt.Z.mul a d = BinInt.Z.mul c b ->
+  Z.mul a d = Z.mul c b ->
   qfrac (a, b) = Z2rat c / Z2rat d.
 Proof.
   move=> Hb Hd Heq.

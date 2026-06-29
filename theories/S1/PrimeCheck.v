@@ -1,8 +1,14 @@
-(* PrimeCheck.v — Z-level trial division primality checker.
-   Proves check_prime_Z_sound for Stdlib's Znumtheory.prime, then
-   bridges to MathComp's ssrnat.prime via check_prime_Z_mc. *)
+(**md**************************************************************************)
+(* # PrimeCheck                                                              *)
+(*                                                                           *)
+(* Z-level trial-division primality checker.  Proves                         *)
+(* [check_prime_Z_sound] for Stdlib's [Znumtheory.prime], then bridges to    *)
+(* MathComp's [ssrnat.prime] via [check_prime_Z_mc].                         *)
+(*                                                                           *)
+(******************************************************************************)
 
-From Stdlib Require Import ZArith List Lia Bool Znumtheory.
+From Stdlib Require Import ZArith Lia Bool Znumtheory.
+From mathcomp Require Import all_boot.
 
 Fixpoint check_no_divisor (p d : Z) (fuel : nat) : bool :=
   match fuel with
@@ -17,18 +23,25 @@ Lemma check_no_divisor_sound p d fuel :
   check_no_divisor p d fuel = true ->
   forall k, (d <= k < d + Z.of_nat fuel)%Z -> (Z.modulo p k <> 0)%Z.
 Proof.
-  revert d. induction fuel as [|f IH]; intros d Hcheck k Hk; [lia|].
-  simpl in Hcheck. apply Bool.andb_true_iff in Hcheck. destruct Hcheck as [Hcur Hrest].
-  apply negb_true_iff in Hcur. apply Z.eqb_neq in Hcur.
-  destruct (Z.eq_dec k d) as [->|]; [exact Hcur | apply (IH _ Hrest k); lia].
+  revert d.
+  induction fuel as [|f IH]; intros d Hcheck k Hk; [lia|].
+  simpl in Hcheck.
+  apply andb_true_iff in Hcheck.
+  destruct Hcheck as [Hcur Hrest].
+  apply negb_true_iff in Hcur.
+  apply Z.eqb_neq in Hcur.
+  by destruct (Z.eq_dec k d) as [->|]; [exact Hcur | apply (IH _ Hrest k); lia].
 Qed.
 
 Lemma check_prime_Z_sound p : check_prime_Z p = true -> Znumtheory.prime p.
 Proof.
-  unfold check_prime_Z. intros H.
-  apply Bool.andb_true_iff in H. destruct H as [Hgt1 Hnd]. apply Z.ltb_lt in Hgt1.
+  unfold check_prime_Z.
+  intros Hchk.
+  apply andb_true_iff in Hchk.
+  destruct Hchk as [Hgt1 Hnd].
+  apply Z.ltb_lt in Hgt1.
   constructor; [lia|].
-  intros n Hn. destruct Hn as [Hn1 Hn2].
+  intros n [Hn1 Hn2].
   apply Zgcd_1_rel_prime.
   set (g := Z.gcd n p).
   destruct (Z.eq_dec g 1) as [|Hne]; [assumption|exfalso].
@@ -48,7 +61,9 @@ Proof.
   - assert (Hmod : Z.modulo p g <> 0%Z).
     { apply (check_no_divisor_sound p 2 _ Hnd).
       pose proof (Z.sqrt_nonneg p). rewrite Z2Nat.id; lia. }
-    apply Hmod. rewrite Hq. apply Z.mod_mul. lia.
+    apply Hmod.
+    rewrite Hq.
+    by apply Z.mod_mul; lia.
   - assert (Hq2 : (2 <= q)%Z).
     { pose proof (Z.gcd_divide_l n p) as Hgn2. fold g in Hgn2.
       destruct Hgn2 as [r Hr].
@@ -56,7 +71,10 @@ Proof.
     assert (Hmod : Z.modulo p q <> 0%Z).
     { apply (check_no_divisor_sound p 2 _ Hnd).
       pose proof (Z.sqrt_nonneg p). rewrite Z2Nat.id; lia. }
-    apply Hmod. rewrite Hq. rewrite Z.mul_comm. apply Z.mod_mul. lia.
+    apply Hmod.
+    rewrite Hq.
+    rewrite Z.mul_comm.
+    by apply Z.mod_mul; lia.
 Qed.
 
 (* Bridge to MathComp's ssrnat.prime *)
@@ -88,13 +106,17 @@ Proof.
   have Hgcd_ge : (Z.of_nat d <= Z.gcd (Z.of_nat d) p)%Z.
   { apply: Z.divide_pos_le; [lia|].
     by apply: Z.gcd_greatest; [exists 1; lia|]. }
-  lia.
+  by lia.
 Qed.
 
 Lemma check_prime_Z_mc p : check_prime_Z p = true -> prime (Z.to_nat p).
 Proof.
-  intro H. apply Zprime_to_ssrprime.
-  - unfold check_prime_Z in H. apply Bool.andb_true_iff in H.
-    destruct H as [H _]. apply Z.ltb_lt in H. lia.
-  - exact (check_prime_Z_sound _ H).
+  intro Hchk.
+  apply Zprime_to_ssrprime.
+  - unfold check_prime_Z in Hchk.
+    apply andb_true_iff in Hchk.
+    destruct Hchk as [Hgt _].
+    apply Z.ltb_lt in Hgt.
+    by lia.
+  - exact: (check_prime_Z_sound _ Hchk).
 Qed.

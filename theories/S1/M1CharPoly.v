@@ -1,55 +1,58 @@
-(**md*** M1CharPoly: char_poly(M1_int) = cp_M1_value via CRT ***)
+(* (c) Copyright 2024-2026, prime_gap contributors. License: CeCILL-B.        *)
 
-(* ===================================================================
-   M1CharPoly.v -- the integer characteristic-polynomial identity for
-   the 42x42 witness matrix M1_int, certified by CRT over Stdlib's Z.
+(**md
+# M1CharPoly
 
-   Two results are exported:
+The integer characteristic-polynomial identity for the 42x42 witness
+matrix `M1_int`, certified by CRT over Stdlib's `Z`.
 
-     char_poly_int_M1_eq : char_poly_int M1_int = cp_M1_value
-     cp_M1_alternates    : alternating_signs cp_M1_value = true
-                           /\ 0 < nth 0 cp_M1_value 0
-                           /\ 0 < last cp_M1_value 0
+Two results are exported:
 
-   The first is proved coefficient-by-coefficient (both lists have
-   length 43).  For each index k and each prime p of the table
-   crt_primes_M1, the two k-th coefficients are congruent mod p,
-   because (a) ModularFL.char_poly_modZ_sound -- fed
-   CRTFrame.M1_square / M1_fl_div / crt_primes_M1_all_prime /
-   crt_primes_M1_gt43 -- gives
-       char_poly_modZ p M1_int = map (.mod p) (char_poly_int M1_int)
-   and (b) CRTFrame.per_prime_ok gives
-       char_poly_modZ p M1_int = map (.mod p) cp_M1_value.
-   The Hadamard-style coefficient bound from Bound
-   (char_poly_int_coeff_bound) together with a single vm_compute
-   check that 4 * fl_coeff_bound 42 (max_abs_entry M1_int) is below
-   the product of the table primes lets CRTCheck.crt_reconstruct
-   collapse the congruences into an honest equality over Z.
+- `char_poly_int_M1_eq : char_poly_int M1_int = cp_M1_value`
+- `cp_M1_alternates : alternating_signs cp_M1_value = true`,
+  with `0 < nth 0 cp_M1_value 0` and `0 < last cp_M1_value 0`
 
-   The second result records that the coefficients of cp_M1_value
-   strictly alternate in sign with positive constant and leading
-   terms -- the integer shadow of M1 being positive definite (all
-   eigenvalues real and > 0).
+The first is proved coefficient-by-coefficient (both lists have length
+43).  For each index `k` and each prime `p` of the table
+`crt_primes_M1`, the two k-th coefficients are congruent mod `p`,
+because (a) `ModularFL.char_poly_modZ_sound` -- fed
+`CRTFrame.M1_square` / `M1_fl_div` / `crt_primes_M1_all_prime` /
+`crt_primes_M1_gt43` -- gives
+`char_poly_modZ p M1_int = map (.mod p) (char_poly_int M1_int)`, and
+(b) `CRTFrame.per_prime_ok` gives
+`char_poly_modZ p M1_int = map (.mod p) cp_M1_value`.  The
+Hadamard-style coefficient bound from `Bound`
+(`char_poly_int_coeff_bound`), together with a single `vm_compute`
+check that `4 * fl_coeff_bound 42 (max_abs_entry M1_int)` is below the
+product of the table primes, lets `CRTCheck.crt_reconstruct` collapse
+the congruences into an honest equality over `Z`.
 
-   No Uint63 / PrimInt63 / native_compute / Axiom / Parameter appears;
-   the only nonstandard assumption inherited is CRTFrame.per_prime_all
-   (a TODO-BRIDGE vm_compute upstream).
-   =================================================================== *)
+The second result records that the coefficients of `cp_M1_value`
+strictly alternate in sign with positive constant and leading terms --
+the integer shadow of M1 being positive definite (all eigenvalues real
+and > 0).
+
+No Uint63 / PrimInt63 / native_compute / Axiom / Parameter appears; the
+only nonstandard assumption inherited is `CRTFrame.per_prime_all`.
+
+TODO(2026-06, gb): `CRTFrame.per_prime_all` is a bridge `vm_compute`
+lemma discharged upstream.
+*)
 
 From Stdlib Require Import ZArith List Bool Lia.
-From Stdlib Require Znumtheory.
+From Stdlib Require Znumtheory. (* used qualified as Z.* *)
 Import ListNotations.
 From PrimeGapS1 Require Import IntMat CharPoly Witness WitnessM1CharPoly.
 From PrimeGapS1 Require Import CRTCheck ModularFL Bound CRTFrame FLDiv.
 
-Open Scope Z_scope.
+Local Open Scope Z_scope.
 
 (* ================================================================== *)
 (* Section 1: structural facts about M1_int                            *)
 (* ================================================================== *)
 
 Local Lemma M1_len : length M1_int = 42%nat.
-Proof. vm_compute. reflexivity. Qed.
+Proof. now vm_compute. Qed.
 
 Local Lemma M1_rows :
   forall i, (i < length M1_int)%nat -> length (nth i M1_int []) = length M1_int.
@@ -70,7 +73,7 @@ Local Definition cp_bound : Z :=
   fl_coeff_bound (length M1_int) (max_abs_entry M1_int).
 
 Local Lemma cp_bound_nonneg : 0 <= cp_bound.
-Proof. rewrite <- Z.leb_le. vm_compute. reflexivity. Qed.
+Proof. now (rewrite <- Z.leb_le; vm_compute). Qed.
 
 (* Every coefficient of the claimed polynomial is within the bound. *)
 Local Lemma cp_coeff_bound (k : nat) :
@@ -92,7 +95,7 @@ Local Lemma mod_eq_divide (a b p : Z) :
   p <> 0 -> a mod p = b mod p -> (p | a - b).
 Proof.
   intros Hp Heq. apply Z.mod_divide; [exact Hp|].
-  rewrite Zminus_mod, Heq, Z.sub_diag. apply Z.mod_0_l; exact Hp.
+  rewrite Zminus_mod, Heq, Z.sub_diag. exact (Z.mod_0_l p Hp).
 Qed.
 
 Local Lemma nth_map_eq_mod (l1 l2 : list Z) (p : Z) (k : nat) :
@@ -102,7 +105,7 @@ Proof.
   intro H.
   rewrite <- (map_nth (fun c => c mod p) l1 0 k).
   rewrite <- (map_nth (fun c => c mod p) l2 0 k).
-  rewrite H. reflexivity.
+  now rewrite H.
 Qed.
 
 (* ================================================================== *)
@@ -188,7 +191,7 @@ Theorem cp_M1_alternates :
   /\ 0 < last cp_M1_value 0.
 Proof.
   split; [|split].
-  - vm_compute. reflexivity.
-  - rewrite <- Z.ltb_lt. vm_compute. reflexivity.
-  - rewrite <- Z.ltb_lt. vm_compute. reflexivity.
+  - now vm_compute.
+  - now (rewrite <- Z.ltb_lt; vm_compute).
+  - now (rewrite <- Z.ltb_lt; vm_compute).
 Qed.

@@ -11,7 +11,7 @@
 From Stdlib Require Import ZArith List Bool Lia Znumtheory.
 Import ListNotations.
 
-Open Scope Z_scope.
+Local Open Scope Z_scope.
 
 (* --- Arithmetic helpers ---------------------------------------- *)
 
@@ -46,8 +46,7 @@ Local Lemma fold_left_mul_assoc : forall (l : list Z) (a : Z),
 Proof.
   induction l as [|x l IHl]; intros a.
   - simpl. lia.
-  - change (fold_left Z.mul (x :: l) a) with (fold_left Z.mul l (Z.mul a x)).
-    change (fold_left Z.mul (x :: l) 1%Z) with (fold_left Z.mul l (Z.mul 1 x)).
+  - cbn [fold_left].
     rewrite IHl. rewrite (IHl (Z.mul 1 x)). nia.
 Qed.
 
@@ -55,7 +54,7 @@ Qed.
 Local Lemma fold_left_mul_pos (l : list Z) (acc : Z) :
   (0 < acc)%Z ->
   (forall z, In z l -> (0 < z)%Z) ->
-  (0 < List.fold_left Z.mul l acc)%Z.
+  (0 < fold_left Z.mul l acc)%Z.
 Proof.
   revert acc. induction l as [|z l IH]; intros acc Hacc Hall; simpl.
   - exact Hacc.
@@ -99,14 +98,12 @@ Proof.
     assert (Hp1 : (1 < p)%Z) by (destruct Hp; lia).
     assert (k = 0 \/ k >= 1 \/ k <= -1)%Z by lia.
     destruct H as [H|[H|H]]; nia.
-  - simpl in Hdiv. rewrite fold_left_mul_assoc in Hdiv.
+  - cbn [fold_left] in Hdiv. rewrite fold_left_mul_assoc in Hdiv.
     assert (Hpq : p <> q) by (intro; subst; apply Hnotin; left; reflexivity).
     assert (Hprime_q : prime q) by (apply Hprimes; left; reflexivity).
     apply prime_mult in Hdiv; [| exact Hp].
     destruct Hdiv as [Hdiv | Hdiv].
-    + replace (match q with 0 => 0 | Z.pos y' => Z.pos y'
-               | Z.neg y' => Z.neg y' end) with q in Hdiv
-        by (destruct q; reflexivity).
+    + rewrite Z.mul_1_l in Hdiv.
       exact (prime_not_divide_other_prime p q Hp Hprime_q Hpq Hdiv).
     + apply IHqs; auto.
       * intros r Hr. apply Hprimes. right. exact Hr.
@@ -122,10 +119,7 @@ Lemma all_primes_divide_product : forall (ps : list Z) (c : Z),
 Proof.
   induction ps as [|p ps IHps]; intros c Hnd Hprimes Hdivs.
   - simpl. exists c. lia.
-  - simpl. rewrite fold_left_mul_assoc.
-    replace (match p with 0 => 0 | Z.pos y' => Z.pos y'
-             | Z.neg y' => Z.neg y' end) with p
-      by (destruct p; reflexivity).
+  - cbn [fold_left]. rewrite fold_left_mul_assoc. rewrite Z.mul_1_l.
     apply coprime_div_mul.
     + apply Hdivs. left. reflexivity.
     + apply IHps.
@@ -140,22 +134,23 @@ Proof.
         -- inversion Hnd; assumption.
 Qed.
 
-(* --- Boolean NoDup check for list Z (ported from CRTLift) ------- *)
+(* --- Boolean NoDup check for list Z ---------------------------- *)
 
 Fixpoint nodup_Z (l : list Z) : bool :=
   match l with
   | nil => true
-  | x :: rest => negb (List.existsb (Z.eqb x) rest) && nodup_Z rest
+  | x :: rest => negb (existsb (Z.eqb x) rest) && nodup_Z rest
   end.
 
 Lemma nodup_Z_sound (l : list Z) : nodup_Z l = true -> NoDup l.
 Proof.
   induction l as [|a l IH]; intro H; [constructor|].
-  simpl in H. apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+  simpl in H. apply andb_true_iff in H. destruct H as [H1 H2].
   constructor.
-  - intro Hin. apply Bool.negb_true_iff in H1.
-    assert (Hex : List.existsb (Z.eqb a) l = true).
-    { apply List.existsb_exists. exists a. split; [exact Hin | apply Z.eqb_refl]. }
+  - intro Hin. apply negb_true_iff in H1.
+    assert (Hex : existsb (Z.eqb a) l = true).
+    { apply existsb_exists. exists a.
+      split; [exact Hin | apply Z.eqb_refl]. }
     rewrite Hex in H1. discriminate.
   - exact (IH H2).
 Qed.
@@ -165,8 +160,8 @@ Qed.
 (*                                                                  *)
 (*  If every prime in a NoDup list divides (c - d), and twice the    *)
 (*  absolute value of (c - d) is below the product of those primes,  *)
-(*  then c = d.  This is the assembly used near det_M1_int_eq in     *)
-(*  CRTPencilCheck.v, packaged for downstream reuse.                 *)
+(*  then c = d.  Packaged as the reusable CRT reconstruction step    *)
+(*  for downstream det-equality checks.                              *)
 (* ================================================================ *)
 
 Lemma crt_reconstruct (c d : Z) (ps : list Z) :

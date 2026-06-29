@@ -14,7 +14,8 @@
          Znumtheory.prime p ->
          square_mat (length M) M ->
          (Z.of_nat (length M) + 1 < p)%Z ->
-         fl_all_divisible (length M) 1 M (meye (length M)) (mzero (length M)) 1 ->
+         fl_all_divisible (length M) 1 M
+           (meye (length M)) (mzero (length M)) 1 ->
          char_poly_modZ p M = map (fun c => c mod p) (char_poly_int M).
 
    The division step is justified by Fermat's little theorem
@@ -26,11 +27,10 @@
    =================================================================== *)
 
 From Stdlib Require Import ZArith List Lia.
-Import ListNotations.
-Open Scope Z_scope.
-
-From PrimeGapS1 Require Import IntMat CharPoly Fermat FLDiv PrimeCheck.
 From Stdlib Require Znumtheory.
+From PrimeGapS1 Require Import IntMat CharPoly Fermat FLDiv PrimeCheck.
+Import ListNotations.
+Local Open Scope Z_scope.
 
 (* ================================================================== *)
 (* Section 0: modular scalar arithmetic over Z                         *)
@@ -152,12 +152,13 @@ Local Lemma mfl_powmodZ_pos_spec (p base : Z) (e : positive) :
   (0 < p)%Z -> powmodZ_pos p base e = (base ^ Z.pos e) mod p.
 Proof.
   intros Hp. induction e as [e IH|e IH|].
-  - cbn [powmodZ_pos]. unfold mulmodZ. rewrite IH.
-    rewrite <- Zmult_mod. rewrite Zmult_mod_idemp_r. rewrite mfl_Z_pow_xI_eq.
+  - cbn [powmodZ_pos]. unfold mulmodZ.
+    rewrite IH, <- Zmult_mod, Zmult_mod_idemp_r, mfl_Z_pow_xI_eq.
     reflexivity.
-  - cbn [powmodZ_pos]. unfold mulmodZ. rewrite IH.
-    rewrite <- Zmult_mod. rewrite mfl_Z_pow_xO_eq. reflexivity.
-  - cbn [powmodZ_pos]. change (Z.pos 1) with 1%Z. rewrite Z.pow_1_r. reflexivity.
+  - cbn [powmodZ_pos]. unfold mulmodZ.
+    rewrite IH, <- Zmult_mod, mfl_Z_pow_xO_eq. reflexivity.
+  - cbn [powmodZ_pos]. change (Z.pos 1) with 1%Z.
+    rewrite Z.pow_1_r. reflexivity.
 Qed.
 
 Local Lemma mfl_invmodZ_spec (p a : Z) :
@@ -187,9 +188,7 @@ Proof.
   rewrite <- (Z.mul_1_r q) at 1.
   rewrite !Z.mod_mod; [|lia|lia].
   rewrite <- Z.mul_mod; [|lia].
-  rewrite <- Z.mul_assoc.
-  rewrite (Z.mul_comm k (k ^ (p - 2))).
-  rewrite Z.mul_assoc.
+  rewrite <- Z.mul_assoc, (Z.mul_comm k (k ^ (p - 2))), Z.mul_assoc.
   rewrite Z.mul_mod; [|lia].
   replace (q * k ^ (p - 2) * k) with (q * (k * k ^ (p - 2))) by lia.
   rewrite Z.mul_mod; [|lia].
@@ -238,8 +237,8 @@ Proof.
   - symmetry; apply Z.mod_0_l; exact Hp.
   - symmetry; apply Z.mod_0_l; exact Hp.
   - symmetry; apply Z.mod_0_l; exact Hp.
-  - unfold addmodZ, mulmodZ. rewrite IH.
-    rewrite <- Zmult_mod. rewrite <- Zplus_mod. reflexivity.
+  - unfold addmodZ, mulmodZ.
+    rewrite IH, <- Zmult_mod, <- Zplus_mod. reflexivity.
 Qed.
 
 Local Lemma mfl_vscaleZ_sound (p c : Z) (xs : list Z) :
@@ -263,7 +262,8 @@ Local Lemma mfl_vaddZ_sound (p : Z) (xs ys : list Z) :
   map (fun a => a mod p) (vadd xs ys)
   = vaddZ p (map (fun a => a mod p) xs) (map (fun a => a mod p) ys).
 Proof.
-  revert ys. induction xs as [|x xs' IH]; intros [|y ys']; simpl; try reflexivity.
+  revert ys.
+  induction xs as [|x xs' IH]; intros [|y ys']; simpl; try reflexivity.
   f_equal; [|exact (IH ys')].
   unfold addmodZ. apply Zplus_mod.
 Qed.
@@ -370,9 +370,7 @@ Proof.
       with ((map (fun c => c mod p) row) :: reduceZ p rest) by reflexivity.
     cbn [mtraceZ_aux mtrace_aux].
     unfold addmodZ.
-    rewrite (mfl_nth_Z_map_mod p row i Hp).
-    rewrite IH.
-    rewrite <- Zplus_mod. reflexivity.
+    rewrite (mfl_nth_Z_map_mod p row i Hp), IH, <- Zplus_mod. reflexivity.
 Qed.
 
 Local Lemma mfl_mtraceZ_sound (p : Z) (M : mat) :
@@ -486,7 +484,8 @@ Proof.
     assert (Hst0 : (0 <= Z.of_nat st)%Z) by apply Zle_0_nat.
     assert (Hss : Z.of_nat (S st) = (Z.of_nat st + 1)%Z)
       by (rewrite Nat2Z.inj_succ; lia).
-    destruct (mfl_fl_all_divisible_S st k A I_n M_prev c_prev Hdiv) as [Hkdiv Hrest].
+    destruct (mfl_fl_all_divisible_S st k A I_n M_prev c_prev Hdiv)
+      as [Hkdiv Hrest].
     set (M_k := madd (mmul A M_prev) (mscale c_prev I_n)) in *.
     set (tr := mtrace (mmul A M_k)) in *.
     set (c_new := Z.div (Z.opp tr) k) in *.

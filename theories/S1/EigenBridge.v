@@ -1,29 +1,26 @@
 (**md**************************************************************************)
-(* # EigenBridge                                                             *)
-(*                                                                           *)
-(* Eigenvalue route for M_{105} > 4 on the rayleigh branch.  Phase 2 here:   *)
-(* the rational matrices and the `matches_closed_forms` trust contract.      *)
-(* The spectral bridge (Phases 3-5) is added on top of `SpectralCrux` and    *)
-(* the positive-definiteness certificate.                                    *)
-(*                                                                           *)
-(* ```                                                                       *)
+(* # EigenBridge                                                              *)
+(*                                                                            *)
+(* Eigenvalue route for M_{105} > 4 on the rayleigh branch.  Phase 2 here:    *)
+(* the rational matrices and the `matches_closed_forms` trust contract.       *)
+(*                                                                            *)
+(* ```                                                                        *)
 (*   M1_rat == M1_int / D_M1   as 'M[rat]_42                                  *)
 (*   M2_rat == M2_int / D_M2   as 'M[rat]_42                                  *)
 (*   A_rat  == invmx M1_rat *m M2_rat        (= M1^-1 M2)                     *)
 (*   M105   == 105 *: A_rat                  (= 105 * M1^-1 M2)               *)
 (*   matches_closed_forms M == M is M105 and the paper-form spec entries      *)
 (*                             agree with the FLINT-shipped integer data      *)
-(* ```                                                                       *)
+(* ```                                                                        *)
 (******************************************************************************)
 
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 From PrimeGapS1 Require Import IntMat CharPoly Witness.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge Cert.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
 Import GRing.Theory.
 
 Local Open Scope ring_scope.
@@ -48,6 +45,6 @@ Definition matches_closed_forms (M : 'M[rat]_42) : Prop :=
 Lemma matches_closed_forms_M105 : matches_closed_forms M105.
 Proof.
 split; first by [].
-- move=> i j Hi Hj; exact: (M1_spec_eq_int Hi Hj).
-- move=> i j Hi Hj; exact: (M2_spec_eq_int Hi Hj).
+- move=> i j Hi Hj; exact: M1_spec_eq_int Hi Hj.
+- move=> i j Hi Hj; exact: M2_spec_eq_int Hi Hj.
 Qed.

@@ -7,10 +7,10 @@
        M_{i,j}_spec  =  Z2rat (mat_get M_int i j) / Z2rat D_M
                                           for all  i, j < 42.
 
-   On the rayleigh branch, the headline theorem `maynard_M105_certified_rayleigh`
-   in `CertRayleigh.v` combines this two-way identity (which gives auditor-
-   level parity with Maynard's paper formulas) with the strict Rayleigh-
-   quotient bound on `(v_witness, M1, M2)`.
+   On the rayleigh branch, the headline theorem
+   `maynard_M105_certified_rayleigh` in `CertRayleigh.v` combines this
+   two-way identity (which gives auditor-level parity with Maynard's paper
+   formulas) with the strict Rayleigh-quotient bound on `(v_witness, M1, M2)`.
 
    There is no eigenvalue, characteristic polynomial, realalg, IVT,
    Sturm, or CRT machinery on this branch.  The only Z-level Qed used
@@ -19,7 +19,7 @@
 
 From Stdlib Require Import ZArith.
 
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_algebra.
 Import GRing.Theory.
 
 From PrimeGapS1 Require Import IntMat Witness.
@@ -42,9 +42,8 @@ Lemma M1_spec_eq_int {i j} :
 Proof.
   move=> Hi Hj.
   rewrite M1_spec_rat_eq.
-  have Hmatch : M1_entry_matchZ i j = true := M1_entry_match_in_grid Hi Hj.
-  rewrite M1_entry_matchZ_E in Hmatch.
-  move/Z.eqb_eq: Hmatch => Hcross.
+  move: (M1_entry_match_in_grid Hi Hj).
+  rewrite M1_entry_matchZ_E => /Z.eqb_eq Hcross.
   rewrite [m1_num_den_at i j]surjective_pairing.
   by apply: qfrac_eq_div;
     [exact: m1_num_den_at_den_pos | exact: D_M1_pos | exact: Hcross].
@@ -56,9 +55,8 @@ Lemma M2_spec_eq_int {i j} :
 Proof.
   move=> Hi Hj.
   rewrite M2_spec_rat_eq.
-  have Hmatch : M2_entry_matchZ i j = true := M2_entry_match_in_grid Hi Hj.
-  rewrite M2_entry_matchZ_E in Hmatch.
-  move/Z.eqb_eq: Hmatch => Hcross.
+  move: (M2_entry_match_in_grid Hi Hj).
+  rewrite M2_entry_matchZ_E => /Z.eqb_eq Hcross.
   rewrite [m2_num_den_at i j]surjective_pairing.
   by apply: qfrac_eq_div;
     [exact: m2_num_den_at_den_pos | exact: D_M2_pos | exact: Hcross].

@@ -1,24 +1,29 @@
-(* ===================================================================
-   FLDiv.v -- Pure-Z helpers for the Faddeev-LeVerrier CRT certificate.
+(**md
+# FLDiv
 
-   This file collects the *integer-only* (no Uint63) infrastructure
-   that the CRT-over-Z characteristic-polynomial certificate needs:
+Pure-`Z` helpers for the Faddeev-LeVerrier CRT certificate.
 
-   - `square_mat` and its preservation under `mmul`, `mscale`, `madd`;
-   - `fl_all_divisible`, the step-by-step FL divisibility predicate;
-   - `fl_all_divisible_from_L2`, which discharges `fl_all_divisible`
-     from CharPoly's `fl_divisibility_L2` (Newton's identities).
+This file collects the *integer-only* (no `Uint63`) infrastructure that the
+CRT-over-`Z` characteristic-polynomial certificate needs:
 
-   These are relocated, verbatim and Uint63-free, from the pencil
-   branch's CRTBridge.v.  Only stdlib Z arithmetic is used; no
-   PrimInt63 / native_compute / Axiom / Parameter appears here.
-   =================================================================== *)
+| name                       | meaning                              |
+|----------------------------|--------------------------------------|
+| `square_mat`               | `n`x`n` integer matrix predicate     |
+| `square_mat_mmul`          | `square_mat` preserved under `mmul`  |
+| `square_mat_mscale`        | `square_mat` preserved under `mscale`|
+| `square_mat_madd`          | `square_mat` preserved under `madd`  |
+| `fl_all_divisible`         | step-by-step FL divisibility         |
+| `fl_all_divisible_from_L2` | `fl_all_divisible` from `..._L2`     |
+
+These are relocated, verbatim and `Uint63`-free, from the pencil branch's
+`CRTBridge.v`.  Only stdlib `Z` arithmetic is used; no
+`PrimInt63` / `native_compute` / `Axiom` / `Parameter` appears here.
+*)
 
 From Stdlib Require Import ZArith List Lia.
-Import ListNotations.
-Open Scope Z_scope.
-
 From PrimeGapS1 Require Import IntMat CharPoly.
+Import ListNotations.
+Local Open Scope Z_scope.
 
 (* ================================================================== *)
 (* Section 1: Structural length lemmas                                 *)
@@ -52,7 +57,8 @@ Qed.
 
 Local Lemma mtrans_fuel_length (fuel : nat) (M : list (list Z)) :
   M <> nil ->
-  (forall j, (j < List.length M)%nat -> (fuel <= List.length (List.nth j M []))%nat) ->
+  (forall j, (j < List.length M)%nat ->
+    (fuel <= List.length (List.nth j M []))%nat) ->
   List.length (mtrans_fuel fuel M) = fuel.
 Proof.
   revert M. induction fuel as [|f IH]; intros M Hne Hwf.
@@ -94,7 +100,8 @@ Local Lemma vadd_length (xs ys : list Z) :
   List.length xs = List.length ys ->
   List.length (vadd xs ys) = List.length xs.
 Proof.
-  revert ys. induction xs as [|x xs' IH]; intros [|y ys'] Hlen; simpl in *; try lia.
+  revert ys. induction xs as [|x xs' IH]; intros [|y ys'] Hlen;
+    simpl in *; try lia.
   f_equal. apply IH. lia.
 Qed.
 
@@ -110,7 +117,8 @@ Local Lemma madd_length (A B : list (list Z)) :
   List.length A = List.length B ->
   List.length (madd A B) = List.length A.
 Proof.
-  revert B. induction A as [|ra A' IH]; intros [|rb B'] Hlen; simpl in *; try lia.
+  revert B. induction A as [|ra A' IH]; intros [|rb B'] Hlen;
+    simpl in *; try lia.
   f_equal. apply IH. lia.
 Qed.
 
@@ -185,9 +193,11 @@ Lemma square_mat_madd (n : nat) (A B : list (list Z)) :
   square_mat n (madd A B).
 Proof.
   intros [HdA HwA] [HdB HwB]. split.
-  - unfold mat_dim. rewrite madd_length; [exact HdA | unfold mat_dim in *; lia].
+  - unfold mat_dim.
+    rewrite madd_length; [exact HdA | unfold mat_dim in *; lia].
   - intros i Hi.
-    apply madd_nth_length; [unfold mat_dim in *; lia| | |unfold mat_dim in HdA; lia].
+    apply madd_nth_length;
+      [unfold mat_dim in *; lia | | | unfold mat_dim in HdA; lia].
     + intros j Hj. apply HwA. unfold mat_dim in HdA; lia.
     + intros j Hj. apply HwB. unfold mat_dim in HdB; lia.
 Qed.
@@ -240,7 +250,8 @@ Proof.
   cut (forall steps j, (j + steps <= n)%nat ->
     fl_all_divisible steps (Z.of_nat (S j)) M (meye (mat_dim M))
       (fst (fl_state j M)) (snd (fl_state j M))).
-  { intros H. rewrite <- Hdim in *. exact (H (mat_dim M) 0%nat (Nat.le_refl _)). }
+  { intros H. rewrite <- Hdim in *.
+    exact (H (mat_dim M) 0%nat (Nat.le_refl _)). }
   induction steps as [|s IH]; intros j Hj.
   - exact I.
   - simpl. split.
@@ -250,16 +261,18 @@ Proof.
       pose proof (@fl_divisibility_L2 M n (S j) Hdim Hwf) as Hdiv.
       assert (H1 : is_true (ssrnat.leq 1 (S j))) by reflexivity.
       assert (H2 : is_true (ssrnat.leq (S j) n))
-        by (unfold is_true, ssrnat.leq; apply Nat.eqb_eq; unfold ssrnat.subn; lia).
+        by (unfold is_true, ssrnat.leq; apply Nat.eqb_eq;
+            unfold ssrnat.subn; lia).
       specialize (Hdiv H1 H2).
-      unfold fl_M_int_k in Hdiv. simpl fl_state in Hdiv. rewrite HFS in Hdiv. simpl fst in Hdiv.
+      unfold fl_M_int_k in Hdiv. simpl fl_state in Hdiv.
+      rewrite HFS in Hdiv. simpl fst in Hdiv.
       apply Z.rem_divide in Hdiv; [exact Hdiv|lia].
     + replace (Z.of_nat (S j) + 1)%Z with (Z.of_nat (S (S j))) by lia.
       specialize (IH (S j) ltac:(lia)).
       destruct (fl_state j M) as [Mj cj] eqn:HFS.
       simpl fst in *. simpl snd in *. rewrite HFS in IH. simpl in IH.
-      replace (Z.pos (PosDef.Pos.of_succ_nat j + 1)) with
-        (Z.pos (PosDef.Pos.succ (PosDef.Pos.of_succ_nat j))) by lia.
+      replace (Z.pos (Pos.of_succ_nat j + 1)) with
+        (Z.pos (Pos.succ (Pos.of_succ_nat j))) by lia.
       exact IH.
 Qed.
 

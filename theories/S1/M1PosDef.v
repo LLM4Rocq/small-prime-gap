@@ -28,7 +28,7 @@
 (* ```                                                                       *)
 (******************************************************************************)
 
-From mathcomp Require Import all_ssreflect all_algebra all_field.
+From mathcomp Require Import all_boot all_order all_algebra all_field.
 From mathcomp Require Import spectral.
 From PrimeGapS1 Require Import IntMat CharPoly Witness WitnessM1CharPoly.
 From PrimeGapS1 Require Import EigenBridge SpectralCrux M1CharPoly.
@@ -74,7 +74,7 @@ Definition M1_sym_check : bool :=
      (List.seq 0 42).
 
 Lemma M1_sym_checkE : M1_sym_check = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. by vm_compute. Qed.
 
 Lemma M1_get_sym (i j : 'I_42) :
   mat_get M1_int (nat_of_ord i) (nat_of_ord j)
@@ -91,11 +91,7 @@ exact: (Hrow (nat_of_ord j) Ij).
 Qed.
 
 Lemma MZ_sym : trmx MZ = MZ.
-Proof.
-apply/matrixP => i j.
-rewrite !mxE.
-by rewrite (M1_get_sym i j).
-Qed.
+Proof. by apply/matrixP => i j; rewrite !mxE (M1_get_sym i j). Qed.
 
 Lemma Mz_C_real : Mz_C \is a mxOver Num.real.
 Proof.
@@ -108,9 +104,7 @@ Lemma Mz_C_sym : Mz_C \is symmetricmx.
 Proof.
 apply/is_hermitianmxP.
 rewrite expr0 scale1r.
-apply/matrixP => i j.
-rewrite !mxE.
-by rewrite (M1_get_sym i j).
+by apply/matrixP => i j; rewrite !mxE (M1_get_sym i j).
 Qed.
 
 Lemma Mz_C_herm : Mz_C \is hermsymmx.
@@ -131,7 +125,7 @@ have Hb : List.forallb (fun r => Nat.eqb (List.length r) 42) M1_int = true
   by vm_compute.
 apply/Nat.eqb_eq.
 apply: (proj1 (forallb_forall _ _) Hb).
-apply: nth_In. exact Hi.
+by apply: nth_In; exact: Hi.
 Qed.
 
 Lemma cp_Mz :
@@ -170,18 +164,18 @@ Proof.
 elim => [|k IH] l Halt Hlen.
 - destruct l as [|x [|y l']]; simpl in Hlen; try lia.
   simpl in Halt. move/andP: Halt => [H1 _].
-  simpl. apply/Z.ltb_lt. exact H1.
+  by simpl; apply/Z.ltb_lt; exact: H1.
 - destruct l as [|x l']; simpl in Hlen; try lia.
   destruct l' as [|y l'']; simpl in Hlen; try lia.
   simpl in Halt. move/andP: Halt => [_ H2].
   apply: (IH (y :: l'')).
-  + exact H2.
+  + exact: H2.
   + simpl in Hlen |- *. lia.
 Qed.
 
 Lemma signsq (k : nat) : ((-1 : int) ^+ k * (-1) ^+ k = 1)%R.
 Proof.
-rewrite -exprMn_comm; last by apply: mulrC.
+rewrite -exprMn_comm; last exact: mulrC.
 by rewrite mulrNN mul1r expr1n.
 Qed.
 
@@ -189,22 +183,21 @@ Lemma sgnprod (k : nat) : ((-1 : int) ^+ k * (-1) ^+ (S k) = -1)%R.
 Proof. by rewrite exprS mulrCA signsq mulr1. Qed.
 
 Lemma zc0_pos : (0 < Z_to_int (List.nth 0 cp_M1_value 0%Z))%R.
-Proof. apply: Zti_pos. exact: (proj1 (proj2 cp_M1_alternates)). Qed.
+Proof. by apply: Zti_pos; exact: (proj1 (proj2 cp_M1_alternates)). Qed.
 
 Lemma zc_sign (k : nat) :
   (k < List.length cp_M1_value)%coq_nat ->
   (0 < Z_to_int (List.nth k cp_M1_value 0%Z) * (-1) ^+ k)%R.
 Proof.
 elim: k => [|k IH] Hk.
-- rewrite expr0 mulr1. exact: zc0_pos.
+- by rewrite expr0 mulr1; exact: zc0_pos.
 - have IH' : (0 < Z_to_int (List.nth k cp_M1_value 0%Z) * (-1) ^+ k)%R
     by apply: IH; lia.
   have Hadj : (Z_to_int (List.nth k cp_M1_value 0%Z)
                * Z_to_int (List.nth (S k) cp_M1_value 0%Z) < 0)%R.
-    rewrite -Z_to_int_mul. apply: Zti_neg.
-    apply: (alt_signs_adj k cp_M1_value (proj1 cp_M1_alternates)). exact Hk.
-  rewrite -(pmulr_rgt0 _ IH') mulrACA sgnprod mulrN1 oppr_gt0.
-  exact Hadj.
+    rewrite -Z_to_int_mul; apply: Zti_neg.
+    by apply: (alt_signs_adj k cp_M1_value (proj1 cp_M1_alternates)); exact: Hk.
+  by rewrite -(pmulr_rgt0 _ IH') mulrACA sgnprod mulrN1 oppr_gt0; exact: Hadj.
 Qed.
 
 Lemma zc_nonneg (k : nat) :
@@ -228,7 +221,7 @@ have term_ge : forall i : nat, 0 <= (char_poly Mz_C)`_i * x ^+ i.
   move=> i.
   rewrite cpC_coef.
   have xE : x = (-1) * (- x) by rewrite mulN1r opprK.
-  rewrite xE exprMn_comm; last by apply: mulrC.
+  rewrite xE exprMn_comm; last exact: mulrC.
   rewrite mulrA -intr_sign -intrM.
   apply: mulr_ge0.
     by rewrite ler0z; exact: zc_nonneg.
@@ -334,9 +327,9 @@ Lemma map_ratr_scale (a : rat) (A : 'M[rat]_42) :
   map_mx (ratr : rat -> C) (a *: A) = ratr a *: map_mx ratr A.
 Proof. by apply/matrixP => i j; rewrite !mxE rmorphM. Qed.
 
-(* The denominator factors out of `mat_int_to_rat`.  Proved GENERICALLY in    *)
-(* `M`, `D`, `n` so that the entrywise `mxE` runs on abstract symbols and      *)
-(* never forces `Z_to_int D_M1` (whose `Pos.to_nat` would be ~10^200 in unary).*)
+(* The denominator factors out of `mat_int_to_rat`.  Proved GENERICALLY in   *)
+(* `M`, `D`, `n` so the entrywise `mxE` runs on abstract symbols and never    *)
+(* forces `Z_to_int D_M1` (whose `Pos.to_nat` would be ~10^200 in unary).     *)
 Lemma mat_int_to_rat_den (M : mat) (D : Z) (n : nat) :
   mat_int_to_rat M D n = ((Z_to_int D)%:~R : rat)^-1 *: mat_int_to_rat M 1 n.
 Proof.
@@ -371,11 +364,7 @@ Qed.
 
 Lemma scaleC_tC (a : C) (A : 'M[C]_42) :
   ((a *: A) ^t*)%sesqui = a^* *: (A ^t*)%sesqui.
-Proof.
-apply/matrixP => i j.
-rewrite !mxE.
-by rewrite rmorphM.
-Qed.
+Proof. by apply/matrixP => i j; rewrite !mxE rmorphM. Qed.
 
 Theorem M1_rat_factor :
   exists R : 'M[C]_42, (R \in unitmx) /\

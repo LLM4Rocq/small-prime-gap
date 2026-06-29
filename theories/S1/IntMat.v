@@ -1,24 +1,26 @@
-(* ============================================================== *)
-(*  IntMat.v                                                        *)
-(*                                                                  *)
-(*  A minimal, purely-stdlib integer-matrix library built on the    *)
-(*  concrete representation `list (list Z)`.  This representation   *)
-(*  is required because MathComp's `'M[rat]_n` does not reduce      *)
-(*  under `vm_compute` at the sizes (42x42, ~200-bit entries) the   *)
-(*  Maynard S1 certificate demands; the hand-rolled nested-list     *)
-(*  version runs the 42x42 workload in ~0.14 s.                     *)
-(*                                                                  *)
-(*  This file exposes only the operations and a handful of          *)
-(*  `vm_compute`-based sanity examples.  Mathematical theorems      *)
-(*  (symmetry, multiplicativity, trace invariance, etc.) are        *)
-(*  deferred to CharPoly.v / Cert.v.                                *)
-(* ============================================================== *)
+(* (c) Copyright 2024-2026, prime_gap contributors. License: CeCILL-B.        *)
+
+(**md**************************************************************************)
+(* # IntMat                                                                   *)
+(*                                                                            *)
+(* A minimal, purely-stdlib integer-matrix library built on the concrete      *)
+(* representation `list (list Z)`.  This representation is required           *)
+(* because MathComp's `'M[rat]_n` does not reduce under `vm_compute` at       *)
+(* the sizes (42x42, ~200-bit entries) the Maynard S1 certificate             *)
+(* demands; the hand-rolled nested-list version runs the 42x42 workload       *)
+(* in ~0.14 s.                                                                *)
+(*                                                                            *)
+(* This file exposes only the operations and a handful of                     *)
+(* `vm_compute`-based sanity examples.  Mathematical theorems (symmetry,      *)
+(* multiplicativity, trace invariance, etc.) are deferred to CharPoly.v       *)
+(* / Cert.v.                                                                  *)
+(******************************************************************************)
 
 From Stdlib Require Import ZArith List.
 Import ListNotations.
-Open Scope Z_scope.
+Local Open Scope Z_scope.
 
-(* ---------- Core type --------------------------------------------------- *)
+(* ---------- Core type ----------------------------------------------------- *)
 
 (** A matrix is its row-major nested list representation.  No
     well-formedness invariant is enforced; the correctness lemmas
@@ -34,7 +36,7 @@ Definition nth_Z (xs : list Z) (i : nat) : Z := nth i xs 0%Z.
 Definition mat_get (m : mat) (i j : nat) : Z :=
   nth_Z (nth i m nil) j.
 
-(* ---------- Constant constructors --------------------------------------- *)
+(* ---------- Constant constructors ----------------------------------------- *)
 
 (** `zrow n` is a list of n zeros. *)
 Fixpoint zrow (n : nat) : list Z :=
@@ -72,8 +74,10 @@ Fixpoint meye_aux (n : nat) (i : nat) : mat :=
 
 Definition meye (n : nat) : mat := meye_aux n n.
 
-(* ---------- Element-wise arithmetic ------------------------------------- *)
+(* ---------- Element-wise arithmetic --------------------------------------- *)
 
+(** `vadd xs ys` adds two vectors element-wise, keeping the tail of the
+    longer vector once the shorter one is exhausted. *)
 Fixpoint vadd (xs ys : list Z) : list Z :=
   match xs, ys with
   | nil, _ => ys
@@ -81,8 +85,10 @@ Fixpoint vadd (xs ys : list Z) : list Z :=
   | x :: xs', y :: ys' => (x + y) :: vadd xs' ys'
   end.
 
+(** `vscale c xs` multiplies every entry of `xs` by the scalar `c`. *)
 Definition vscale (c : Z) (xs : list Z) : list Z := map (fun x => c * x) xs.
 
+(** `madd A B` adds two matrices row-by-row via `vadd`. *)
 Fixpoint madd (A B : mat) : mat :=
   match A, B with
   | nil, _ => B
@@ -90,9 +96,10 @@ Fixpoint madd (A B : mat) : mat :=
   | r1 :: A', r2 :: B' => vadd r1 r2 :: madd A' B'
   end.
 
+(** `mscale c A` multiplies every entry of `A` by the scalar `c`. *)
 Definition mscale (c : Z) (A : mat) : mat := map (vscale c) A.
 
-(* ---------- Transpose --------------------------------------------------- *)
+(* ---------- Transpose ----------------------------------------------------- *)
 
 (** `heads m` is the list of first elements of each row of m
     (empty rows contribute 0). *)
@@ -142,8 +149,10 @@ Definition mtrans (m : mat) : mat :=
   | row :: _ => mtrans_fuel (length row) m
   end.
 
-(* ---------- Dot product and matrix product ------------------------------ *)
+(* ---------- Dot product and matrix product -------------------------------- *)
 
+(** `dot_int xs ys` is the dot product of two vectors (any excess
+    entries are ignored). *)
 Fixpoint dot_int (xs ys : list Z) : Z :=
   match xs, ys with
   | nil, _ => 0%Z
@@ -157,13 +166,15 @@ Definition mmul (A B : mat) : mat :=
   let Bt := mtrans B in
   map (fun row => map (fun col => dot_int row col) Bt) A.
 
-(* ---------- Trace ------------------------------------------------------- *)
+(* ---------- Trace --------------------------------------------------------- *)
 
+(** `mtrace_aux i m` sums the diagonal of `m` from column `i` onward. *)
 Fixpoint mtrace_aux (i : nat) (m : mat) : Z :=
   match m with
   | nil => 0%Z
   | row :: rest => nth_Z row i + mtrace_aux (S i) rest
   end.
 
+(** `mtrace m` is the trace (sum of the diagonal) of `m`. *)
 Definition mtrace (m : mat) : Z := mtrace_aux 0 m.
 

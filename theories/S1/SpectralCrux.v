@@ -54,8 +54,7 @@ apply/eigenvalueP; exists ('e_i *m P).
 apply/negP => /eqP h.
 have key : ('e_i : 'rV[C]_n) 0 i = 0.
   by rewrite -['e_i](mulmxK Punit) h mul0mx mxE.
-move: key; rewrite !mxE !eqxx /= => /eqP H.
-by rewrite oner_eq0 in H.
+by move: key; rewrite !mxE !eqxx /= => /eqP; rewrite oner_eq0.
 Qed.
 
 (* a strictly positive real-weighted sum of squares has a positive weight *)
@@ -70,8 +69,7 @@ apply/negP => /forallP Hall.
 have Hle : \sum_j s j * t j <= 0.
   apply: sumr_le0 => j _.
   apply: mulr_le0_ge0; last exact: tge.
-  have e : (s j <= 0) = ~~ (0 < s j) := @real_leNgt C (s j) 0 (sr j) (@real0 C).
-  by rewrite e; exact: Hall.
+  by rewrite (real_leNgt (sr j) (real0 C)); exact: Hall.
 by move: Hsum; rewrite (Order.POrderTheory.le_gtF Hle).
 Qed.
 
@@ -98,10 +96,10 @@ have keyq0 : (w *m A *m (w ^t*)%sesqui) 0 0 = \sum_j sp 0 j * `|u j 0| ^+ 2.
 have [j Hj] : exists j, 0 < sp 0 j.
   apply: (realsum_pos (t := fun j => `|u j 0| ^+ 2)).
   - by move=> k; apply: spr.
-  - by move=> k; apply: exprn_ge0; apply: normr_ge0.
+  - by move=> k; rewrite exprn_ge0// normr_ge0.
   - by rewrite -keyq0.
 exists (sp 0 j); last exact: Hj.
-rewrite AE; apply: eig_transfer; exact: Punit.
+by rewrite AE; apply: eig_transfer; exact: Punit.
 Qed.
 
 End HermCrux.

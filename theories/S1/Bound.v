@@ -1,25 +1,27 @@
-(* Bound.v — coefficient-bound infrastructure for char_poly_int.
+(**md**************************************************************************)
+(** # Bound.v — coefficient-bound infrastructure for char_poly_int
 
-   Pure-Z port of the COEFFICIENT-BOUND half of pencil:theories/S1/CRTLift.v
-   (Uint63 / CRT-product / prime-checking parts dropped), together with the
-   generic Hadamard-style coefficient bound from
-   pencil:theories/S1/CRTPencilHadamardGeneric.v, generalised here to ALL
-   coefficients of char_poly_int M (not just the constant term).
+ Pure-Z port of the COEFFICIENT-BOUND half of pencil:theories/S1/CRTLift.v
+ (Uint63 / CRT-product / prime-checking parts dropped), together with the
+ generic Hadamard-style coefficient bound from
+ pencil:theories/S1/CRTPencilHadamardGeneric.v, generalised here to ALL
+ coefficients of char_poly_int M (not just the constant term).
 
-   Main results:
-   - max_abs_entry and its arithmetic (mmul/madd/mscale/mtrace/meye/mzero).
-   - dot_int_bound, Z_abs_div_*.
-   - fl_bound_aux / fl_coeff_bound and the loop bound fl_loop_coeff_bound:
-     every coefficient produced by the FL loop is bounded by fl_bound_aux.
-   - char_poly_int_coeff_bound: for a square matrix M,
-       forall k, |nth k (char_poly_int M)| <= fl_coeff_bound (length M) (max_abs_entry M).
+ Main results:
+ - max_abs_entry and its arithmetic (mmul/madd/mscale/mtrace/meye/mzero).
+ - dot_int_bound, Z_abs_div_*.
+ - fl_bound_aux / fl_coeff_bound and the loop bound fl_loop_coeff_bound:
+   every coefficient produced by the FL loop is bounded by fl_bound_aux.
+ - char_poly_int_coeff_bound: for a square matrix M,
+   forall k, |nth k (char_poly_int M)|
+     <= fl_coeff_bound (length M) (max_abs_entry M).
 
-   Axiom-free: computation only over stdlib Z; no Uint63 / native_compute. *)
+ Axiom-free: computation only over stdlib Z; no Uint63 / native_compute. *)
 
 From Stdlib Require Import ZArith List Lia.
 From PrimeGapS1 Require Import IntMat CharPoly FLDiv.
 Import ListNotations.
-Open Scope Z_scope.
+Local Open Scope Z_scope.
 
 (* ================================================================ *)
 (*  max_abs_entry and char_poly_int length / index structure         *)
@@ -31,13 +33,18 @@ Definition max_abs_entry (M : list (list Z)) : Z :=
 
 Lemma fl_loop_length steps k A I_n M_prev c_prev acc :
   length (fl_loop steps k A I_n M_prev c_prev acc) = (steps + length acc)%nat.
-Proof. revert k A I_n M_prev c_prev acc.
-  induction steps as [|s IH]; intros; simpl; [reflexivity | rewrite IH; simpl; lia].
+Proof.
+  revert k A I_n M_prev c_prev acc.
+  induction steps as [|s IH]; intros; simpl;
+    [reflexivity | rewrite IH; simpl; lia].
 Qed.
 
 Lemma length_char_poly_int_gen (M : mat) :
   length (char_poly_int M) = S (mat_dim M).
-Proof. unfold char_poly_int. rewrite List.length_app. rewrite fl_loop_length. simpl. lia. Qed.
+Proof.
+  unfold char_poly_int. rewrite List.length_app. rewrite fl_loop_length. simpl.
+  lia.
+Qed.
 
 (* Generic structural lemmas about char_poly_int (no specific matrix) *)
 Lemma char_poly_int_nth_lt (M : mat) (n k : nat) :
@@ -56,7 +63,8 @@ Proof.
   intro Hd. unfold char_poly_int. rewrite Hd.
   rewrite List.app_nth2; [|rewrite fl_loop_length; simpl; lia].
   rewrite fl_loop_length. simpl.
-  replace (n - (n + 0))%nat with 0%nat by lia. reflexivity.
+  replace (n - (n + 0))%nat with 0%nat by lia.
+  reflexivity.
 Qed.
 
 (* ================================================================ *)
@@ -167,7 +175,9 @@ Lemma dot_int_bound (u v : list Z) (n : nat) (Bu Bv : Z) :
   (0 <= Bu)%Z -> (0 <= Bv)%Z ->
   (Z.abs (dot_int u v) <= Z.of_nat n * Bu * Bv)%Z.
 Proof.
-  revert v n Bu Bv. induction u as [|a u IH]; intros v n Bu Bv Hlu Hlv Hbu Hbv HBu HBv.
+  revert v n Bu Bv.
+  induction u as [|a u IH];
+    intros v n Bu Bv Hlu Hlv Hbu Hbv HBu HBv.
   - simpl in Hlu. subst n. simpl. lia.
   - destruct v as [|b v']; [simpl in *; lia|].
     simpl in Hlu, Hlv. simpl.
@@ -192,7 +202,8 @@ Lemma fold_left_zmax_le (l : list Z) (acc B : Z) :
   (acc <= B)%Z -> (forall x, In x l -> (Z.abs x <= B)%Z) ->
   (List.fold_left (fun a x => Z.max a (Z.abs x)) l acc <= B)%Z.
 Proof.
-  revert acc. induction l as [|x l IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
+  revert acc.
+  induction l as [|x l IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
   apply IH; [|intros y Hy; exact (Hall y (or_intror Hy))].
   pose proof (Hall x (or_introl eq_refl)). lia.
 Qed.
@@ -203,7 +214,8 @@ Lemma fold_left_zmax_outer_le (M : mat) (acc B : Z) :
   (List.fold_left (fun a row =>
     List.fold_left (fun a2 x => Z.max a2 (Z.abs x)) row a) M acc <= B)%Z.
 Proof.
-  revert acc. induction M as [|r M IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
+  revert acc.
+  induction M as [|r M IH]; intros acc Hacc Hall; simpl; [exact Hacc|].
   apply IH; [|intros row Hr x Hx; exact (Hall row (or_intror Hr) x Hx)].
   apply fold_left_zmax_le; [exact Hacc|exact (Hall r (or_introl eq_refl))].
 Qed.
@@ -263,7 +275,8 @@ Lemma max_abs_entry_mscale_le (c : Z) (M : mat) :
   (max_abs_entry (mscale c M) <= Z.abs c * max_abs_entry M)%Z.
 Proof.
   apply max_abs_entry_le_bound.
-  - apply Z.mul_nonneg_nonneg; [apply Z.abs_nonneg | apply max_abs_entry_nonneg].
+  - apply Z.mul_nonneg_nonneg;
+      [apply Z.abs_nonneg | apply max_abs_entry_nonneg].
   - intros i j Hi Hj.
     rewrite length_mscale in Hi.
     assert (Hj' : (j < length (List.nth i M nil))%nat).
@@ -282,7 +295,9 @@ Lemma max_abs_entry_madd_le (A B : mat) (n : nat) :
 Proof.
   intros HdA HdB HrA HrB.
   apply max_abs_entry_le_bound.
-  - pose proof (max_abs_entry_nonneg A). pose proof (max_abs_entry_nonneg B). lia.
+  - pose proof (max_abs_entry_nonneg A).
+    pose proof (max_abs_entry_nonneg B).
+    lia.
   - intros i j Hi Hj.
     assert (HlenAB : length A = length B) by (unfold mat_dim in *; lia).
     assert (Hi' : (i < length A)%nat).
@@ -306,7 +321,8 @@ Qed.
 
 Lemma max_abs_entry_mmul_le (A B : mat) (n : nat) :
   mat_dim A = n -> mat_dim B = n -> all_rows_len n A -> all_rows_len n B ->
-  (max_abs_entry (mmul A B) <= Z.of_nat n * max_abs_entry A * max_abs_entry B)%Z.
+  (max_abs_entry (mmul A B)
+   <= Z.of_nat n * max_abs_entry A * max_abs_entry B)%Z.
 Proof.
   intros HdA HdB HrA HrB.
   apply max_abs_entry_le_bound.
@@ -501,7 +517,8 @@ Lemma fl_bound_aux_mono (steps : nat) (k n B E C mc : Z) :
 Proof.
   revert k E C mc. induction steps as [|s IH]; intros k E C mc Hmc; simpl.
   - lia.
-  - apply Z.le_trans with (Z.max mc (Z.abs (n * n * B * (n * B * E + Z.abs C) / k)))%Z.
+  - apply Z.le_trans with
+      (Z.max mc (Z.abs (n * n * B * (n * B * E + Z.abs C) / k)))%Z.
     + lia.
     + apply IH. lia.
 Qed.
@@ -520,14 +537,18 @@ Local Lemma gen_mat_dim : mat_dim M = length M.
 Proof. reflexivity. Qed.
 
 Local Lemma gen_fl_all_divisible :
-  fl_all_divisible (length M) Z.one M (meye (length M)) (mzero (length M)) Z.one.
-Proof. apply fl_all_divisible_from_L2; [exact gen_mat_dim | exact M_rows]. Qed.
+  fl_all_divisible
+    (length M) Z.one M (meye (length M)) (mzero (length M)) Z.one.
+Proof.
+  apply fl_all_divisible_from_L2; [exact gen_mat_dim | exact M_rows].
+Qed.
 
 Local Lemma gen_fl_loop_coeff (k : nat) (Hk : (k < length M)%nat) :
   (Z.abs (List.nth k
             (fl_loop (length M) Z.one M (meye (length M))
                (mzero (length M)) Z.one nil) 0%Z)
-   <= fl_bound_aux (length M) 1 (Z.of_nat (length M)) (max_abs_entry M) 0 1 1)%Z.
+   <= fl_bound_aux (length M) 1 (Z.of_nat (length M))
+        (max_abs_entry M) 0 1 1)%Z.
 Proof.
   apply (fl_loop_coeff_bound (length M) Z.one M (meye (length M))
            (mzero (length M)) Z.one nil (length M) (max_abs_entry M) 0 1 1).
@@ -574,4 +595,5 @@ Qed.
 
 End GenericBound.
 
-Print Assumptions char_poly_int_coeff_bound.
+(* Axiom-free: [Print Assumptions char_poly_int_coeff_bound] reports
+   "Closed under the global context". *)

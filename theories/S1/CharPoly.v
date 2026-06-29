@@ -1,46 +1,38 @@
-(* theories/S1/CharPoly.v
-   ---------------------------------------------------------------
-   Integer-cleared characteristic polynomial — Faddeev-LeVerrier.
+(**md
+# Integer-cleared characteristic polynomial (Faddeev-LeVerrier)
 
-   This file gives a hand-rolled implementation of the Faddeev-
-   LeVerrier algorithm over `list (list Z)` matrices, returning a
-   `pol` (low-to-high `list Z`) whose value at lambda is
-   det(lambda*I_n - A). The leading coefficient is 1 and the result
-   is monic of degree `mat_dim A`.
+A hand-rolled implementation of the Faddeev-LeVerrier algorithm over
+`list (list Z)` matrices, returning a `pol` (low-to-high `list Z`) whose
+value at lambda is det(lambda*I_n - A). The leading coefficient is 1 and
+the result is monic of degree `mat_dim A`.
 
-   This Definition assumes the input is a square matrix. If so,
-   all integer divisions by `k` performed during the recurrence are
-   exact (a classical identity from the Faddeev-LeVerrier proof),
-   and `Z.div` returns the correct rational value. The exactness is
-   discharged inside `char_poly_int_correct` (Qed below at the end
-   of this file) via `fl_divisibility_L2`.
+This definition assumes the input is a square matrix. If so, all integer
+divisions by `k` performed during the recurrence are exact (a classical
+identity from the Faddeev-LeVerrier proof), and `Z.div` returns the
+correct rational value. The exactness is discharged inside
+`char_poly_int_correct` (Qed at the end of this file) via
+`fl_divisibility_L2`.
 
-   Dependencies:
-   - PrimeGapS1.IntPoly (list Z polynomial library, by another agent)
-   - PrimeGapS1.IntMat  (list (list Z) matrix library, by another agent)
-   - MathComp algebra   (for the abstract `char_poly` spec).
+| name                   | meaning                                      |
+|------------------------|----------------------------------------------|
+| `Z_to_int z`           | stdlib `Z` embedded into mathcomp `int`      |
+| `char_poly_int A`      | `det(lambda*I - A)` over `Z`, low-to-high    |
+| `mat_int_to_rat M D n` | `M` lifted to `'M[rat]_n` with denominator D |
+| `pol_to_polyrat p`     | `pol` lifted to `{poly rat}` coefficientwise |
 
-   ===============================================================
-   PROOF OUTLINE for `char_poly_int_correct`  (L2)
-   ===============================================================
+Dependencies:
+- `PrimeGapS1.IntPoly` (list Z polynomial library)
+- `PrimeGapS1.IntMat`  (list (list Z) matrix library)
+- MathComp algebra     (for the abstract `char_poly` spec)
 
-   Goal:
-     pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n)
-
-   Proof chain (all Qed, zero Admitted):
-
-   Step 0: Structural trivia (meye_aux_len, mat_dim_meye, mzero_aux_len,
-     mat_dim_mzero) — proved by list induction.
-
-   Step 1: Bridge lemmas (mat_int_to_rat_meye/mzero/mmul/madd/mscale,
-     mtrace_int_to_rat).
-
-   Steps 2-3: FL loop invariant (fl_invariant_L2) and
-     fl_loop_rat_is_char_poly_L2 (via adj_coef_jacobi, itself proved
-     from Leibniz's formula).
-
-   Step 4: Assembly of Steps 1-3 into char_poly_int_correct.
-   --------------------------------------------------------------- *)
+PROOF OUTLINE for `char_poly_int_correct` (L2):
+- Goal: `pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n)`
+- Step 0: structural trivia (`meye_aux_len`, `mat_dim_meye`, ...).
+- Step 1: bridge lemmas (`mat_int_to_rat_meye`/`mzero`/`mmul`/`madd`/...).
+- Steps 2-3: FL loop invariant (`fl_invariant_L2`) and
+  `fl_loop_rat_is_char_poly_L2` (via `adj_coef_jacobi`).
+- Step 4: assembly into `char_poly_int_correct`.
+*)
 
 From Stdlib Require Import ZArith List Lia.
 Import ListNotations.
@@ -165,17 +157,17 @@ Definition pol_to_polyrat (p : pol) : {poly rat} :=
 Lemma meye_aux_len (n i : nat) : length (meye_aux n i) = i.
 Proof.
   induction i as [|k IH]; simpl; [reflexivity|].
-  rewrite length_app. simpl. rewrite IH. apply Nat.add_1_r.
+  rewrite length_app. simpl. rewrite IH. exact: Nat.add_1_r.
 Qed.
 
 Lemma mat_dim_meye (n : nat) : mat_dim (meye n) = n.
-Proof. unfold mat_dim, meye. apply meye_aux_len. Qed.
+Proof. unfold mat_dim, meye. exact: meye_aux_len. Qed.
 
 Lemma mzero_aux_len (rows cols : nat) : length (mzero_aux rows cols) = rows.
-Proof. induction rows as [|k IH]; simpl; [reflexivity|]. now rewrite IH. Qed.
+Proof. induction rows as [|k IH]; simpl; [reflexivity|]. by rewrite IH. Qed.
 
 Lemma mat_dim_mzero (n : nat) : mat_dim (mzero n) = n.
-Proof. unfold mat_dim, mzero. apply mzero_aux_len. Qed.
+Proof. unfold mat_dim, mzero. exact: mzero_aux_len. Qed.
 
 (* ==================================================================
    STEP 1 — bridge lemmas.
@@ -194,10 +186,10 @@ Proof. unfold mat_dim, mzero. apply mzero_aux_len. Qed.
    ================================================================== *)
 
 Lemma Z_to_int_0 : Z_to_int Z0 = 0%R.
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 Lemma Z_to_int_1 : Z_to_int (Zpos xH) = 1%R.
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 (* ==================================================================
    STEP 1 lemmas
@@ -224,11 +216,11 @@ Proof.
   destruct (Compare_dec.lt_dec i n) as [Hlt|Hge].
   - rewrite (nth_mzero_aux_is_zrow n n i nil Hlt).
     change (List.nth j (zrow n) Z0) with (nth_Z (zrow n) j).
-    apply nth_Z_zrow.
+    exact: nth_Z_zrow.
   - assert (Hge' : Nat.le (List.length (mzero_aux n n)) i).
-    { rewrite mzero_aux_len. apply Nat.nlt_ge; exact Hge. }
+    { rewrite mzero_aux_len. lia. }
     rewrite (List.nth_overflow _ _ Hge').
-    simpl. destruct j; reflexivity.
+    by case: j.
 Qed.
 
 Lemma mat_int_to_rat_mzero (n : nat) :
@@ -237,8 +229,7 @@ Proof.
   apply/matrixP => i j.
   rewrite /mat_int_to_rat !mxE.
   rewrite mat_get_mzero Z_to_int_0.
-  rewrite /= mul0r.
-  reflexivity.
+  by rewrite /= mul0r.
 Qed.
 
 (* ------- (2) mat_int_to_rat (mscale c A) ----------------------- *)
@@ -266,10 +257,11 @@ Proof.
   unfold mat_get, mscale.
   destruct (Compare_dec.lt_dec i (length A)) as [Hlt|Hge].
   - rewrite (nth_map_vscale _ _ _ _ Hlt).
-    apply nth_Z_vscale.
+    exact: nth_Z_vscale.
   - rewrite List.nth_overflow; [| rewrite length_map; lia].
     rewrite (List.nth_overflow A); [| lia].
-    simpl. unfold nth_Z. destruct j; simpl; rewrite BinInt.Z.mul_0_r; reflexivity.
+    simpl. unfold nth_Z.
+    by destruct j; simpl; rewrite BinInt.Z.mul_0_r.
 Qed.
 
 Lemma Z_to_int_neg_pos (p : positive) :
@@ -284,7 +276,7 @@ Qed.
 
 Lemma Z_to_int_pos_pos (p : positive) :
   Z_to_int (Zpos p) = Posz (Pos.to_nat p).
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 Lemma Z_to_int_mul (a b : Z) :
   Z_to_int (BinInt.Z.mul a b) = ((Z_to_int a) * (Z_to_int b))%R.
@@ -324,9 +316,11 @@ Proof.
     by rewrite addrAC subrr add0r.
   - rewrite Z_to_int_neg_pos. rewrite Hd Pos2Nat.inj_add PoszD.
     rewrite opprD.
-    have ->: (Posz (Pos.to_nat pa) + (- Posz (Pos.to_nat pa) - Posz (Pos.to_nat k)) = - Posz (Pos.to_nat k))%R
+    have ->: (Posz (Pos.to_nat pa)
+              + (- Posz (Pos.to_nat pa) - Posz (Pos.to_nat k))
+              = - Posz (Pos.to_nat k))%R
       by rewrite addrA addrN add0r.
-    reflexivity.
+    by [].
 Qed.
 
 (* Additivity of Z_to_int. *)
@@ -358,8 +352,7 @@ Proof.
   rewrite mat_get_mscale.
   rewrite Z_to_int_mul.
   rewrite intrM.
-  rewrite mulrA.
-  reflexivity.
+  by rewrite mulrA.
 Qed.
 
 (* ------- (3) mat_int_to_rat (meye n) = 1%:M ----------------------- *)
@@ -379,7 +372,7 @@ Proof.
   elim: n i j => [|k IH] i j /= H.
   - by unfold nth_Z; destruct j.
   - destruct i as [|i]; destruct j as [|j]; simpl.
-    + by exfalso; apply H.
+    + by exfalso; apply: H.
     + exact: nth_Z_zrow.
     + by [].
     + by apply: IH => E; apply: H; f_equal.
@@ -404,7 +397,7 @@ Lemma mat_get_meye_eq (n i : nat) :
 Proof.
   intros H. unfold mat_get, meye.
   rewrite (nth_meye_aux n i n nil); try lia.
-  apply nth_eye_row_eq; exact H.
+  by apply: nth_eye_row_eq; exact: H.
 Qed.
 
 Lemma mat_get_meye_neq (n i j : nat) :
@@ -413,7 +406,7 @@ Lemma mat_get_meye_neq (n i j : nat) :
 Proof.
   intros Hi Hij. unfold mat_get, meye.
   rewrite (nth_meye_aux n i n nil); try lia.
-  apply nth_eye_row_neq; exact Hij.
+  by apply: nth_eye_row_neq; exact: Hij.
 Qed.
 
 Lemma mat_int_to_rat_meye (n : nat) :
@@ -425,15 +418,13 @@ Proof.
   - have Hj : (nat_of_ord j < n)%coq_nat by apply/ltP; apply: ltn_ord.
     rewrite (mat_get_meye_eq n j Hj).
     rewrite Z_to_int_1.
-    rewrite /= divr1.
-    reflexivity.
+    by rewrite /= divr1.
   - have Hi : (nat_of_ord i < n)%coq_nat by apply/ltP; apply: ltn_ord.
     have Hne' : (nat_of_ord i) <> (nat_of_ord j).
     { move=> E. move/eqP: Hne => Hne. apply: Hne. apply: val_inj. exact: E. }
     rewrite (mat_get_meye_neq n i j Hi Hne').
     rewrite Z_to_int_0.
-    rewrite /= mul0r.
-    reflexivity.
+    by rewrite /= mul0r.
 Qed.
 
 (* ------- (4) mat_int_to_rat (madd A B) --------------------- *)
@@ -474,10 +465,10 @@ Lemma mat_get_madd (A B : mat) (n : nat) (i j : nat) :
 Proof.
   intros Hlen HA HB Hi. unfold mat_get.
   rewrite (nth_madd A B i Hlen).
-  assert (HAlen : List.length (List.nth i A nil) = n) by (apply HA; exact Hi).
+  assert (HAlen : List.length (List.nth i A nil) = n) by (apply: HA; exact: Hi).
   assert (HBlen : List.length (List.nth i B nil) = n).
-  { apply HB. rewrite <- Hlen. exact Hi. }
-  apply nth_Z_vadd. rewrite HAlen HBlen. reflexivity.
+  { apply: HB. rewrite -Hlen. exact: Hi. }
+  apply: nth_Z_vadd. by rewrite HAlen HBlen.
 Qed.
 
 Lemma mat_int_to_rat_madd (A B : mat) (n : nat) :
@@ -517,7 +508,7 @@ Proof.
     rewrite /mat_get /=. rewrite /bump /=.
     have Heq: (k + i)%coq_nat.+1 = (k + (1 + i))%coq_nat
       by rewrite /= Nat.add_succ_r.
-    rewrite Heq. reflexivity.
+    by rewrite Heq.
 Qed.
 
 Lemma mtrace_int_to_rat (A : mat) (n : nat) :
@@ -533,7 +524,7 @@ Proof.
   apply: eq_bigr => i _.
   rewrite /mat_int_to_rat mxE.
   change (Z_to_int 1) with (1%R : int).
-  rewrite /= divr1. reflexivity.
+  by rewrite /= divr1.
 Qed.
 
 (* ------- (6) mmul ------------------------------------------- *)
@@ -543,7 +534,7 @@ Qed.
 Lemma length_tails (m : mat) : List.length (tails m) = List.length m.
 Proof.
   induction m as [|row rest IH]; simpl; [reflexivity|].
-  destruct row; simpl; rewrite IH; reflexivity.
+  by destruct row; simpl; rewrite IH.
 Qed.
 
 Lemma nth_tails (m : mat) (k : nat) :
@@ -565,7 +556,7 @@ Qed.
 Lemma length_heads (m : mat) : List.length (heads m) = List.length m.
 Proof.
   induction m as [|row rest IH]; simpl; [reflexivity|].
-  destruct row; simpl; rewrite IH; reflexivity.
+  by destruct row; simpl; rewrite IH.
 Qed.
 
 Fixpoint all_rows_at_least (k : nat) (m : mat) : Prop :=
@@ -580,17 +571,17 @@ Proof.
   induction m as [|r rest IH]; intros H; simpl; [exact I|].
   destruct H as [Hr Hrest]. destruct r as [|x r']; simpl in *.
   - lia.
-  - split; [lia|]. apply IH. exact Hrest.
+  - split; [lia|]. exact: (IH Hrest).
 Qed.
 
 Lemma all_empty_false_of_Sk (k : nat) (m : mat) :
   m <> nil -> all_rows_at_least (S k) m -> all_empty m = false.
 Proof.
   intros Hne H. destruct m as [|r rest].
-  - exfalso; apply Hne; reflexivity.
+  - by exfalso; apply: Hne.
   - simpl. destruct H as [Hr _]. destruct r as [|x r']; simpl in *.
     + lia.
-    + reflexivity.
+    + by [].
 Qed.
 
 Lemma length_mtrans_fuel_exact (f : nat) (m : mat) :
@@ -649,7 +640,7 @@ Proof.
   induction m as [|r rest IH]; simpl; [intros _; exact I|].
   intros H. split.
   - have H0 : List.length (List.nth 0 (r :: rest) nil) = n
-      by (apply H; simpl; lia).
+      by (apply: H; simpl; lia).
     simpl in H0. rewrite H0. apply Nat.le_refl.
   - apply IH. intros i Hi.
     have := H (S i). simpl. intros HH. apply HH. lia.
@@ -661,7 +652,7 @@ Lemma length_mtrans_sq (B : mat) (n : nat) :
 Proof.
   intros Hdim Hrow.
   unfold mtrans. destruct B as [|r rest] eqn:EB.
-  - simpl in Hdim. subst. reflexivity.
+  - simpl in Hdim. subst. by [].
   - have Hrlen : List.length r = n.
     { have H0 : List.length (List.nth 0 (r :: rest) nil) = n
         by (apply Hrow; simpl; lia).
@@ -766,8 +757,7 @@ Proof.
   have Hjlt : (j < List.length Bt)%coq_nat by lia.
   rewrite (List.nth_indep _ Z0 (dot_int row nil));
     [| rewrite length_map; exact Hjlt].
-  rewrite (List.map_nth (fun col => dot_int row col) Bt nil j).
-  reflexivity.
+  by rewrite (List.map_nth (fun col => dot_int row col) Bt nil j).
 Qed.
 
 Lemma mat_int_to_rat_mmul (A B : mat) (n : nat) :
@@ -797,8 +787,7 @@ Proof.
   { unfold nth_Z.
     rewrite (nth_nth_mtrans_sq B n (nat_of_ord j) (nat_of_ord k) HdimB HrowB Hj).
     reflexivity. }
-  rewrite HBkj.
-  reflexivity.
+  by rewrite HBkj.
 Qed.
 
 (* ==================================================================
@@ -884,7 +873,7 @@ Proof.
   rewrite BinInt.Z.div_mul; [|exact Hd].
   rewrite Z_to_int_mul intrM.
   rewrite mulfK.
-  - reflexivity.
+  - by [].
   - apply/eqP => Habs. apply Hd.
     destruct d as [|pd|pd]; [reflexivity| |]; exfalso.
     + rewrite Z_to_int_pos_pos /= in Habs. revert Habs. rewrite /intmul /=.
@@ -1305,7 +1294,7 @@ Proof.
       have := @ltr0Sn _ k'.
       move=> /(_ rat). rewrite Habs. by move=> []. }
     apply (mulfI Hkne0).
-    rewrite Hfl Hsums_eq Hnewton subSS opprK. reflexivity.
+    by rewrite Hfl Hsums_eq Hnewton subSS opprK.
 Qed.
 
 End FL_CharPoly_Core.
@@ -1317,7 +1306,7 @@ Proof.
   destruct sz as [|n].
   - rewrite /= /char_poly.
     have -> : B = (0 : 'M_0)%R by apply/matrixP => i; case: i => [].
-    rewrite det_mx00 cons_poly_def mul0r add0r. reflexivity.
+    by rewrite det_mx00 cons_poly_def mul0r add0r.
   - rewrite /=.
     set cs := map _ _.
     set q := char_poly B.
@@ -1361,7 +1350,7 @@ Lemma length_zrow (n : nat) : List.length (zrow n) = n.
 Proof. induction n as [|k IH]; simpl; [reflexivity | rewrite IH; reflexivity]. Qed.
 
 Lemma length_vscale (c : Z) (xs : list Z) : List.length (vscale c xs) = List.length xs.
-Proof. unfold vscale. apply List.length_map. Qed.
+Proof. unfold vscale. exact: List.length_map. Qed.
 
 Lemma length_vadd (xs ys : list Z) :
   List.length xs = List.length ys ->
@@ -1374,10 +1363,10 @@ Proof.
 Qed.
 
 Lemma mat_dim_mscale_eq (c : Z) (A : mat) : mat_dim (mscale c A) = mat_dim A.
-Proof. unfold mat_dim, mscale. rewrite List.length_map. reflexivity. Qed.
+Proof. unfold mat_dim, mscale. by rewrite List.length_map. Qed.
 
 Lemma mat_dim_mmul_eq (A B : mat) : mat_dim (mmul A B) = mat_dim A.
-Proof. unfold mat_dim, mmul. rewrite List.length_map. reflexivity. Qed.
+Proof. unfold mat_dim, mmul. by rewrite List.length_map. Qed.
 
 Lemma mat_dim_madd_eq (A B : mat) :
   mat_dim A = mat_dim B ->
@@ -1506,27 +1495,27 @@ Qed.
 Lemma fl_M_int_k_dim (M : mat) (sz : nat) (k : nat) :
   mat_dim M = sz -> all_rows_len sz M ->
   (k <= sz)%N -> mat_dim (fl_M_int_k M k) = sz.
-Proof. intros; exact (fl_M_int_k_wf H H0 H1).1. Qed.
+Proof. by move=> Hdim Hrows Hle; exact: (fl_M_int_k_wf Hdim Hrows Hle).1. Qed.
 
 Lemma fl_M_int_k_rows (M : mat) (sz : nat) (k : nat) :
   mat_dim M = sz -> all_rows_len sz M ->
   (k <= sz)%N -> all_rows_len sz (fl_M_int_k M k).
-Proof. intros; exact (fl_M_int_k_wf H H0 H1).2. Qed.
+Proof. by move=> Hdim Hrows Hle; exact: (fl_M_int_k_wf Hdim Hrows Hle).2. Qed.
 
 Lemma fl_M_int_k_base (M : mat) :
   fl_M_int_k M 0 = mzero (mat_dim M).
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 Lemma fl_c_int_k_base (M : mat) :
   fl_c_int_k M 0 = Zpos xH.
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 Lemma fl_M_int_k_step (M : mat) (k : nat) :
   fl_M_int_k M (S k) = madd (mmul M (fl_M_int_k M k))
                              (mscale (fl_c_int_k M k) (meye (mat_dim M))).
 Proof.
   unfold fl_M_int_k, fl_c_int_k. simpl.
-  destruct (fl_state k M) as [M_prev c_prev] eqn:E. simpl. reflexivity.
+  destruct (fl_state k M) as [M_prev c_prev] eqn:E. by [].
 Qed.
 
 Lemma fl_c_int_k_step (M : mat) (k : nat) :
@@ -1535,7 +1524,7 @@ Lemma fl_c_int_k_step (M : mat) (k : nat) :
                           (BinInt.Z.of_nat (S k)).
 Proof.
   unfold fl_c_int_k, fl_M_int_k. simpl.
-  destruct (fl_state k M) as [M_prev c_prev] eqn:E. simpl. reflexivity.
+  destruct (fl_state k M) as [M_prev c_prev] eqn:E. by [].
 Qed.
 
 (* ==================================================================
@@ -1620,7 +1609,7 @@ Proof.
   move=> A Hdim Hrows.
   elim => [|k IH] Hle.
   - split; [split |].
-    + rewrite /fl_M_int_k /= Hdim. rewrite mat_int_to_rat_mzero. reflexivity.
+    + rewrite /fl_M_int_k /= Hdim. by rewrite mat_int_to_rat_mzero.
     + rewrite /fl_c_int_k /=. exact Z_to_int_1_rat.
     + move=> Habs. by rewrite ltnn in Habs.
   - have Hle' : (k <= sz)%N := ltnW Hle.
@@ -1694,8 +1683,7 @@ Proof.
                  Hrows HMk1_rows).
       rewrite Hmat.
       rewrite /fl_c_rat /= -/fl_loop_rat /fl_step_rat /=.
-      rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
-      reflexivity.
+      by rewrite -/(fl_M_rat A k) -/(fl_c_rat A k).
     + intros _. exact Hdiv.
 Qed.
 
@@ -1755,7 +1743,7 @@ Lemma char_poly_int_correct
           List.length (List.nth i M nil) = n) :
   pol_to_polyrat (char_poly_int M) = char_poly (mat_int_to_rat M 1 n).
 Proof.
-  rewrite <- (fl_loop_rat_is_char_poly_L2 (mat_int_to_rat M 1 n)).
+  rewrite -(fl_loop_rat_is_char_poly_L2 (mat_int_to_rat M 1 n)).
   rewrite /char_poly_int sq.
   have Hwf : all_rows_len n M by exact wf.
   have Hfl_eq : fl_loop n Z.one M (meye n) (mzero n) Z.one [::]

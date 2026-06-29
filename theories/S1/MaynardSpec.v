@@ -1,44 +1,40 @@
-(* ==================================================================
-   MaynardSpec.v — Maynard's closed-form specification of M1, M2.
-
-   Transcribes the Python helpers `Poly_at_k`, `Cff_rat`,
-   `enumerate_bounds`, `const_gram`, `prime_gram` from
-   flint_probe.py (Maynard 2013 §7-8, arXiv:1311.4600).  The analytic
-   closed forms for the Dirichlet-type integrals are taken as rational
-   *definitions* here; the analytic identification is not proved in
-   this project.
-
-   Two parallel representations are provided:
-
-   (a) a `rat`-valued specification `M1_spec_ij, M2_spec_ij` that
-       matches the textbook formulas verbatim, and
-
-   (b) an integer (Z, Z) num/den pair `m1_num_den, m2_num_den` that
-       is used by `MaynardVerify.v` to cross-multiply with the
-       shipped integer matrices — purely in Z, so vm_compute does
-       not hit `rat`'s canonical-form normalisation at scale.
-
-   The two representations are bridged by Qed lemmas
-   `M{1,2}_spec_rat_eq` in `MaynardSpecBridge.v` (no axioms,
-   "Closed under the global context").  `MaynardVerify.v`
-   consumes the (num, den) pair directly for the Z-level
-   cross-multiplication check, and `Cert.maynard_M105_certified`
-   conjoins both the Z-level bool match and the rat-level paper-form
-   bridge so a single `Print Assumptions` covers the full
-   FLINT-matrix → Z-spec → rat-paper-form → eigenvalue chain.
-   See SPEC_TO_PAPER.md for the line-level paper mapping.
-   ================================================================== *)
-
 From Stdlib Require Import ZArith List.
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_algebra.
 From PrimeGapS1 Require Import MaynardFactQ MaynardBasis.
 
-Import ListNotations.
+(**md*************************************************************************)
+(** # MaynardSpec — Maynard's closed-form specification of M1, M2
+
+Transcribes the Python helpers `Poly_at_k`, `Cff_rat`, `enumerate_bounds`,
+`const_gram`, `prime_gram` from flint_probe.py (Maynard 2013 §7-8,
+arXiv:1311.4600).  The analytic closed forms for the Dirichlet-type
+integrals are taken as rational *definitions* here; the analytic
+identification is not proved in this project.
+
+Two parallel representations are provided:
+
+- a `rat`-valued specification `M1_spec_ij, M2_spec_ij` that matches the
+  textbook formulas verbatim, and
+
+- an integer (Z, Z) num/den pair `m1_num_den, m2_num_den` that is used by
+  `MaynardVerify.v` to cross-multiply with the shipped integer matrices —
+  purely in Z, so vm_compute does not hit `rat`'s canonical-form
+  normalisation at scale.
+
+The two representations are bridged by Qed lemmas `M{1,2}_spec_rat_eq` in
+`MaynardSpecBridge.v` (no axioms, "Closed under the global context").
+`MaynardVerify.v` consumes the (num, den) pair directly for the Z-level
+cross-multiplication check, and `Cert.maynard_M105_certified` conjoins both
+the Z-level bool match and the rat-level paper-form bridge so a single
+`Print Assumptions` covers the full FLINT-matrix → Z-spec → rat-paper-form
+→ eigenvalue chain.  See SPEC_TO_PAPER.md for the line-level paper
+mapping. *)
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Import ListNotations.
 Import GRing.Theory.
 
 (* ------------------------------------------------------------------
@@ -78,7 +74,8 @@ Definition cff (a : seq nat) : rat :=
   \prod_(x <- a) (factQ (2 * x) / factQ x).
 
 (* G_{n,2}(k) per Maynard Lemma 8.1 (= Lemma 7.1 in v1):
-     G_{n,2}(k) = n! * \sum_{r=1}^{n} C(k, r) * \sum_{a in compositions(r, n)} cff(a).
+     G_{n,2}(k) = n! * \sum_{r=1}^{n} C(k, r)
+                     * \sum_{a in compositions(r, n)} cff(a).
    The factQ n prefactor is exactly the paper's global  n!  factor in
    front of the double sum.  For n = 0 the convention is
    G_{0,2}(k) = 1 (the empty product). *)
@@ -140,7 +137,7 @@ Fixpoint factZ (n : nat) : Z :=
   end.
 
 (* Integer (2x)! / x!  — equals x! * C(2x, x), always divisible. *)
-Definition dblratZ (x : nat) : Z := factZ (2 * x)%nat / factZ x.
+Definition dblratZ (x : nat) : Z := factZ (2 * x)%N / factZ x.
 
 Fixpoint prod_dblratZ (xs : list nat) : Z :=
   match xs with
@@ -157,7 +154,7 @@ Fixpoint compositions_auxZ (r remaining : nat) : list (list nat) :=
       List.flat_map
         (fun a =>
            List.map (fun tl => a :: tl)
-                    (compositions_auxZ r' (remaining - a)%nat))
+                    (compositions_auxZ r' (remaining - a)%N))
         (List.seq 1 remaining)
   end.
 
@@ -169,10 +166,11 @@ Definition cffZ (a : list nat) : Z := prod_dblratZ a.
 
 (* C(n, k) as Z, integer-valued. *)
 Definition binZ (n k : nat) : Z :=
-  if Nat.leb k n then factZ n / (factZ k * factZ (n - k)%nat) else 0.
+  if Nat.leb k n then factZ n / (factZ k * factZ (n - k)%N) else 0.
 
 (* G_{n,2}(k) as Z, mirroring PART A's `G_2`:
-     G_{n,2}(k) = n! * sum_{r=1..n} C(k, r) * sum_{a in compositionsZ(r, n)} cffZ(a).
+     G_{n,2}(k) = n! * sum_{r=1..n} C(k, r)
+                     * sum_{a in compositionsZ(r, n)} cffZ(a).
    The factZ n prefactor is the paper's global  n!  factor. *)
 Definition G2Z (n k : nat) : Z :=
   if Nat.eqb n O then 1
@@ -194,9 +192,9 @@ Definition K1n : nat := 105.
 Definition K2n : nat := 104.
 
 Definition m1_num_den (bi ci bj cj : nat) : Z * Z :=
-  let b := (bi + bj)%nat in
-  let c := (ci + cj)%nat in
-  (factZ b * G2Z c K1n, factZ (K1n + b + 2 * c)%nat).
+  let b := (bi + bj)%N in
+  let c := (ci + cj)%N in
+  (factZ b * G2Z c K1n, factZ (K1n + b + 2 * c)%N).
 
 (* M2 is a double sum.  Each term has shape
      alpha(bi,ci,cp1) * alpha(bj,cj,cp2)
@@ -224,16 +222,16 @@ Definition qmul (p q : Z * Z) : Z * Z :=
    C(c,cp) is an integer — so numerator is that integer times b! times
    (2c-2cp)!, and denominator is (b+2c-2cp+1)!. *)
 Definition alphaZ (b c cp : nat) : Z * Z :=
-  (binZ c cp * factZ b * factZ (2 * c - 2 * cp)%nat,
-   factZ (b + 2 * c - 2 * cp + 1)%nat).
+  (binZ c cp * factZ b * factZ (2 * c - 2 * cp)%N,
+   factZ (b + 2 * c - 2 * cp + 1)%N).
 
 Definition m2_term_num_den (bi ci bj cj cp1 cp2 : nat) : Z * Z :=
-  let bp1 := (bi + 2 * ci - 2 * cp1 + 1)%nat in
-  let bp2 := (bj + 2 * cj - 2 * cp2 + 1)%nat in
-  let bsum := (bp1 + bp2)%nat in
-  let csum := (cp1 + cp2)%nat in
+  let bp1 := (bi + 2 * ci - 2 * cp1 + 1)%N in
+  let bp2 := (bj + 2 * cj - 2 * cp2 + 1)%N in
+  let bsum := (bp1 + bp2)%N in
+  let csum := (cp1 + cp2)%N in
   qmul (qmul (alphaZ bi ci cp1) (alphaZ bj cj cp2))
-       (factZ bsum * G2Z csum K2n, factZ (K2n + bsum + 2 * csum)%nat).
+       (factZ bsum * G2Z csum K2n, factZ (K2n + bsum + 2 * csum)%N).
 
 Definition m2_num_den (bi ci bj cj : nat) : Z * Z :=
   List.fold_left
@@ -246,11 +244,11 @@ Definition m2_num_den (bi ci bj cj : nat) : Z * Z :=
 (* Index-based Z lookups. *)
 
 Definition m1_num_den_at (i j : nat) : Z * Z :=
-  let bci := List.nth i maynard_basis (0%nat, 0%nat) in
-  let bcj := List.nth j maynard_basis (0%nat, 0%nat) in
+  let bci := List.nth i maynard_basis (0%N, 0%N) in
+  let bcj := List.nth j maynard_basis (0%N, 0%N) in
   m1_num_den bci.1 bci.2 bcj.1 bcj.2.
 
 Definition m2_num_den_at (i j : nat) : Z * Z :=
-  let bci := List.nth i maynard_basis (0%nat, 0%nat) in
-  let bcj := List.nth j maynard_basis (0%nat, 0%nat) in
+  let bci := List.nth i maynard_basis (0%N, 0%N) in
+  let bcj := List.nth j maynard_basis (0%N, 0%N) in
   m2_num_den bci.1 bci.2 bcj.1 bcj.2.

@@ -1,16 +1,18 @@
-(* ==================================================================
-   MaynardBasis.v — the 42-element basis used by Maynard's spec.
-
-   Order is the Mathematica xExponents[5]/yExponents[5] enumeration
-   (see python/flint_probe.py:xExponents_mma / yExponents_mma).  The
-   bridge lemma `maynard_basis_eq_witness` pins the hand-listed
-   `maynard_basis` below to the FLINT-shipped `Witness.basis` ordering
-   by `vm_compute`, so an auditor never has to manually check the
-   42 (b, c) pairs against the FLINT enumeration.
-   ================================================================== *)
+(**md**************************************************************************)
+(* # MaynardBasis                                                             *)
+(*                                                                            *)
+(* The 42-element basis used by Maynard's spec.                               *)
+(*                                                                            *)
+(* Order is the Mathematica `xExponents[5]`/`yExponents[5]` enumeration (see  *)
+(* `python/flint_probe.py:xExponents_mma / yExponents_mma`).  The bridge lemma*)
+(* `maynard_basis_eq_witness` pins the hand-listed `maynard_basis` below to   *)
+(* the FLINT-shipped `Witness.basis` ordering by `vm_compute`, so an auditor  *)
+(* never has to manually check the 42 (b, c) pairs against the FLINT          *)
+(* enumeration.                                                               *)
+(******************************************************************************)
 
 From Stdlib Require Import List Lia.
-From mathcomp Require Import all_ssreflect zify.
+From mathcomp Require Import all_boot zify.
 From PrimeGapS1 Require Import Witness.
 
 Import ListNotations.
@@ -27,17 +29,17 @@ Definition maynard_basis : list (nat * nat) :=
   ; (8, 0); (1, 4); (3, 3); (5, 2); (7, 1); (9, 0)
   ; (0, 5); (2, 4); (4, 3); (6, 2); (8, 1); (10, 0)
   ; (1, 5); (3, 4); (5, 3); (7, 2); (9, 1); (11, 0)
-  ]%nat.
+  ]%N.
 
 Lemma maynard_basis_size : length maynard_basis = 42.
-Proof. reflexivity. Qed.
+Proof. by []. Qed.
 
 (* The hand-listed basis matches the FLINT-shipped row/column ordering
    of M1_int / M2_int (kernel-checked).  Without this lemma an auditor
    would have to manually verify the 42 (b, c) pairs against the FLINT
    enumeration. *)
 Lemma maynard_basis_eq_witness : maynard_basis = Witness.basis.
-Proof. vm_compute. reflexivity. Qed.
+Proof. by vm_compute. Qed.
 
 (* ==================================================================
    Set-level characterization of the basis.
@@ -60,24 +62,24 @@ Proof. by vm_compute. Qed.
 Lemma canonical_basis_spec p :
   (p \in canonical_basis) = (p.1 + 2 * p.2 <= 11)%N.
 Proof.
-  case: p => b c.
-  rewrite /canonical_basis mem_filter.
-  case Hp: (b + 2 * c <= 11)%N => /=; last by [].
-  have Hb : b \in iota 0 12.
-    rewrite mem_iota /= add0n ltnS.
-    by apply: leq_trans Hp; rewrite leq_addr.
-  have Hc : c \in iota 0 6.
-    rewrite mem_iota /= add0n.
-    have H2c : 2 * c <= 11 by apply: leq_trans Hp; rewrite leq_addl.
-    lia.
-  exact: (allpairs_f (fun a d => (a, d)) Hb Hc).
+case: p => b c.
+rewrite /canonical_basis mem_filter.
+case Hp: (b + 2 * c <= 11)%N => /=; last by [].
+have Hb : b \in iota 0 12.
+  rewrite mem_iota /= add0n ltnS.
+  by apply: leq_trans Hp; rewrite leq_addr.
+have Hc : c \in iota 0 6.
+  rewrite mem_iota /= add0n.
+  have ? : 2 * c <= 11 by apply: leq_trans Hp; rewrite leq_addl.
+  by lia.
+exact: (allpairs_f _ Hb Hc).
 Qed.
 
 (* Headline: the basis is exactly the set {(b, c) : b + 2c <= 11}. *)
 Lemma maynard_basis_spec p :
   (p \in maynard_basis) = (p.1 + 2 * p.2 <= 11)%N.
 Proof.
-  by rewrite (perm_mem maynard_basis_perm_canonical) canonical_basis_spec.
+by rewrite (perm_mem maynard_basis_perm_canonical) canonical_basis_spec.
 Qed.
 
 (* Together with maynard_basis_size = 42 and the bound `b + 2c <= 11`,

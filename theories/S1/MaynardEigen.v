@@ -24,8 +24,7 @@
 (* `ratrM M105`.                                                              *)
 (******************************************************************************)
 
-From mathcomp Require Import all_ssreflect all_algebra all_field.
-From mathcomp Require Import spectral.
+From mathcomp Require Import all_boot all_algebra all_field spectral.
 From PrimeGapS1 Require Import IntMat CharPoly Witness.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge Cert.
 From PrimeGapS1 Require Import CertRayleigh EigenBridge SpectralCrux M1PosDef.
@@ -36,7 +35,6 @@ From PrimeGapS1 Require Import CertRayleigh EigenBridge SpectralCrux M1PosDef.
    re-asserted last so ring-scope numerals dominate. *)
 From Stdlib Require Import ZArith List Lia.
 Import ListNotations.
-From mathcomp.algebra_tactics Require Import ring.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -49,9 +47,7 @@ Local Open Scope ring_scope.
 Local Notation C := algC.
 Local Notation ratrM := (map_mx (ratr : rat -> C)).
 
-(* ================================================================== *)
-(* Section 1: symmetry of the integer / rational witness matrices      *)
-(* ================================================================== *)
+(** * Section 1: symmetry of the integer / rational witness matrices *)
 
 (* `M2_int` is symmetric, checked entrywise over Z by `vm_compute`.       *)
 Definition M2_sym_check : bool :=
@@ -60,7 +56,7 @@ Definition M2_sym_check : bool :=
      (List.seq 0 42).
 
 Lemma M2_sym_checkE : M2_sym_check = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. by vm_compute. Qed.
 
 Lemma M2_get_sym (i j : 'I_42) :
   mat_get M2_int (nat_of_ord i) (nat_of_ord j)
@@ -68,8 +64,7 @@ Lemma M2_get_sym (i j : 'I_42) :
 Proof.
 apply/Z.eqb_eq.
 move: M2_sym_checkE; rewrite /M2_sym_check => /forallb_forall H.
-have Hi := ltn_ord i; have Hj := ltn_ord j.
-move/ltP in Hi; move/ltP in Hj.
+have /ltP Hi := ltn_ord i; have /ltP Hj := ltn_ord j.
 have Ii : In (nat_of_ord i) (List.seq 0 42) by apply/in_seq; lia.
 have Ij : In (nat_of_ord j) (List.seq 0 42) by apply/in_seq; lia.
 move: (H (nat_of_ord i) Ii) => /forallb_forall Hrow.
@@ -82,9 +77,7 @@ Proof. by apply/matrixP => i j; rewrite !mxE (M1_get_sym i j). Qed.
 Lemma M2_rat_sym : trmx M2_rat = M2_rat.
 Proof. by apply/matrixP => i j; rewrite !mxE (M2_get_sym i j). Qed.
 
-(* ================================================================== *)
-(* Section 2: the rat-level pencil `Srat` and its image `Sc` over C     *)
-(* ================================================================== *)
+(** * Section 2: the rat-level pencil `Srat` and its image `Sc` over C *)
 
 Local Definition vr : 'cV[rat]_42 := \col_i v_rat i.
 Local Definition Srat : 'M[rat]_42 := 105%:Q *: M2_rat - 4%:Q *: M1_rat.
@@ -105,7 +98,9 @@ Lemma M2_rat_spec (i j : 'I_42) : M2_rat i j = M2_spec_ij i j.
 Proof. by rewrite M2_ratE (M2_spec_eq_int (ltn_ord i) (ltn_ord j)). Qed.
 
 Lemma Sc_real : Sc \is a mxOver Num.real.
-Proof. apply/mxOverP => i j; rewrite mxE; exact: (Creal_Crat (Crat_rat _)). Qed.
+Proof.
+by apply/mxOverP => i j; rewrite mxE; apply: (Creal_Crat (Crat_rat _)).
+Qed.
 
 Lemma Sc_sym : Sc \is symmetricmx.
 Proof.
@@ -120,7 +115,9 @@ Proof. exact: (realsym_hermsym Sc_sym Sc_real). Qed.
 (* `ratrM M2_rat` is Hermitian (real symmetric).  Proved before the
    `Local Opaque` below, while `M2_rat` is still entry-transparent. *)
 Lemma M2_C_real : (ratrM M2_rat) \is a mxOver Num.real.
-Proof. apply/mxOverP => i j; rewrite mxE; exact: (Creal_Crat (Crat_rat _)). Qed.
+Proof.
+by apply/mxOverP => i j; rewrite mxE; apply: (Creal_Crat (Crat_rat _)).
+Qed.
 
 Lemma M2_C_sym : (ratrM M2_rat) \is symmetricmx.
 Proof.
@@ -132,16 +129,15 @@ Qed.
 Lemma M2_C_herm : (ratrM M2_rat) \is hermsymmx.
 Proof. exact: (realsym_hermsym M2_C_sym M2_C_real). Qed.
 
-(* ================================================================== *)
-(* Section 3: the rat-level Rayleigh quadratic form of the pencil       *)
-(* ================================================================== *)
+(** * Section 3: the rat-level Rayleigh quadratic form of the pencil *)
 
 (* The matrix quadratic form `v^T A v` of a 42x42 rat matrix, unfolded
    to the bigop used by `CertRayleigh.quad_spec`.  `A` is kept abstract
    so `mxE` never forces the ~10^200 denominators of the concrete
    matrices into unary. *)
 Lemma quad_form_expand (A : 'M[rat]_42) :
-  (trmx vr *m A *m vr) 0 0 = \sum_(j < 42) \sum_(i < 42) v_rat i * A i j * v_rat j.
+  (trmx vr *m A *m vr) 0 0 =
+  \sum_(j < 42) \sum_(i < 42) v_rat i * A i j * v_rat j.
 Proof.
 rewrite mxE; apply: eq_bigr => j _.
 rewrite mxE big_distrl /=; apply: eq_bigr => i _.
@@ -231,9 +227,7 @@ rewrite mxE Srat_form_val ltr0q subr_gt0.
 exact: rayleigh_lt_main.
 Qed.
 
-(* ================================================================== *)
-(* Section 4: generic spectral / matrix lemmas (abstract over C)        *)
-(* ================================================================== *)
+(** * Section 4: generic spectral / matrix lemmas (abstract over C) *)
 
 (* Conjugate-transpose of the identity. *)
 Lemma tC1 (n : nat) : ((1%:M)^t*)%sesqui = 1%:M :> 'M[C]_n.
@@ -277,7 +271,8 @@ Qed.
    witness `w = (X *m u)^t*`. *)
 Lemma congr_collapse (n : nat) (X B : 'M[C]_n) (u : 'cV[C]_n) :
   X \in unitmx ->
-  (((X *m u)^t*)%sesqui *m ((invmx X)^t* *m B *m invmx X)%sesqui *m (X *m u)) 0 0
+  (((X *m u)^t*)%sesqui *m ((invmx X)^t* *m B *m invmx X)%sesqui
+     *m (X *m u)) 0 0
    = ((u^t*)%sesqui *m B *m u) 0 0.
 Proof.
 move=> Xunit.
@@ -314,7 +309,8 @@ have M1cu : M1c \in unitmx by rewrite -HM1c unitmx_mul RtCu Runit.
 have M2cE : (M2c^t*)%sesqui = M2c.
   by move/is_hermitianmxP: M2ch; rewrite expr0 scale1r => H; rewrite -H.
 have Sch : Sc' \is hermsymmx.
-  apply/is_hermitianmxP; rewrite expr0 scale1r HSc'def tC_scaleB !conjC_nat M2cE.
+  apply/is_hermitianmxP; rewrite expr0 scale1r HSc'def tC_scaleB !conjC_nat.
+  rewrite M2cE.
   by rewrite -HM1c !trmxC_mul trmxCK.
 set S2 := ((invmx R)^t* *m Sc' *m invmx R)%sesqui.
 have S2herm : S2 \is hermsymmx by rewrite /S2; apply: herm_congr; exact: Sch.
@@ -326,7 +322,8 @@ have [a aeig apos] : exists2 a : C, eigenvalue S2 a & 0 < a.
 have keyInv : invmx R *m ((invmx R)^t*)%sesqui = invmx M1c.
   have hh : (invmx R *m ((invmx R)^t*)%sesqui) *m M1c = 1%:M.
     rewrite -HM1c !mulmxA.
-    rewrite -[invmx R *m ((invmx R)^t*)%sesqui *m (R^t*)%sesqui]mulmxA -trmxC_mul.
+    rewrite -[invmx R *m ((invmx R)^t*)%sesqui *m (R^t*)%sesqui]mulmxA.
+    rewrite -trmxC_mul.
     by rewrite mulmxV // tC1 mulmx1 mulVmx.
   by rewrite -[invmx R *m _](mulmxK M1cu) hh mul1mx.
 have simEq : invmx R *m S2 *m R = invmx M1c *m Sc'.
@@ -340,9 +337,7 @@ exists (a + 4%:R).
 by rewrite -subr_gt0 addrK.
 Qed.
 
-(* ================================================================== *)
-(* Section 5: the headline theorem                                      *)
-(* ================================================================== *)
+(** * Section 5: the headline theorem *)
 
 (* Connection facts feeding `eigen_bridge`: the concrete pencil `Sc` and
    `ratrM M105` rewritten into the algC-level `105 *: M2 - 4 *: M1` and

@@ -1,41 +1,45 @@
-(* ==================================================================
-   CertRayleigh.v — Rayleigh-quotient witness route for M_{105} > 4.
-
-   This file replaces the eigenvalue/char-poly closure of Cert.v with
-   a single direct evaluation: a 42-dim rational vector `v_witness`
-   (shipped in Witness_Rayleigh.v) satisfies
-
-         105 * v^T M2 v  >  4 * v^T M1 v
-
-   on the FLINT-shipped (M1, M2) pair (Witness.v).  Modulo Maynard's
-   Lemma 8.3 (paper-side), this single Rayleigh quotient bound entails
-   `M_{105} > 4`: Lemma 8.3 says M_k = k * sup_F (J_k(F)/I_k(F)), and
-   sup is at least any individual quotient.
-
-   Strategy: clear all denominators uniformly to a single integer
-   inequality, discharged by one `vm_compute` Qed.
-
-   Concretely, with v_num[i] = num_i * (v_den / d_i) and
-                  v_den      = lcm(d_0, ..., d_41),
-   the rational vector v lifts as v_rat[i] = v_num[i] / v_den.  Then
-
-       v^T M_k v  =  (v_num^T M_int_k v_num) / (D_M_k * v_den^2)
-
-   for k in {1, 2}, so the strict Rayleigh-quotient bound reduces to
-
-       105 * D_M1 * num_M2  >  4 * D_M2 * num_M1.
-
-   (provided num_M1 > 0, which is also checked by `vm_compute`).
-
-   No eigenvalue, no characteristic polynomial, no realalg, no IVT,
-   no Sturm, no CRT lift.
-   ================================================================== *)
+(**md**************************************************************************)
+(* # CertRayleigh                                                             *)
+(*                                                                            *)
+(* Rayleigh-quotient witness route for M_{105} > 4.                           *)
+(*                                                                            *)
+(* Replaces the eigenvalue / char-poly closure of Cert.v with one             *)
+(* direct evaluation: a 42-dim rational vector `v_witness` (shipped in        *)
+(* Witness_Rayleigh.v) satisfies, on the FLINT-shipped (M1, M2) pair          *)
+(* (Witness.v),                                                               *)
+(*                                                                            *)
+(*       105 * v^T M2 v  >  4 * v^T M1 v.                                     *)
+(*                                                                            *)
+(* Modulo Maynard's Lemma 8.3 (paper-side; M_k = k * sup_F                    *)
+(* J_k(F)/I_k(F)), this single Rayleigh quotient bound entails                *)
+(* M_{105} > 4, since the sup is at least any individual quotient.            *)
+(*                                                                            *)
+(* Strategy: clear all denominators uniformly to one integer                  *)
+(* inequality, discharged by a single `vm_compute` Qed.  With                 *)
+(* v_num[i] = num_i * (v_den / d_i) and v_den = lcm(d_0, ..., d_41),          *)
+(* the rational vector lifts as v_rat[i] = v_num[i] / v_den, so               *)
+(* v^T M_k v = (v_num^T M_int_k v_num) / (D_M_k * v_den^2) and the            *)
+(* strict bound reduces to 105 * D_M1 * num_M2 > 4 * D_M2 * num_M1            *)
+(* (with num_M1 > 0, also checked by `vm_compute`).                           *)
+(*                                                                            *)
+(* Main definitions:                                                          *)
+(*                                                                            *)
+(*           v_den == lcm of all `v_witness` denominators (> 0)               *)
+(*           v_num == scaled integer numerators of the witness                *)
+(*   row_dot row v == sum_i row[i] * v[i] over Z                              *)
+(*        quad M v == v^T M v over Z                                          *)
+(*      num_M{1,2} == quad M{1,2}_int v_num                                   *)
+(*         v_rat i == Z2rat v_num[i] / Z2rat v_den                            *)
+(*     quad_spec M == \sum_(i,j) v_rat i * M i j * v_rat j (rat)              *)
+(*                                                                            *)
+(* No eigenvalue, characteristic polynomial, realalg, IVT, Sturm,             *)
+(* or CRT lift.  No Uint63 / native_compute / Axiom.                          *)
+(******************************************************************************)
 
 From Stdlib Require Import ZArith List Lia.
 Import ListNotations.
 
-From mathcomp Require Import all_ssreflect all_algebra.
-Import GRing.Theory Num.Theory.
+From mathcomp Require Import all_boot all_order all_algebra.
 
 From PrimeGapS1 Require Import IntMat CharPoly Witness Witness_Rayleigh.
 From PrimeGapS1 Require Import MaynardSpec MaynardSpecBridge Cert.
@@ -49,6 +53,8 @@ From mathcomp.algebra_tactics Require Import ring.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
+Import GRing.Theory Num.Theory.
 
 (* ================================================================= *)
 (*  Section 1 — integer reduction of v_witness                        *)
@@ -92,11 +98,11 @@ Definition num_M2 : Z := quad M2_int v_num.
 (*  Section 3 — integer inequalities (vm_compute Qeds)                *)
 (* ================================================================= *)
 
-Lemma v_den_pos : 0 < v_den.
-Proof. vm_compute. reflexivity. Qed.
+Lemma v_den_gt0 : 0 < v_den.
+Proof. by vm_compute. Qed.
 
-Lemma rayleigh_witness_M1_positive : 0 < num_M1.
-Proof. vm_compute. reflexivity. Qed.
+Lemma rayleigh_witness_M1_gt0 : 0 < num_M1.
+Proof. by vm_compute. Qed.
 
 (* The headline integer inequality:
      105 * D_M1 * num_M2  >  4 * D_M2 * num_M1.
@@ -104,7 +110,7 @@ Proof. vm_compute. reflexivity. Qed.
    Rayleigh-quotient bound  105 * v^T M2 v  >  4 * v^T M1 v. *)
 Lemma rayleigh_witness_holds :
   4 * D_M2 * num_M1 < 105 * D_M1 * num_M2.
-Proof. vm_compute. reflexivity. Qed.
+Proof. by vm_compute. Qed.
 
 (* ================================================================= *)
 (*  Section 4 — rat-level Rayleigh-quotient bound                     *)
@@ -158,17 +164,11 @@ Lemma Z2rat_row_dot_eq_sum (row v : list Z) (n : nat) :
   \sum_(i < n) Z2rat (List.nth i row BinInt.Z0)
              * Z2rat (List.nth i v BinInt.Z0).
 Proof.
-  elim: n row v => [|n IH] row v Hv Hr.
-  - destruct row; destruct v; try discriminate.
-    by rewrite /= Z2rat_0 big_ord0.
-  - destruct row as [|r row']; [discriminate|].
-    destruct v as [|x v']; [discriminate|].
-    simpl in Hv, Hr.
-    rewrite big_ord_recl /=.
-    rewrite Z2rat_add Z2rat_mul.
-    congr (_ + _).
-    rewrite (IH row' v');
-      [by apply: eq_bigr => i _ | by inversion Hv | by inversion Hr].
+  elim: n row v => [|n IH] [|r row'] [|x v'] //=.
+  - by move=> _ _; rewrite Z2rat_0 big_ord0.
+  - move=> [= Hv] [= Hr].
+    rewrite big_ord_recl /= Z2rat_add Z2rat_mul; congr (_ + _).
+    by rewrite (IH row' v' Hv Hr); apply: eq_bigr => i _.
 Qed.
 
 (* For any well-formed 42x42 matrix M, the integer `quad M v_num`
@@ -257,7 +257,7 @@ Lemma v_num_length : length v_num = 42%nat.
 Proof. by vm_compute. Qed.
 
 Lemma v_den_neq0_rat : Z2rat v_den != 0.
-Proof. by apply: Z_to_int_pos_rat_neq0; exact: v_den_pos. Qed.
+Proof. exact: (Z_to_int_pos_rat_neq0 v_den_gt0). Qed.
 
 (* ================================================================= *)
 (*  Section 7 — Rayleigh-quotient identity for M_spec                 *)
@@ -333,7 +333,7 @@ Qed.
 (* ================================================================= *)
 
 (* Z2rat is positive on positive Z. *)
-Lemma Z2rat_pos (a : Z) : BinInt.Z.lt 0 a -> (0 : rat) < Z2rat a.
+Lemma Z2rat_gt0 (a : Z) : BinInt.Z.lt 0 a -> (0 : rat) < Z2rat a.
 Proof.
   case: a => [//|p _|p Hp]; last by lia.
   by rewrite /Z2rat Z_to_int_pos_pos ltr0z; apply/ltP; exact: Pos2Nat.is_pos.
@@ -345,12 +345,12 @@ Proof.
   have -> : Z2rat b - Z2rat a = Z2rat (BinInt.Z.sub b a).
     rewrite /Z2rat -intrB -Z_to_int_opp -Z_to_int_add.
     by congr ((Z_to_int _)%:~R); lia.
-  by apply: Z2rat_pos; lia.
+  by apply: Z2rat_gt0; lia.
 Qed.
 
 Lemma rayleigh_witness_holds_rat :
   Z2rat (4 * D_M2 * num_M1) < Z2rat (105 * D_M1 * num_M2).
-Proof. by apply: Z2rat_lt; exact: rayleigh_witness_holds. Qed.
+Proof. exact: (Z2rat_lt rayleigh_witness_holds). Qed.
 
 (* Generic Rayleigh-quotient lift: from two scaled-quad identities
    `Z2rat d_k * v^2 * q_k = Z2rat a_k` (k = 1, 2) and the integer
@@ -375,8 +375,8 @@ Hypothesis Hcmp : Z2rat (4 * d2Z * a1Z) < Z2rat (105 * d1Z * a2Z).
 
 Lemma rayleigh_lift_generic : 4%:Q * q1 < 105%:Q * q2.
 Proof.
-  have Hd1r : (0 : rat) < Z2rat d1Z by exact: Z2rat_pos.
-  have Hd2r : (0 : rat) < Z2rat d2Z by exact: Z2rat_pos.
+  have Hd1r : (0 : rat) < Z2rat d1Z by exact: Z2rat_gt0.
+  have Hd2r : (0 : rat) < Z2rat d2Z by exact: Z2rat_gt0.
   have HK   : (0 : rat) < Z2rat d1Z * Z2rat d2Z * v ^+ 2.
     by rewrite expr2; do !apply: mulr_gt0.
   rewrite -(ltr_pM2r HK).
@@ -400,7 +400,7 @@ Lemma rayleigh_lt_main : 4%:Q * quad_spec M1_spec_ij <
                          105%:Q * quad_spec M2_spec_ij.
 Proof.
   exact: (rayleigh_lift_generic D_M1_pos D_M2_pos
-                                (Z2rat_pos v_den_pos)
+                                (Z2rat_gt0 v_den_gt0)
                                 quad_M1_spec_eq_Z quad_M2_spec_eq_Z
                                 rayleigh_witness_holds_rat).
 Qed.
@@ -430,8 +430,8 @@ Theorem maynard_M105_certified_rayleigh :
      M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
   4%:Q * quad_spec M1_spec_ij < 105%:Q * quad_spec M2_spec_ij.
 Proof.
-  split; first by move=> i j Hi Hj; apply: M1_spec_eq_int.
-  split; first by move=> i j Hi Hj; apply: M2_spec_eq_int.
+  split; first exact: @M1_spec_eq_int.
+  split; first exact: @M2_spec_eq_int.
   exact: rayleigh_lt_main.
 Qed.
 
