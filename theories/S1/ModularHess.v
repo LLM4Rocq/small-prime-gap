@@ -59,13 +59,14 @@
      hess_reduce_similar    -- the Hessenberg reduction is a similarity,
                                so char_poly(H) = char_poly(M) mod p.
 
-   Both are left `Admitted` with a (* TODO-BRIDGE *) marker: each is a
-   multi-hundred-line MathComp determinant/similarity development (see
-   the proof-strategy notes at each lemma), beyond the scope closed
-   here.  The algorithm itself is exercised by the machine-checked
-   `Example`s below (char_poly_hess = char_poly_int mod p on concrete
-   matrices, by vm_compute), giving a computational correctness check
-   independent of those two bridges.
+   Both are now FULLY PROVEN and axiom-free (see the proof-strategy
+   notes at each lemma): hess_recurrence_sound = the upper-Hessenberg
+   leading-principal-minor determinant recurrence computes char_poly;
+   hess_reduce_similar = char_poly is invariant under the elementary
+   conjugations (similarity transformations) of the reduction.  The
+   algorithm is also exercised by the machine-checked `Example`s below
+   (char_poly_hess = char_poly_int mod p on concrete matrices, by
+   vm_compute), an independent computational correctness check.
 
    No Uint63 / PrimInt63 / native_compute / Axiom / Parameter appears.
    =================================================================== *)
@@ -208,7 +209,7 @@ Definition char_poly_hess (p : Z) (M : mat) : list Z :=
 (*                                                                     *)
 (* These reduce char_poly_hess on concrete integer matrices and check  *)
 (* equality with char_poly_int mod p by vm_compute -- a computational  *)
-(* correctness witness independent of the two TODO-BRIDGE lemmas.      *)
+(* correctness check of the two bridge lemmas (now proven) below.      *)
 (* ================================================================== *)
 
 Example hess_validate_4 :

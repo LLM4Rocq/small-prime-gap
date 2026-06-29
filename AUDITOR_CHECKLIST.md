@@ -12,16 +12,38 @@ published proof). Maynard references use the v3 / Annals
 numbering ([arXiv:1311.4600v3](https://arxiv.org/abs/1311.4600);
 Annals **181** (2015), 383–413).
 
-The proof is the **Rayleigh-quotient witness route**: it evaluates a
-single Rayleigh quotient at a shipped 42-entry rational witness
-vector `v_witness` and shows it exceeds the threshold `4 / 105`.
-There is no eigenvalue computation, no characteristic polynomial,
-no IVT, no Sturm chain, and no Chinese-remainder lift anywhere in
-the development. The headline theorem
-`CertRayleigh.maynard_M105_certified_rayleigh` is `Qed` and reports
-*Closed under the global context* — zero axioms, including zero
-kernel primitives. There are no `Admitted`, no `Axiom`, and no
+The development proves `M_{105} > 4` in **two independent,
+axiom-free routes**, each with its own `Qed` headline theorem that
+reports *Closed under the global context* — zero axioms, including
+zero kernel primitives (every reduction runs in stdlib
+`Z`-arithmetic, not native 63-bit arithmetic):
+
+  - **Route 1 — Rayleigh-quotient witness**
+    (`CertRayleigh.maynard_M105_certified_rayleigh`,
+    `CertRayleigh.v:429`). It evaluates a single Rayleigh quotient
+    at a shipped 42-entry rational witness vector `v_witness` and
+    shows it exceeds the threshold `4 / 105`. **This route** uses no
+    eigenvalue computation, no characteristic polynomial, and no
+    Chinese-remainder lift.
+  - **Route 2 — eigenvalue / target form**
+    (`MaynardEigen.maynard_M105_certified`, `MaynardEigen.v:372`).
+    It exhibits an *actual* eigenvalue `> 4` of the generalized
+    problem `M_2 v = λ M_1 v`, matching Maynard's characterization
+    of `M_k` as `k` times the largest generalized eigenvalue. This
+    route **does** build a characteristic polynomial (modulo
+    primes), **does** perform a deterministic Chinese-remainder
+    lift, and **does** exhibit an eigenvalue — all axiom-free. Its
+    positivity input is Route 1's strict Rayleigh inequality, so
+    Route 1 is also the computational core of Route 2.
+
+Both headlines have been re-checked with `Print Assumptions`:
+each prints *Closed under the global context*. No route uses an IVT
+argument, a Sturm chain, `realalg`, or native 63-bit (`Uint63` /
+`PrimInt63` / `native_compute`) arithmetic; these remain absent from
+the whole development. There are no `Admitted`, no `Axiom`, and no
 `Parameter` declarations anywhere in `theories/S1/`.
+
+## Route 1 — Rayleigh-quotient witness
 
 | # | Claim | Maynard ref | Rocq backing |
 |---|---|---|---|
@@ -112,3 +134,54 @@ For (3) — the only paper-conformance step that is read rather than
 machine-checked — the line-level map in `SPEC_TO_PAPER.md` reduces
 it to checking that ~30 lines of `MaynardSpec.v` match Maynard's eq.
 8.4 character-for-character.
+
+## Route 2 — eigenvalue / target form
+
+Route 2 delivers Maynard's own characterization of `M_k`: the
+constant is `k` times the largest eigenvalue of the generalized
+problem `M_2 v = λ M_1 v`. The headline
+`MaynardEigen.maynard_M105_certified` (`MaynardEigen.v:372`, `Qed`,
+*Closed under the global context*) states, with `C := algC`,
+`ratrM := map_mx (ratr : rat -> C)`, `A_rat := invmx M1_rat *m
+M2_rat`, and `M105 := 105%:Q *: A_rat`:
+
+```
+  matches_closed_forms M105 /\
+  exists lam : C, eigenvalue (ratrM M105) lam /\ (4 < lam).
+```
+
+The first conjunct is the same trust contract as Route 1 item (4)
+(`EigenBridge.matches_closed_forms`: `M105` is the closed form and
+the paper-form spec entries match the FLINT-shipped integer matrices
+entrywise). The second conjunct exhibits a genuine eigenvalue of the
+generalized problem strictly above `4`. This route builds — axiom-
+free — a characteristic polynomial modulo primes, does a
+deterministic Chinese-remainder lift, and exhibits an eigenvalue.
+
+| # | Claim | Maynard ref | Rocq backing |
+|---|---|---|---|
+| 7 | `M_1` is positive definite, established **axiom-free by a CRT-over-`Z` characteristic-polynomial sign argument**: the integer char-poly of the shipped `M1_int` equals a shipped coefficient list whose signs strictly alternate, so all eigenvalues are `> 0` | Lemma 8.2 makes `M_1` a Gram matrix, hence PD | `M1CharPoly.char_poly_int_M1_eq` (`M1CharPoly.v:162`: `char_poly_int M1_int = cp_M1_value`) + `M1CharPoly.cp_M1_alternates` (`M1CharPoly.v:188`: `alternating_signs cp_M1_value` with positive ends) ⟹ `M1PosDef` spectrum `> 0`. All `Qed`, *Closed under the global context* |
+| 8 | The CRT lift is **deterministic, not probabilistic**: each char-poly coefficient is pinned by agreement modulo 200 distinct primes (~2³⁰ each) whose product exceeds `4 ×` a Hadamard-style coefficient bound | — (kernel CRT; standard a-priori coefficient bound) | `CRTCheck.crt_reconstruct` (`CRTCheck.v:171`, needs `2·\|c−d\| < ∏ primes`) fed by `Bound.char_poly_int_coeff_bound` (Hadamard-style) and the `vm_compute`'d margin `4 * cp_bound < ∏ crt_primes_M1` (`M1CharPoly.v:153`); 200 primes + the 43-entry coefficient list shipped in `WitnessM1CharPoly.{crt_primes_M1, cp_M1_value}`; primality / distinctness / `> 43` by `CRTFrame.{crt_primes_M1_all_prime, crt_primes_M1_NoDup, crt_primes_M1_gt43}` |
+| 9 | The **fast** `O(n³)` Hessenberg modular char-poly used by the per-prime checks is correct: it agrees with the (slow, proven) integer char-poly reduced mod `p` | — (algorithm correctness) | `ModularHess.char_poly_hess_sound` (`ModularHess.v:2246`), built from the two **fully proven, axiom-free** structural lemmas `ModularHess.hess_recurrence_sound` (`:2147`, the upper-Hessenberg leading-principal-minor determinant recurrence) and `ModularHess.hess_reduce_similar` (`:2213`, char-poly is conjugation-invariant), with `ModularFL.char_poly_modZ_sound` as the bad-pivot fallback. The 200-prime mass check `CRTFrame.per_prime_hess_all` (`CRTFrame.v:166`, sharded across 8 `CRTFrame_part*.v` for `make -j8`) is `Qed`, *Closed* |
+| 10 | The **spectral bridge**: a Hermitian matrix with a strictly positive value of its sesquilinear form on some vector has a strictly positive eigenvalue — this turns the positive Rayleigh value into an actual eigenvalue `> 4` | variational principle behind Lemma 8.3 | `SpectralCrux.herm_crux` (`SpectralCrux.v:77`: `A \is hermsymmx -> 0 < (w *m A *m w^t*) 0 0 -> exists2 a, eigenvalue A a & 0 < a`), via mathcomp-analysis' spectral theorem over `algC`; combined with `M1PosDef.M1_rat_factor` (`M1PosDef.v:369`: a complex congruence factor `R \in unitmx`, `R^t* *m R = ratrM M1_rat`) to reduce the generalized problem to a standard one. All `Qed`, *Closed* |
+| 11 | The strict Rayleigh inequality `4 · vᵀM₁v < 105 · vᵀM₂v` (Route 1 item (5)) supplies the positivity input to the bridge | reuses item (5) | `CertRayleigh.rayleigh_lt_main` is consumed inside `MaynardEigen` (`MaynardEigen.v` Rayleigh-numerator collapse), making Route 1 the computational core of Route 2 |
+| 12 | The composed headline `MaynardEigen.maynard_M105_certified` conjoins the trust contract with a witnessed eigenvalue `> 4` | **Lemma 8.3** (`M_k = k · largest generalized eigenvalue`) | `MaynardEigen.maynard_M105_certified` (`MaynardEigen.v:372`), `Qed`, `Print Assumptions` = *Closed under the global context* |
+
+**Files specific to Route 2** (all axiom-free, all `Qed`):
+`SpectralCrux.v` (the variational crux), `EigenBridge.v`
+(`M1_rat` / `M2_rat` / `A_rat` / `M105` + `matches_closed_forms`),
+`CharPoly.v` and `IntPoly.v` (the list-`Z` characteristic
+polynomial — `IntPoly` is **used** here, via `CharPoly`),
+`ModularFL.v` (Faddeev–LeVerrier mod `p`), `ModularHess.v` (the fast
+Hessenberg pass), `Bound.v` (the coefficient bound),
+`CRTCheck.v` (CRT uniqueness), `WitnessM1CharPoly.v` (the 200 primes
+and the coefficient list), `CRTFrame.v` + `CRTFrameDefs.v` +
+`CRTFrame_part0..7.v` (the sharded per-prime check),
+`M1CharPoly.v` (`char_poly_int M1_int = cp_M1_value`),
+`M1PosDef.v` (PD + the spectral factor), and `MaynardEigen.v`
+(the assembled headline).
+
+An auditor who trusts the kernel reads only whichever composed
+headline they prefer; the two routes are independent except that
+Route 2 reuses Route 1's Rayleigh inequality as its positivity
+input.

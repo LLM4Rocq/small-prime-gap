@@ -88,6 +88,20 @@ in the native 63-bit primitive-integer interface: no
 \texttt{PrimInt63}, no \texttt{Uint63Axioms}, no \texttt{CarryType}
 appear in the reported assumptions.
 
+\paragraph{Two certified routes.}
+The repository ships the conclusion $\Mk[105] > 4$ in two axiom-free
+forms. \emph{Route~1} (Chapters~\ref{ch:matrix}--\ref{ch:rayleigh}) is the
+direct Rayleigh-quotient witness described above, with headline
+\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}.
+\emph{Route~2} (Chapter~\ref{ch:eigen}) restates the result in Maynard's
+own spectral language --- $M_{105} = 105 \cdot \Mone^{-1}\Mtwo$ has an
+eigenvalue $> 4$ over the algebraic complex numbers --- with headline
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified}; it is built on
+Route~1's inequality and additionally constructs an integer characteristic
+polynomial, a Chinese-remainder lift, and an explicit eigenvalue, all over
+$\Z$ and $\Fp$. Both are \Qed{} and report \emph{Closed under the global
+context}.
+
 \paragraph{How to read this blueprint.}
 Each chapter mirrors a Rocq source file or a small group of related
 files. Inside each chapter, mathematical statements are presented as
@@ -399,7 +413,7 @@ generator is therefore not part of the trust base for the input data
 either.
 \end{remark}
 
-\section{Paper-form $\leftrightarrow$ computational-form spec bridge}
+\section{Paper-form \texorpdfstring{$\leftrightarrow$}{<->} computational-form spec bridge}
 
 The cross-checks above operate on the $\Z$-level twins
 (\texttt{m1\_num\_den}, \texttt{m2\_num\_den}) because \vmcompute{} on
@@ -855,6 +869,294 @@ accepts Maynard's Lemma~8.3 (an Annals-published Rayleigh-quotient
 identity, paper-side) obtains $\Mk[105] > 4$ end-to-end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{The eigenvalue route (target form)}\label{ch:eigen}
+
+The Rayleigh chapter certifies a strict inequality at one witness vector;
+combined with Maynard's Lemma~8.3 (paper-side) that already gives
+$\Mk[105] > 4$. This chapter establishes a \emph{second}, self-contained
+Rocq result that matches Maynard's own \emph{characterisation} of $\Mk$ as
+($k$ times) the largest eigenvalue of the generalised eigenproblem
+$\Mtwo v = \lambda \Mone v$: it exhibits, inside the kernel, an eigenvalue
+$> 4$ of the rational matrix
+$M_{105} = 105 \cdot \Mone^{-1}\Mtwo$. The headline of this route is
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified}
+(Theorem~\ref{thm:M105_eigen}).
+
+This route is built \emph{on} the Rayleigh witness — the strict inequality
+of Theorem~\ref{thm:rayleigh_lt_main} is exactly the positivity input the
+spectral bridge consumes — so Route~1 is at once a direct proof of the
+inequality and the computational core of Route~2. Everything below is
+\Qed{} and axiom-free; in particular this route genuinely \emph{does}
+build a characteristic polynomial (modulo primes), perform a
+Chinese-remainder lift, and exhibit an eigenvalue, all over Stdlib's $\Z$
+and $\Fp$ with no \texttt{native\_compute} and no real-algebra
+(IVT / Sturm / $\realalg$) machinery.
+
+\section{The generalised-eigenvalue matrices}
+
+\begin{definition}[Rational pencil matrices]\label{def:eigen_mats}
+\rocq{PrimeGapS1.EigenBridge.M1_rat, PrimeGapS1.EigenBridge.M2_rat,
+      PrimeGapS1.EigenBridge.A_rat, PrimeGapS1.EigenBridge.M105}
+\rocqok
+As genuine MathComp matrices in $\mathrm{'M}[\rat]_{42}$:
+$\Mone^{\rat} := M_1^{\mathrm{int}} / \DMone$ and
+$\Mtwo^{\rat} := M_2^{\mathrm{int}} / \DMtwo$ (entrywise int-to-rat
+division), with $A^{\rat} := (\Mone^{\rat})^{-1} \Mtwo^{\rat}$ and
+$M_{105} := 105 \cdot A^{\rat}
+   = 105 \cdot (\Mone^{\rat})^{-1}\Mtwo^{\rat}$.
+\end{definition}
+
+\begin{definition}[Closed-form trust contract]\label{def:matches_closed_forms}
+\rocq{PrimeGapS1.EigenBridge.matches_closed_forms}
+\rocqok
+\uses{def:M1_entry, def:M2_entry, def:eigen_mats}
+$\texttt{matches\_closed\_forms}(M)$ holds when $M = M_{105}$ and the
+paper-form specs match the FLINT integer data entrywise:
+$\texttt{M1\_spec\_ij}(i,j)
+   = \texttt{Z2rat}(M_1^{\mathrm{int}}[i][j])/\texttt{Z2rat}(\DMone)$
+and the $\Mtwo$ analogue, for all $(i,j) < 42$.
+\end{definition}
+
+\begin{lemma}[The pencil meets the contract]\label{lem:matches_closed_forms_M105}
+\rocq{PrimeGapS1.EigenBridge.matches_closed_forms_M105}
+\rocqok
+\uses{def:matches_closed_forms, lem:M1_spec_eq_int, lem:M2_spec_eq_int}
+$\texttt{matches\_closed\_forms}(M_{105})$.
+\end{lemma}
+\begin{proof}\rocqok
+The first conjunct is reflexivity; the other two are
+Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int}.
+\end{proof}
+
+\section{The Hermitian variational crux}
+
+The bridge from the Rayleigh inequality to a genuine eigenvalue runs
+through a single spectral fact, proved over a \texttt{numClosedFieldType}
+(instantiated at $\algC$, MathComp's field of algebraic complex numbers)
+on top of the \emph{complex} spectral theorem shipped in MathComp~2.5.0
+(\texttt{orthomx\_spectralP}). No real spectral theorem (mathcomp
+PR~\#1611) and no project axiom is used.
+
+\begin{theorem}[Hermitian crux]\label{thm:herm_crux}
+\rocq{PrimeGapS1.SpectralCrux.herm_crux}
+\rocqok
+For $A \in \mathrm{'M}[\algC]_n$ Hermitian
+($A \in \texttt{hermsymmx}$) and a vector
+$w \in \mathrm{'rV}[\algC]_n$ with $(w\,A\,w^{*})_{00} > 0$, there exists
+$a$ with $\texttt{eigenvalue}\,A\,a$ and $a > 0$: a Hermitian matrix whose
+Hermitian quadratic form is strictly positive at some vector has a
+strictly positive eigenvalue.
+\end{theorem}
+\begin{proof}\rocqok
+Spectral-decompose $A = P^{-1} (\mathrm{diag}\,\mathrm{sp})\,P$ with $P$
+unitary and the spectrum $\mathrm{sp}$ real
+(\texttt{hermitian\_spectral\_diag\_real}). The form rewrites as
+$\sum_j \mathrm{sp}_{0j}\,|u_j|^2$ with $u := P\,w^{*}$; strict positivity
+forces some $\mathrm{sp}_{0j} > 0$ (\texttt{realsum\_pos}), and that
+diagonal entry is an eigenvalue (\texttt{eig\_transfer}). Only
+$\texttt{hermsymmx}$ (not $\texttt{realmx}$) is required, so a
+\emph{complex} congruence factor may be used downstream — no real Cholesky
+is needed.
+\end{proof}
+
+\section{Axiom-free positive definiteness of \texorpdfstring{$\Mone$}{M\_1}}
+
+The crux needs a Hermitian \emph{congruence factor} of $\Mone^{\rat}$ over
+$\algC$, i.e.\ $\Mone^{\rat}$ positive definite. The certificate is a
+characteristic-polynomial sign argument carried out entirely in $\Z$ and
+$\Fp$, reconstructed by a deterministic Chinese remainder theorem — not a
+floating-point or probabilistic check.
+
+\subsection{The list-\texorpdfstring{$\Z$}{Z} characteristic polynomial}
+
+\begin{definition}[Integer characteristic polynomial]\label{def:char_poly_int}
+\rocq{PrimeGapS1.CharPoly.char_poly_int}
+\rocqok
+$\texttt{char\_poly\_int}(M) : \texttt{list }\Z$ is the coefficient list of
+$\charpolysym_M(x) = \det(xI - M)$ for an integer matrix $M$, built on the
+list-$\Z$ polynomial library \texttt{IntPoly.v} (which is therefore part of
+the eigenvalue route, not legacy). For the $42 \times 42$ matrix
+$\Mone^{\mathrm{int}}$ it has $43$ coefficients.
+\end{definition}
+
+\subsection{Modular char-poly: Faddeev--LeVerrier and fast Hessenberg}
+
+\begin{theorem}[Modular Faddeev--LeVerrier is sound]\label{thm:char_poly_modZ_sound}
+\rocq{PrimeGapS1.ModularFL.char_poly_modZ, PrimeGapS1.ModularFL.char_poly_modZ_sound}
+\rocqok
+\uses{def:char_poly_int}
+For a prime $p$, a square matrix $M$ with $\#M + 1 < p$ and the
+Faddeev--LeVerrier divisibility side-condition,
+$\texttt{char\_poly\_modZ}\,p\,M
+   = \texttt{map}\,(\cdot \bmod p)\,(\texttt{char\_poly\_int}\,M)$.
+\end{theorem}
+
+\begin{theorem}[Fast Hessenberg char-poly is sound]\label{thm:char_poly_hess_sound}
+\rocq{PrimeGapS1.ModularHess.char_poly_hess, PrimeGapS1.ModularHess.char_poly_hess_sound}
+\rocqok
+\uses{def:char_poly_int, thm:char_poly_modZ_sound}
+Under the same hypotheses,
+$\texttt{char\_poly\_hess}\,p\,M
+   = \texttt{map}\,(\cdot \bmod p)\,(\texttt{char\_poly\_int}\,M)$.
+The $O(n^3)$ Hessenberg pass replaces the $O(n^4)$ Faddeev--LeVerrier pass
+for the heavy per-prime work; it returns \texttt{None} on a vanishing pivot
+and then falls back to the (sound) FL pass, so no good-pivot hypothesis is
+needed.
+\end{theorem}
+\begin{proof}\rocqok
+The \texttt{None} branch reuses Theorem~\ref{thm:char_poly_modZ_sound}.
+The \texttt{Some} branch factors through two structural lemmas, both
+\emph{fully proven and axiom-free}:
+\rocq{PrimeGapS1.ModularHess.hess_recurrence_sound} (the upper-Hessenberg
+leading-principal-minor determinant recurrence computes $\charpolysym$, by
+Laplace expansion along the last row) and
+\rocq{PrimeGapS1.ModularHess.hess_reduce_similar} ($\charpolysym$ is
+invariant under the elementary conjugations of the Hessenberg reduction,
+i.e.\ that reduction is a similarity), transported coefficientwise through
+the ring homomorphism $\Z \to \Fp$.
+\end{proof}
+
+\subsection{The CRT reconstruction}
+
+\begin{lemma}[A-priori coefficient bound]\label{lem:char_poly_int_coeff_bound}
+\rocq{PrimeGapS1.Bound.char_poly_int_coeff_bound}
+\rocqok
+\uses{def:char_poly_int}
+Every coefficient of $\texttt{char\_poly\_int}(M)$ is bounded in absolute
+value by a Hadamard-style quantity
+$\texttt{fl\_coeff\_bound}(\#M)(\texttt{max\_abs\_entry}\,M)$ that depends
+only on the dimension and the largest entry magnitude.
+\end{lemma}
+
+\begin{theorem}[Deterministic CRT reconstruction]\label{thm:crt_reconstruct}
+\rocq{PrimeGapS1.CRTCheck.crt_reconstruct}
+\rocqok
+For integers $c, d$ and a list $ps$ of distinct primes: if every $p \in ps$
+divides $c - d$ and $2\,|c - d| < \prod ps$, then $c = d$.
+\end{theorem}
+
+\begin{lemma}[Per-prime agreement]\label{lem:per_prime}
+\rocq{PrimeGapS1.CRTFrame.per_prime_hess_all, PrimeGapS1.CRTFrame.per_prime_ok}
+\rocqok
+\uses{thm:char_poly_hess_sound}
+For every prime $p$ of the table \texttt{crt\_primes\_M1},
+$\texttt{char\_poly\_hess}\,p\,M_1^{\mathrm{int}}
+   = \texttt{map}\,(\cdot \bmod p)\,\texttt{cp\_M1\_value}$
+(\texttt{per\_prime\_hess\_all}), and the same equality holds for the
+Faddeev--LeVerrier pass (\texttt{per\_prime\_ok}).
+\end{lemma}
+\begin{proof}\rocqok
+The aggregate Boolean \texttt{forallb} over the $200$ table primes
+(\texttt{WitnessM1CharPoly.crt\_primes\_M1}, each just under $2^{30}$) is
+closed by \vmcompute, sharded across eight files
+(\texttt{CRTFrame\_part0..7.v}) so \texttt{make -j8} runs the heavy
+$O(n^3)$ reductions concurrently and recombines them via
+\texttt{forallb\_app} with no per-prime recomputation in the
+\Qed. \texttt{per\_prime\_ok} transports the fast-path equality to the FL
+pass through Theorems~\ref{thm:char_poly_hess_sound}
+and~\ref{thm:char_poly_modZ_sound}.
+\end{proof}
+
+\begin{theorem}[$\charpolysym_{\Mone}$ and its sign pattern]\label{thm:cp_M1}
+\rocq{PrimeGapS1.M1CharPoly.char_poly_int_M1_eq, PrimeGapS1.M1CharPoly.cp_M1_alternates}
+\rocqok
+\uses{thm:char_poly_modZ_sound, thm:crt_reconstruct,
+      lem:char_poly_int_coeff_bound, lem:per_prime}
+$\texttt{char\_poly\_int}(M_1^{\mathrm{int}}) = \texttt{cp\_M1\_value}$
+(the shipped $43$-coefficient list), and \texttt{cp\_M1\_value} has
+strictly alternating signs with positive constant and leading coefficients.
+\end{theorem}
+\begin{proof}\rocqok
+Coefficient by coefficient: for each index and each table prime the two
+$k$-th coefficients agree modulo $p$ (Lemma~\ref{lem:per_prime} with
+Theorem~\ref{thm:char_poly_modZ_sound}); the a-priori bound
+(Lemma~\ref{lem:char_poly_int_coeff_bound}) lies below the prime product
+(a single \vmcompute), so Theorem~\ref{thm:crt_reconstruct} collapses the
+$200$ congruences into an honest equality over $\Z$. The sign pattern is
+then a \vmcompute{} on the concrete list.
+\end{proof}
+
+\subsection{From sign alternation to a congruence factor}
+
+\begin{theorem}[$\Mone$ is positive definite]\label{thm:M1_rat_factor}
+\rocq{PrimeGapS1.M1PosDef.M1_rat_factor}
+\rocqok
+\uses{thm:cp_M1, thm:herm_crux}
+There is a unitary-scaled congruence factor
+$R \in \mathrm{'M}[\algC]_{42}$ with $R \in \texttt{unitmx}$ and
+$R^{*} R = \texttt{map\_mx ratr}\,\Mone^{\rat}$.
+\end{theorem}
+\begin{proof}\rocqok
+A monic polynomial over $\algC$ with integer, strictly sign-alternating
+coefficients (positive constant) is strictly positive at every real
+$x \le 0$, so each of its real roots is $> 0$. By the complex spectral
+theorem the spectrum of the Hermitian $\texttt{map\_mx ratr}\,\Mone^{\rat}$
+is real and consists of such roots (Theorem~\ref{thm:cp_M1}), hence
+positive; the diagonal matrix of the $\sqrt{\cdot}$ of the spectrum, times
+the spectral basis, is the factor $R$, after transferring the $1/\DMone$
+scaling over $\rat$ (no division in $\algC$).
+\end{proof}
+
+\section{The spectral bridge and the headline}
+
+\begin{lemma}[Abstract spectral bridge]\label{lem:eigen_bridge}
+\rocq{PrimeGapS1.MaynardEigen.eigen_bridge}
+\rocqok
+\uses{thm:herm_crux}
+Let $M_1^c, M_2^c, R, S', A \in \mathrm{'M}[\algC]_n$ and
+$u \in \mathrm{'cV}[\algC]_n$ with $R \in \texttt{unitmx}$,
+$R^{*} R = M_1^c$, $M_2^c$ Hermitian,
+$S' = 105 \cdot M_2^c - 4 \cdot M_1^c$,
+$A = 105 \cdot (M_1^c)^{-1} M_2^c$, and $(u^{*} S'\, u)_{00} > 0$. Then $A$
+has an eigenvalue $> 4$.
+\end{lemma}
+\begin{proof}\rocqok
+$S_2 := (R^{-1})^{*} S'\, R^{-1}$ is Hermitian (congruence) and the witness
+$w := (R\,u)^{*}$ makes its Hermitian form positive; Theorem~\ref{thm:herm_crux}
+yields a positive eigenvalue $a$ of $S_2$. Since $S_2$ is similar to
+$(M_1^c)^{-1} S' = A - 4\cdot I$, the shifted value $a + 4$ is an
+eigenvalue of $A$, with $a + 4 > 4$. The lemma is stated on abstract
+matrices, so its kernel type-check never forces the
+$\sim 10^{200}$-denominator FLINT data.
+\end{proof}
+
+\begin{theorem}[End-to-end eigenvalue certification (target form)]\label{thm:M105_eigen}
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified}
+\rocqok
+\uses{lem:matches_closed_forms_M105, thm:M1_rat_factor, lem:eigen_bridge,
+      thm:rayleigh_lt_main}
+With $\texttt{ratrM} := \texttt{map\_mx}\,(\texttt{ratr} : \rat \to \algC)$
+the entrywise embedding of rational matrices into $\algC$:
+\begin{verbatim}
+Theorem maynard_M105_certified :
+  matches_closed_forms M105 /\
+  exists lam : algC, eigenvalue (ratrM M105) lam /\ (4 < lam).
+\end{verbatim}
+i.e.\ the closed-form contract holds and
+$M_{105} = 105 \cdot \Mone^{-1}\Mtwo$ has an eigenvalue $> 4$ over $\algC$ —
+Maynard's characterisation of $\Mk[105]$ as ($105$ times) the largest
+eigenvalue of the generalised eigenproblem $\Mtwo v = \lambda \Mone v$.
+\end{theorem}
+\begin{proof}\rocqok
+The first conjunct is Lemma~\ref{lem:matches_closed_forms_M105}. For the
+second, the complex congruence factor of Theorem~\ref{thm:M1_rat_factor}
+and the Rayleigh positivity of Theorem~\ref{thm:rayleigh_lt_main} (pushed
+through \texttt{ratr}, where it becomes the positive Hermitian form
+feeding the crux) discharge the hypotheses of the bridge
+Lemma~\ref{lem:eigen_bridge}. \texttt{Print Assumptions}: \emph{Closed
+under the global context}.
+\end{proof}
+
+\paragraph{Reading.}
+Route~2 is the \emph{target form} of the result: rather than a strict
+Rayleigh inequality at one witness (Route~1), it states the conclusion in
+Maynard's own spectral language — $M_{105}$ has an eigenvalue exceeding
+$4$. The two routes share the same axiom-free, $\Z$/$\Fp$-only
+computational footprint, and Route~2's only numerical input beyond the
+matrix data is the very inequality Route~1 certifies.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Trust base}\label{ch:trust}
 
 \section{What is a Qed and what is paper-side}
@@ -885,15 +1187,20 @@ identity, paper-side) obtains $\Mk[105] > 4$ end-to-end.
 
 \section{Reported assumptions}
 
-\texttt{Print Assumptions maynard\_M105\_certified\_alt} reports a
-single line: \emph{Closed under the global context}. This is
-stronger than the typical \vmcompute{} footprint: because the
-matrices and the witness vector are encoded as \texttt{list (list
-Z)} and \texttt{list (Z * Z)} rather than as native 63-bit packed
-arrays, \vmcompute{} reduces through $\Z$ arithmetic instead of
-through the $\Uintsf$ kernel primitives. None of
-\texttt{PrimInt63}, \texttt{Uint63Axioms}, or \texttt{CarryType}
-appear in the reported assumptions.
+\emph{Both} headline theorems report a single line under
+\texttt{Print Assumptions} — \emph{Closed under the global context}:
+\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh} (Route~1,
+the direct Rayleigh witness, Theorem~\ref{thm:M105}) and
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified} (Route~2, the
+eigenvalue / target form, Theorem~\ref{thm:M105_eigen}). This is stronger
+than the typical \vmcompute{} footprint: because the matrices and the
+witness vector are encoded as \texttt{list (list Z)} and
+\texttt{list (Z * Z)} rather than as native 63-bit packed arrays,
+\vmcompute{} reduces through $\Z$ arithmetic — and, for the CRT
+positive-definiteness certificate of Route~2, through $\Fp = \Z/p\Z$ —
+instead of through the $\Uintsf$ kernel primitives. None of
+\texttt{PrimInt63}, \texttt{Uint63Axioms}, or \texttt{CarryType} appears
+in the reported assumptions of either theorem.
 
 The project does not invoke \texttt{native\_compute} anywhere — a
 \texttt{grep -n native\_compute theories/S1} returns zero hits in
@@ -947,34 +1254,35 @@ $(105 \cdot v^T \Mtwo v - 4 \cdot v^T \Mone v) / v^T \Mone v
    \approx +2.07 \cdot 10^{-3}$.
 
 \paragraph{Build profile.}
-On a $16$~GB / $6$-thread machine: ${\sim}25$--$30$~min wall-clock
-with \texttt{make -j6} (clean rebuild). The dominant single-\Qed{}
-costs are:
+A clean \texttt{make -j8} rebuild takes ${\sim}8.6$~min wall-clock and
+produces $43$ \texttt{.vo} files. It splits into two largely concurrent
+parts:
 \begin{itemize}
-\item Theorem~\ref{thm:M2_match}
-  (\texttt{all\_match\_M2Z\_true}): ${\sim}35$~min sequentially
-  across the six $7$-row chunks
-  (\texttt{MaynardVerify/M2\_0..5.v}), reduced to a per-chunk wall
-  of a few minutes under \texttt{make -j} — $1764$ entries, each up
-  to $36$ rational summands with intermediate denominators reaching
-  $\sim 10^{7000}$ digits.
-\item Theorem~\ref{thm:M1_match}: ${\sim}90$~s.
-\item Theorem~\ref{thm:rayleigh_holds}
-  (\texttt{rayleigh\_witness\_holds}): ${\sim}5$~s — a single
-  BigZ comparison of two large products.
-\item \texttt{Witness.v} parsing: ${\sim}30$~s — \BigZ\ literal
-  parser on the shipped matrix coefficients.
+\item \emph{Matrix / spec / Rayleigh base} (${\sim}4.5$~min after a
+  \texttt{vm\_cast\_no\_check} speed-up), dominated by the reflection
+  mass-checks. Theorem~\ref{thm:M2_match}
+  (\texttt{all\_match\_M2Z\_true}) — $1764$ entries, each up to $36$
+  rational summands with intermediate denominators reaching
+  $\sim 10^{7000}$ digits — is split into six $7$-row chunks
+  (\texttt{MaynardVerify/M2\_0..5.v}) that \texttt{make -j} runs in
+  parallel and stitches via \texttt{forallb\_app}. Theorem~\ref{thm:M1_match}
+  and Theorem~\ref{thm:rayleigh_holds} are comparatively cheap, and
+  \texttt{Witness.v} parsing is a one-off \BigZ\ literal cost.
+\item \emph{Eigenvalue chain} (${\sim}2.3$~min): the $200$-prime CRT
+  positive-definiteness certificate for $\Mone$ (Lemma~\ref{lem:per_prime}),
+  whose per-prime $O(n^3)$ Hessenberg \vmcompute{} is sharded across
+  \texttt{CRTFrame\_part0..7.v} for \texttt{make -j8} and recombined via
+  \texttt{forallb\_app} (serially this step is ${\sim}36$~min).
 \end{itemize}
-With \texttt{make -j6} the six $M_2$ chunks run concurrently, so
-the wall clock is bounded by the slowest single chunk plus the
-linear assembly tail.
 
-\paragraph{Project size.} $20$ \texttt{.v} files under
-\texttt{theories/S1/} ($13$ top-level plus $7$ in the
-\texttt{MaynardVerify/} parallel-chunk subdirectory), ${\sim}9{,}590$
+\paragraph{Project size.} $43$ \texttt{.v} files under
+\texttt{theories/S1/} ($36$ top-level plus $7$ in the
+\texttt{MaynardVerify/} parallel-chunk subdirectory), ${\sim}15{,}300$
 lines total; \texttt{Witness.v} alone is ${\sim}5{,}700$ lines of
-autogenerated certificate data, and \texttt{Witness\_Quad.v} is
-${\sim}80$ lines of $42$ $(\mathrm{num}, \mathrm{den})$ pairs.
+autogenerated certificate data, \texttt{WitnessM1CharPoly.v} ships the
+$200$ CRT primes and the $43$ char-poly coefficients, and
+\texttt{Witness\_Rayleigh.v} is ${\sim}80$ lines of $42$
+$(\mathrm{num}, \mathrm{den})$ pairs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Map of key lemmas and files}\label{ch:map}
@@ -998,6 +1306,20 @@ Headline outputs: Theorems~\ref{thm:rayleigh_pos},
 \ref{thm:rayleigh_holds}, Lemmas~\ref{lem:quad_spec_eq_Z},
 \ref{lem:rayleigh_lift_generic}, Theorem~\ref{thm:rayleigh_lt_main}.
 
-The two backbones merge at \texttt{CertRayleigh.v}, producing
-Theorem~\ref{thm:M105}. A single \texttt{Require Import
-PrimeGapS1.CertRayleigh.} loads the entire proof.
+\paragraph{Eigenvalue-route backbone.}
+\texttt{SpectralCrux} (the Hermitian crux) together with the $\Z$/$\Fp$
+char-poly stack — \texttt{IntPoly} $\to$ \texttt{CharPoly},
+\texttt{ModularFL}, \texttt{ModularHess}, \texttt{Bound}, \texttt{CRTCheck},
+\texttt{WitnessM1CharPoly}, \texttt{CRTFrameDefs} +
+\texttt{CRTFrame\_part0..7} $\to$ \texttt{CRTFrame} $\to$
+\texttt{M1CharPoly} $\to$ \texttt{M1PosDef} — feed \texttt{EigenBridge} and
+\texttt{MaynardEigen}. Headline output: Theorem~\ref{thm:M105_eigen}
+(\texttt{maynard\_M105\_certified}), which also consumes the Rayleigh
+inequality Theorem~\ref{thm:rayleigh_lt_main}.
+
+The matrix-spec and Rayleigh-witness backbones merge at
+\texttt{CertRayleigh.v}, producing the Route~1 headline
+Theorem~\ref{thm:M105} (\texttt{Require Import PrimeGapS1.CertRayleigh.}
+loads it); the eigenvalue-route backbone builds on that inequality to
+produce the Route~2 headline Theorem~\ref{thm:M105_eigen}
+(\texttt{Require Import PrimeGapS1.MaynardEigen.} loads the whole proof).

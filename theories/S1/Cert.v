@@ -12,10 +12,14 @@
    two-way identity (which gives auditor-level parity with Maynard's paper
    formulas) with the strict Rayleigh-quotient bound on `(v_witness, M1, M2)`.
 
-   There is no eigenvalue, characteristic polynomial, realalg, IVT,
-   Sturm, or CRT machinery on this branch.  The only Z-level Qed used
+   This file itself uses no eigenvalue, characteristic polynomial,
+   realalg, IVT, Sturm, or CRT machinery; the only Z-level Qed it feeds
    downstream is the entry-by-entry `all_match_M{1,2}Z = true` check
-   from `MaynardVerify/Def.v` + `MaynardVerify/M2_{0..5}.v`. *)
+   from `MaynardVerify/Def.v` + `MaynardVerify/M2_{0..5}.v`.  (The
+   eigenvalue route -- Route 2, `MaynardEigen.maynard_M105_certified`
+   -- does build a characteristic polynomial mod p, perform a
+   Chinese-remainder lift, and exhibit an eigenvalue > 4, all
+   axiom-free; IVT / Sturm / realalg are used nowhere.) *)
 
 From Stdlib Require Import ZArith.
 

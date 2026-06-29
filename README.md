@@ -1,4 +1,4 @@
-# Maynard `M_{105} > 4` — a Rocq Rayleigh-quotient witness proof
+# Maynard `M_{105} > 4` — an axiom-free Rocq proof (eigenvalue + Rayleigh-quotient routes)
 
 [![Blueprint CI](https://img.shields.io/github/actions/workflow/status/LLM4Rocq/small-prime-gap/blueprint.yml?branch=main&style=for-the-badge&label=blueprint%20CI)](https://github.com/LLM4Rocq/small-prime-gap/actions/workflows/blueprint.yml)
 [![Blueprint](https://img.shields.io/badge/blueprint-online-blue?style=for-the-badge)](https://llm4rocq.github.io/small-prime-gap/blueprint/)
@@ -26,13 +26,17 @@ Mathematica notebook supplied as supplementary material with the
 arXiv preprint. This project replaces that step with a kernel-checked
 Rocq proof.
 
-## The proof strategy in one paragraph
+## The proof strategy — two axiom-free routes
 
-This development mechanises Maynard's notebook strategy directly:
-the heart of the proof is a single `vm_compute` Qed on an integer
-Rayleigh inequality at a shipped 42-entry rational witness vector.
-Concretely, the file `theories/S1/Witness_Rayleigh.v` ships a vector
-$v \in \mathbb{Q}^{42}$ (whose entries are obtained by snapping the
+The development proves `M_{105} > 4` in two independent, fully
+axiom-free forms. Both are `Qed` and report *Closed under the global
+context*; every reduction runs in stdlib `Z` arithmetic, so neither
+route touches the native 63-bit primitive-integer interface.
+
+**Route 1 — direct Rayleigh-quotient witness.** The heart is a single
+`vm_compute` Qed on an integer Rayleigh inequality at a shipped 42-entry
+rational witness vector. The file `theories/S1/Witness_Rayleigh.v` ships
+a vector $v \in \mathbb{Q}^{42}$ (its entries obtained by snapping the
 top eigenvector of $M_1^{-1} M_2$ to small-denominator rationals via
 continued-fraction convergents), and `theories/S1/CertRayleigh.v` closes
 the integer inequality
@@ -44,10 +48,52 @@ by `vm_compute` reflexivity on `Z`-arithmetic. This is equivalent
 (after clearing denominators uniformly) to the strict Rayleigh-quotient
 bound `4 · vᵀM₁v < 105 · vᵀM₂v` on the paper-form spec matrices, which
 in turn entails `M_{105} > 4` modulo Maynard's Lemma 8.3 (paper-side).
-No eigenvalue is computed, no characteristic polynomial is built,
-no IVT or Sturm chain is invoked.
+Route 1 computes **no eigenvalue, builds no characteristic polynomial,
+and performs no Chinese-remainder lift**.
 
-## The headline theorem
+**Route 2 — eigenvalue / target form.** This is the completed target,
+matching Maynard's characterisation of $M_k$ as ($k$ times) the largest
+eigenvalue of the generalised problem $M_2 v = \lambda M_1 v$. It
+*exhibits* an eigenvalue: `theories/S1/MaynardEigen.v` proves that
+`M105 = 105 *: (invmx M1_rat *m M2_rat)` has an eigenvalue `> 4` over
+`algC`. Route 2 is built on the Route 1 computation: the strict Rayleigh
+inequality `CertRayleigh.rayleigh_lt_main` supplies the strict-positivity
+input, a Hermitian variational bridge (`SpectralCrux.herm_crux`, via
+mathcomp's complex spectral theorem) reduces the generalised problem to a
+standard one through `M1`'s spectral square root, and the
+positive-definiteness of `M1` is certified **axiom-free by a
+characteristic-polynomial / CRT argument over `Z`**:
+`char_poly_int(M1_int)` equals a shipped, strictly-sign-alternating
+coefficient list (⟹ all eigenvalues `> 0` ⟹ `M1` positive-definite),
+proved by agreement modulo 200 primes whose product exceeds twice a
+Hadamard-style coefficient bound — a deterministic CRT, not a
+probabilistic one. So Route 2 **does** build a characteristic polynomial
+(mod p), perform a Chinese-remainder lift, and exhibit an eigenvalue —
+all kernel-checked and axiom-free.
+
+Neither route invokes an IVT or Sturm chain, or a `realalg` decision
+procedure.
+
+## The headline theorems
+
+**Route 2 (eigenvalue / target form)** —
+`MaynardEigen.maynard_M105_certified`:
+
+```rocq
+(* with  C := algC  and  ratrM := map_mx (ratr : rat -> C) *)
+Theorem maynard_M105_certified :
+  matches_closed_forms M105 /\
+  exists lam : algC, eigenvalue (ratrM M105) lam /\ (4 < lam).
+```
+
+in `theories/S1/MaynardEigen.v`, where
+`M105 = 105 *: (invmx M1_rat *m M2_rat)`. `matches_closed_forms` bundles
+the closed-form identity `M = M105` with the entrywise agreement of the
+paper-form spec and the FLINT-shipped integer matrices; the existential
+exhibits a real eigenvalue strictly above `4`.
+
+**Route 1 (direct Rayleigh witness)** —
+`CertRayleigh.maynard_M105_certified_rayleigh`:
 
 ```rocq
 Theorem maynard_M105_certified_rayleigh :
@@ -66,17 +112,17 @@ entries via the common denominators; the third is the strict
 Rayleigh-quotient bound on those paper-form matrices at the shipped
 witness.
 
-A single `Print Assumptions maynard_M105_certified_rayleigh` reports
-*Closed under the global context* — zero axioms, including zero
-kernel primitives (this development does every reduction in `Z`
-arithmetic, so `vm_compute` never touches the native 63-bit
-`PrimInt63` / `Uint63Axioms` / `CarryType` interface). There are no
-`Admitted`, no `Axiom`, and no `Parameter` declarations anywhere in
-`theories/S1/`.
+`Print Assumptions` on either headline —
+`maynard_M105_certified` or `maynard_M105_certified_rayleigh` — reports
+*Closed under the global context*: zero axioms, including zero kernel
+primitives (every reduction runs in `Z` arithmetic, so `vm_compute`
+never touches the native 63-bit `PrimInt63` / `Uint63Axioms` /
+`CarryType` interface). There are no `Admitted`, no `Axiom`, and no
+`Parameter` declarations anywhere in `theories/S1/`.
 
-| Headline | Files | LOC | Compile |
+| Headlines | Files | LOC | Compile |
 |---|---|---|---|
-| `maynard_M105_certified_rayleigh` | 20 | 9 590 | ~25–30 min |
+| `maynard_M105_certified` (Route 2) + `maynard_M105_certified_rayleigh` (Route 1) | 43 | ~15 300 | clean `make -j8` ≈ 8.6 min |
 
 ## Repository layout
 
@@ -100,15 +146,15 @@ prime_gap/
 |   +-- m1m2.pkl                    cached exact-rational M1, M2
 |   +-- certificate.json            small certificate (~510 KB)
 |
-+-- theories/S1/                    20 .v files total
++-- theories/S1/                    43 .v files total
+    |   -- shared data & helpers --
     +-- Recompose.v                 bigZ <-> Z helpers
     +-- Witness.v                   FLINT-shipped certificate data (autogenerated)
-    +-- Witness_Rayleigh.v              42-entry rational Rayleigh witness (autogenerated)
-    |
-    +-- IntPoly.v                   list Z polynomial library (legacy, not used by the headline)
     +-- IntMat.v                    list (list Z) matrix library
-    +-- CharPoly.v                  Z<->rat / Z<->int bridging definitions (Z2rat, mat_int_to_rat)
+    +-- IntPoly.v                   list Z polynomial library (used by CharPoly)
+    +-- CharPoly.v                  list-Z char poly (char_poly_int) + Z->rat bridge (mat_int_to_rat)
     |
+    |   -- paper spec & FLINT parity (shared by both routes) --
     +-- MaynardFactQ.v              factorial / binomial as rat
     +-- MaynardBasis.v              42-element basis with Witness bridge
     +-- MaynardSpec.v               G_{n,2}(k), M1_entry, M2_entry closed forms
@@ -117,35 +163,55 @@ prime_gap/
     |   +-- Def.v                   definitions + the fast M1 Qed
     |   +-- M2_0.v ... M2_5.v       7-row chunks of the M2 check
     +-- MaynardSpecBridge.v         kernel-Qed: paper-form (rat) <-> computational (Z) spec
-    |
     +-- Cert.v                      slim auditor bridge: M{1,2}_spec_eq_int
-    +-- CertRayleigh.v                  Rayleigh witness route: rayleigh_witness_holds + headline
+    |
+    |   -- Route 1: Rayleigh witness --
+    +-- Witness_Rayleigh.v          42-entry rational Rayleigh witness (autogenerated)
+    +-- CertRayleigh.v              Rayleigh route: rayleigh_lt_main + headline (Route 1)
+    |
+    |   -- Route 2: eigenvalue / target form --
+    +-- EigenBridge.v               M1_rat/M2_rat/A_rat/M105 + matches_closed_forms
+    +-- SpectralCrux.v              Hermitian variational crux herm_crux (complex spectral thm)
+    +-- ModularFL.v                 char_poly_modZ (Faddeev-LeVerrier mod p) + soundness
+    +-- ModularHess.v               O(n^3) Hessenberg modular char-poly + soundness (both bridge
+    |                               lemmas hess_reduce_similar / hess_recurrence_sound proven)
+    +-- Fermat.v / FLDiv.v / PrimeCheck.v   modular-inverse / primality support
+    +-- Bound.v                     Hadamard-style char_poly coefficient bound
+    +-- CRTCheck.v                  crt_reconstruct (deterministic CRT uniqueness)
+    +-- WitnessM1CharPoly.v         data: 200 CRT primes + char_poly coefficient list
+    +-- CRTFrameDefs.v              CRT-frame definitions
+    +-- CRTFrame_part0.v .. part7.v 200-prime per-prime check, sharded for make -j8
+    +-- CRTFrame.v                  recombines the shards (per_prime_hess_all)
+    +-- M1CharPoly.v                char_poly_int(M1_int) = shipped coefficient list
+    +-- M1PosDef.v                  M1 positive-definite + spectral factor M1_rat_factor
+    +-- MaynardEigen.v              assembles maynard_M105_certified (Route 2 headline)
 ```
 
-The dependency graph under `theories/S1/` is linear: the proof does
-not use a characteristic polynomial, an eigenvalue computation, an
-IVT or Sturm chain, or a Chinese-remainder lift. `Witness.v` is the
-matrix data ship from the FLINT pipeline; the auxiliary scalars it
-also exposes (`A_int` / `D_A` / `D_q` and the cleared-denominator
-char-poly coefficients) are unused by any downstream file on this
-branch.
+Route 1's dependency chain is short and linear and uses no
+characteristic polynomial, eigenvalue, or Chinese-remainder lift.
+Route 2 adds the eigenvalue chain on top of the shared spec/parity
+layer: a list-`Z` characteristic polynomial, a modular (mod p) char-poly
+with a deterministic 200-prime Chinese-remainder lift, and a complex
+spectral decomposition that exhibits the eigenvalue. Neither route uses
+an IVT or Sturm chain, or a `realalg` decision procedure. `Witness.v` is
+the matrix data shipped from the FLINT pipeline.
 
 ## Auditor's checklist
 
-See [`AUDITOR_CHECKLIST.md`](./AUDITOR_CHECKLIST.md) for the 6-row
-table mapping each verifiable claim to its reference in Maynard's
-paper and the Rocq lemma backing it.
+See [`AUDITOR_CHECKLIST.md`](./AUDITOR_CHECKLIST.md) for the table
+mapping each verifiable claim to its reference in Maynard's paper and the
+Rocq lemma backing it.
 
 ## Axiom status
 
-The headline `CertRayleigh.maynard_M105_certified_rayleigh` and every
-auditor-checklist lemma report *Closed under the global context*:
-zero axioms across the whole proof chain. No `Admitted`, no
-`Axiom`, no `Parameter` anywhere in `theories/S1/`. Because every
-reduction is in `Z` arithmetic, `vm_compute` never touches the
-native 63-bit primitive-integer interface either — not even
-`PrimInt63` / `Uint63Axioms` / `CarryType` appear in `Print
-Assumptions` output.
+Both headlines — `MaynardEigen.maynard_M105_certified` and
+`CertRayleigh.maynard_M105_certified_rayleigh` — and every
+auditor-checklist lemma report *Closed under the global context*: zero
+axioms across the whole proof chain. No `Admitted`, no `Axiom`, no
+`Parameter` anywhere in `theories/S1/`. Because every reduction is in
+`Z` arithmetic, `vm_compute` never touches the native 63-bit
+primitive-integer interface either — not even `PrimInt63` /
+`Uint63Axioms` / `CarryType` appear in `Print Assumptions` output.
 
 ## Prerequisites
 
@@ -167,19 +233,23 @@ source .venv/bin/activate && python python/build_certificate.py
 python python/json_to_v.py
 python python/build_quad_witness.py
 
-# 3. Build all Rocq files (~25–30 min on a 16 GB / 6-thread machine
-#    with make -j6). The dominant phase is the six MaynardVerify/M2_*
-#    chunks, which compile in parallel under make -j.
+# 3. Build all Rocq files (clean `make -j8` ≈ 8.6 min on a modern
+#    multicore machine). The dominant phases are the six
+#    MaynardVerify/M2_* spec chunks and the eight CRTFrame_part*
+#    per-prime CRT checks, all of which compile in parallel under make -j.
 coq_makefile -f _CoqProject -o Makefile
-make -j6
+make -j8
 
-# 4. Inspect the headline's assumptions.
+# 4. Inspect each headline's assumptions.
+coqtop -Q theories/S1 PrimeGapS1 \
+  -l theories/S1/MaynardEigen.v -batch \
+  -e 'Print Assumptions maynard_M105_certified.'
 coqtop -Q theories/S1 PrimeGapS1 \
   -l theories/S1/CertRayleigh.v -batch \
   -e 'Print Assumptions maynard_M105_certified_rayleigh.'
-# Expected: Closed under the global context (zero axioms — not even
-# PrimInt63 / Uint63Axioms / CarryType, since alt's proof chain
-# operates in Z arithmetic only).
+# Expected (both): Closed under the global context (zero axioms — not even
+# PrimInt63 / Uint63Axioms / CarryType, since the proof chain operates in
+# Z arithmetic only).
 ```
 
 ## License
