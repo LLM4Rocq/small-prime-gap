@@ -40,6 +40,10 @@ From Stdlib Require Znumtheory.
 Import ListNotations.
 From PrimeGapS1 Require Import IntMat CharPoly Witness WitnessM1CharPoly.
 From PrimeGapS1 Require Import PrimeCheck CRTCheck FLDiv ModularFL ModularHess.
+From PrimeGapS1 Require Import CRTFrameDefs.
+From PrimeGapS1 Require Import CRTFrame_part0 CRTFrame_part1 CRTFrame_part2.
+From PrimeGapS1 Require Import CRTFrame_part3 CRTFrame_part4 CRTFrame_part5.
+From PrimeGapS1 Require Import CRTFrame_part6 CRTFrame_part7.
 
 Open Scope Z_scope.
 
@@ -104,14 +108,10 @@ Qed.
 (* Section 3: per-prime agreement via the fast Hessenberg path         *)
 (* ================================================================== *)
 
-(* Element-wise boolean equality on lists of Z. *)
-Fixpoint list_Z_eqb (l1 l2 : list Z) : bool :=
-  match l1, l2 with
-  | nil, nil => true
-  | x :: l1', y :: l2' => Z.eqb x y && list_Z_eqb l1' l2'
-  | _, _ => false
-  end.
-
+(* list_Z_eqb (element-wise boolean equality on list Z) and
+   per_prime_hess_chk now live in CRTFrameDefs, shared with the
+   sharded CRTFrame_part*.v files; only their soundness lemmas and the
+   reassembly remain here. *)
 Lemma list_Z_eqb_sound :
   forall l1 l2, list_Z_eqb l1 l2 = true -> l1 = l2.
 Proof.
@@ -148,16 +148,31 @@ Proof. vm_compute. reflexivity. Qed.
 (* coqc, where the O(n^4) pass would take ~16 h.                       *)
 (* ------------------------------------------------------------------ *)
 
-Definition per_prime_hess_chk (p : Z) : bool :=
-  list_Z_eqb (char_poly_hess p M1_int)
-             (map (fun c => c mod p) cp_M1_value).
+(* per_prime_hess_chk is defined in CRTFrameDefs (shared with the
+   CRTFrame_part*.v shards). *)
 
-(* THE heavy computation, now O(n^3) and feasible: the fast char-poly of
-   M1_int agrees with cp_M1_value mod p for every table prime.  Closed by
-   [vm_compute; reflexivity]; run the final coqc with no timeout. *)
+(* The 200-prime table is the concatenation of the eight 25-prime
+   crt_chunk slices (pure firstn/skipn list slicing, ~50 ms). *)
+Lemma crt_primes_M1_chunks :
+  crt_primes_M1 = crt_chunk 0 ++ crt_chunk 1 ++ crt_chunk 2 ++ crt_chunk 3
+                  ++ crt_chunk 4 ++ crt_chunk 5 ++ crt_chunk 6 ++ crt_chunk 7.
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE heavy computation, now O(n^3) AND sharded: the fast char-poly of
+   M1_int agrees with cp_M1_value mod p for every table prime.  Each
+   25-prime chunk is discharged by [vm_compute] in its own
+   CRTFrame_part*.v (run concurrently by make -j8); here we reassemble
+   them via forallb_app without re-running the VM. *)
 Lemma per_prime_hess_all :
   forallb per_prime_hess_chk crt_primes_M1 = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof.
+  rewrite crt_primes_M1_chunks.
+  rewrite !forallb_app.
+  rewrite per_prime_hess_chunk0, per_prime_hess_chunk1, per_prime_hess_chunk2,
+          per_prime_hess_chunk3, per_prime_hess_chunk4, per_prime_hess_chunk5,
+          per_prime_hess_chunk6, per_prime_hess_chunk7.
+  reflexivity.
+Qed.
 
 (* Opaque congruence bridge (same load-bearing role as per_prime_chk_eq
    below): freezes the delta-identity so discharging per_prime_hess never

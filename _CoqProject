@@ -29,6 +29,15 @@ theories/S1/EigenBridge.v
 theories/S1/CRTCheck.v
 theories/S1/Bound.v
 theories/S1/WitnessM1CharPoly.v
+theories/S1/CRTFrameDefs.v
+theories/S1/CRTFrame_part0.v
+theories/S1/CRTFrame_part1.v
+theories/S1/CRTFrame_part2.v
+theories/S1/CRTFrame_part3.v
+theories/S1/CRTFrame_part4.v
+theories/S1/CRTFrame_part5.v
+theories/S1/CRTFrame_part6.v
+theories/S1/CRTFrame_part7.v
 theories/S1/CRTFrame.v
 theories/S1/M1CharPoly.v
 theories/S1/M1PosDef.v
