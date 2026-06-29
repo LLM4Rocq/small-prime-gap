@@ -827,28 +827,22 @@ Proof.
      expansion along the last row of an upper-Hessenberg matrix). *)
 Admitted.
 
-(* TODO-BRIDGE.
+(* hess_reduce_similar: the Hessenberg reduction preserves the
+   characteristic polynomial mod p.  PROVED (axiom-free), via the
+   infrastructure of Section 5b.
 
-   hess_reduce_similar: the Hessenberg reduction preserves the
-   characteristic polynomial mod p.
-
-   Proof strategy (MathComp).  Work over the field 'F_p.  Each
-   hess_elim_step is conjugation of the current matrix (mapped into 'F_p)
-   by the elementary matrix E = 1 + m *: delta_{i,k1}, which is in
-   `unitmx` (det E = 1; its inverse is 1 - m *: delta_{i,k1}).  Since the
-   pivot is invertible mod p (guaranteed by hess_reduce returning Some,
-   p prime), every step is a genuine conjugation, and
-       char_poly (conjmx E A) = char_poly A
-   because, lifting by `map_mx polyC`,
-       char_poly_mx (P *m A *m P^-1)
-         = (polyC P) *m char_poly_mx A *m (polyC P)^-1
-   (the scalar 'X%:M commutes), whence by det_mulmx / det_inv / det_map_mx
-   the two determinants agree.  Induct over the fold of elimination steps
-   (hess_inner / hess_outer) to get char_poly(H) = char_poly(reduceZ p M)
-   over 'F_p, then transport to the list-Z statement via the ring hom
-   Z -> 'F_p (`map_char_poly`) and CharPoly.char_poly_int_correct exactly
-   as in ModularFL.char_poly_modZ_sound, yielding
-   map (.mod p) (char_poly_int H) = map (.mod p) (char_poly_int M). *)
+   Proof (MathComp).  Over the field 'F_p, each hess_elim_step is the
+   conjugation (1 - m *: delta_{i,k1}) *m A *m (1 + m *: delta_{i,k1})
+   of the matrix mapped into 'F_p (MXFp_elim_step); the two elementary
+   factors multiply to 1%:M (ELER, since i <> k1), so char_poly_conj
+   gives char_poly invariance per step (elim_step_charpoly).  Folding
+   over hess_inner / hess_outer (hess_inner_ok / hess_outer_ok) and
+   reduceZ (MXFp_reduceZ) yields char_poly(H) = char_poly(M) over 'F_p
+   (hess_reduce_charpoly_Fp).  This is transported to the list-Z
+   statement coefficientwise through the ring hom Z -> 'F_p
+   (cp_MXFp_coef, built on map_char_poly and
+   CharPoly.char_poly_int_correct) and Z_to_Fp injectivity mod p
+   (Z_to_Fp_eqmod), exactly as in ModularFL.char_poly_modZ_sound. *)
 Lemma hess_reduce_similar (p : Z) (M H : mat) :
   Znumtheory.prime p ->
   square_mat (length M) M ->
