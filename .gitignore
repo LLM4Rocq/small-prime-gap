@@ -35,3 +35,12 @@ Makefile.coq.conf
 .vscode/
 rocq_mcp_cache_*.v
 MCP_PET_ISOLATION_REPORT.md
+
+# Blueprint LaTeX build artefacts (local xelatex/latexmk; real build is CI)
+blueprint/src/*.pdf
+blueprint/src/*.log
+blueprint/src/*.out
+blueprint/src/*.toc
+blueprint/src/*.xdv
+blueprint/src/*.fls
+blueprint/src/*.fdb_latexmk

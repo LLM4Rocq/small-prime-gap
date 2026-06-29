@@ -32,11 +32,11 @@
 (*         v_rat i == Z2rat v_num[i] / Z2rat v_den                            *)
 (*     quad_spec M == \sum_(i,j) v_rat i * M i j * v_rat j (rat)              *)
 (*                                                                            *)
-(* The Rayleigh witness route uses no eigenvalue, characteristic              *)
-(* polynomial, realalg, IVT, Sturm, or CRT lift, and no Uint63 /              *)
-(* native_compute / Axiom.  (The eigenvalue route -- Route 2 in               *)
-(* MaynardEigen.v -- builds a char-poly mod p, does a CRT lift,               *)
-(* and exhibits an eigenvalue > 4, all axiom-free.)                           *)
+(* This file uses no eigenvalue, characteristic polynomial, realalg,          *)
+(* IVT, Sturm, or CRT lift, and no Uint63 / native_compute / Axiom.           *)
+(* (The eigenvalue theorem MaynardEigen.maynard_M105_certified does           *)
+(* build a char-poly mod p, do a CRT lift, and exhibit an eigenvalue          *)
+(* > 4, all axiom-free.)                                                      *)
 (******************************************************************************)
 
 From Stdlib Require Import ZArith List Lia.

@@ -112,7 +112,8 @@ and `alphaZ_to_rat`, each one a small structural induction.
 
 `MaynardSpecBridge.v` is imported by `Cert.v` and used (together with
 the Z-level bool match `all_match_M{1,2}Z_true` from `MaynardVerify.v`)
-to discharge a *composed* paper-form ↔ FLINT identity in the headline:
+to discharge a *composed* paper-form ↔ FLINT identity used by both certified
+theorems:
 
 ```rocq
 Lemma M{1,2}_spec_eq_int i j :
@@ -120,47 +121,58 @@ Lemma M{1,2}_spec_eq_int i j :
   M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}.
 ```
 
-where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
+where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The standalone theorem
 `CertRayleigh.maynard_M105_certified_rayleigh` exposes this composed identity
-directly (one conjunct per matrix), not the Z-level bool match and
-the rat<->Z bridge as separate conjuncts. The Z-level bool checks
+directly (one conjunct per matrix), and the eigenvalue headline reuses it
+through `matches_closed_forms` — in neither case do the Z-level bool match and
+the rat<->Z bridge appear as separate conjuncts. The Z-level bool checks
 `all_match_M{1,2}Z_true`
 and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
 `Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
 individually `Print Assumptions`-able — they just no longer appear as
-top-level conjuncts of the headline. Their purpose remains to certify
+top-level conjuncts. Their purpose remains to certify
 in the kernel that the rat-level paper-form spec (the documentation-
 shaped Part A a reviewer reads against the paper) and the Z-level
 computational spec (the Part B `vm_compute` consumes) encode the same
 closed forms.
 
-### Two certified routes to `M_{105} > 4`
+### The headline: `M_{105} > 4` in Maynard's eigenvalue form
 
-The project now closes `M_{105} > 4` in **two** axiom-free forms; both are
-`Qed` and `Print Assumptions` reports *Closed under the global context*.
+The headline theorem `MaynardEigen.maynard_M105_certified`
+(`theories/S1/MaynardEigen.v:372`) proves `M_{105} > 4` in the spectral form
+that matches Maynard's Lemma 8.3 characterisation of `M_k` as (k times) the
+largest eigenvalue of the generalized problem `M_2 v = λ M_1 v`:
 
-- **Route 1 — direct Rayleigh witness.**
-  `CertRayleigh.maynard_M105_certified_rayleigh`
-  (`theories/S1/CertRayleigh.v`) is the 3-conjunct headline described above:
-  the two composed paper-form ↔ FLINT identities plus the strict
-  Rayleigh-quotient bound `4 * quad_spec M1_spec_ij < 105 * quad_spec
-  M2_spec_ij` at the shipped 42-entry rational witness. It uses **no**
-  eigenvalue, **no** characteristic polynomial, and **no** Chinese-remainder
-  lift — it is the single-quotient strategy of Maynard's original notebook,
-  mechanised in pure-`Z` arithmetic by `vm_compute`.
+```rocq
+matches_closed_forms M105 /\
+exists lam : C, eigenvalue (ratrM M105) lam /\ (4 < lam)
+```
 
-- **Route 2 — eigenvalue / target form.**
-  `MaynardEigen.maynard_M105_certified` (`theories/S1/MaynardEigen.v:372`)
-  proves the spectral form that matches Maynard's Lemma 8.3 characterisation
-  of `M_k` directly (see "The eigenvalue route" section below). It is built
-  *on* Route 1 — `CertRayleigh.rayleigh_lt_main` supplies the strict `> 4`
-  input — and additionally formalises an eigenvalue, a characteristic
-  polynomial (mod `p`, lifted by deterministic CRT), and the
-  positive-definiteness of `M_1`.
+with `M105 = 105 *: (invmx M1_rat *m M2_rat)` (the full mapping is §6½). It is
+`Qed` and `Print Assumptions` reports *Closed under the global context* — no
+axioms, no `Uint63`/`PrimInt63`/`native_compute`/classical/funext; every
+reduction runs in stdlib `Z` via `vm_compute`.
 
-Route 1 is therefore both the direct route and the computational core of
-Route 2. Neither route uses IVT, a Sturm chain, `realalg`, or native 63-bit
-integers.
+**Computational core.** The heart of the headline is a single strict integer
+Rayleigh inequality, `CertRayleigh.rayleigh_lt_main`
+(`theories/S1/CertRayleigh.v:402`): `4 * quad_spec M1_spec_ij < 105 *
+quad_spec M2_spec_ij` at the shipped 42-entry rational witness, closed by one
+`vm_compute` over `Z`. Turning that quotient bound into a positive
+*eigenvalue* of `M105` needs two further axiom-free ingredients (both detailed
+in §6½): the positive-definiteness of `M_1`, via a CRT-over-`Z`
+sign-alternating characteristic-polynomial certificate, and the hermitian
+spectral bridge `SpectralCrux.herm_crux`.
+
+**Minimal-trust note.** The same Rayleigh inequality is also packaged
+standalone as `CertRayleigh.maynard_M105_certified_rayleigh`
+(`theories/S1/CertRayleigh.v:429`) — a proof of `M_{105} > 4` whose only
+kernel obligations are the matrix transcription (§4/§6) and one integer
+`vm_compute`, needing neither the spectral theorem nor the CRT certificate; a
+minimal-trust audit anchor. It too is `Qed`, *Closed under the global
+context*.
+
+Neither the headline nor the standalone note uses IVT, a Sturm chain,
+`realalg`, or native 63-bit integers.
 
 ### The `K = 105` vs `K2 = 104` distinction
 
@@ -574,12 +586,13 @@ so that lifting back to `rat` gives `M2_entry` exactly.
 
 ---
 
-## 6½. The eigenvalue route: `M105` ↔ Maynard's `M_k = k · λ_max(M_1^{-1} M_2)`
+## 6½. The headline: `M105` ↔ Maynard's `M_k = k · λ_max(M_1^{-1} M_2)`
 
-This section maps the Route 2 objects back to Maynard's Lemma 8.3. Route 1
-(§6, "Why the `k` factor lives in the threshold") bounds the Rayleigh
-quotient at a single witness; Route 2 instead exhibits an eigenvalue of the
-scaled pencil and so certifies the spectral form of `M_{105}` itself.
+This section maps the headline objects back to Maynard's Lemma 8.3. Where §6
+("Why the `k` factor lives in the threshold") bounds the Rayleigh quotient at
+a single witness — the computational core — here we lift that bound to an
+actual eigenvalue of the scaled pencil and so certify the spectral form of
+`M_{105}` itself.
 
 ### Source
 
@@ -657,8 +670,8 @@ since `M_{105} = λ_max(M105)` dominates every eigenvalue, this is exactly
    `ModularHess.char_poly_hess` (both `_sound`, fully proven).
 
 All of these are `Qed` and `Print Assumptions` reports *Closed under the
-global context* — same `vm_compute`-over-`Z` footprint as Route 1, no
-project axioms.
+global context* — same `vm_compute`-over-`Z` footprint as the standalone
+Rayleigh note, no project axioms.
 
 ---
 
@@ -802,37 +815,38 @@ requires:
 The analytic identity itself (integrals `→` Gram matrices) is taken on
 the paper side (REPORT.md §1.4 makes the same disclosure).
 
-What the **two routes** formalise of the matrix-level conclusion differs:
+The headline theorem `maynard_M105_certified` formalises the spectral half
+`k · λ_max(M_1^{-1} M_2) > 4` of (a) inside Rocq: it builds a characteristic
+polynomial (mod `p`, lifted by deterministic CRT), proves `M_1`
+positive-definite, and exhibits an actual eigenvalue of `M105` above `4`
+(see §6½). It discharges (b) at the shipped witness as its computational
+core; the analytic step (a) relating `M_k` to the Gram matrices remains
+paper-side.
 
-- **Route 1** (`maynard_M105_certified_rayleigh`) discharges only (b) at a
-  single witness — it formalises **no** eigenvalue, **no** characteristic
-  polynomial, and **no** Chinese-remainder lift; the proof is the
-  single-quotient strategy of Maynard's original Mathematica notebook,
-  mechanised in pure-`Z` arithmetic by `vm_compute`.
-- **Route 2** (`maynard_M105_certified`) goes further and formalises the
-  spectral half `k · λ_max(M_1^{-1} M_2) > 4` of (a) inside Rocq: it *does*
-  build a characteristic polynomial (mod `p`, lifted by deterministic CRT),
-  prove `M_1` positive-definite, and exhibit an actual eigenvalue of
-  `M105` above `4` (see §6½). The analytic step relating `M_k` to the Gram
-  matrices remains paper-side.
+The standalone `maynard_M105_certified_rayleigh` discharges only (b) at a
+single witness — it formalises **no** eigenvalue, **no** characteristic
+polynomial, and **no** Chinese-remainder lift; it is the single-quotient
+strategy of Maynard's original Mathematica notebook, mechanised in pure-`Z`
+arithmetic by `vm_compute`, and serves as the minimal-trust audit anchor.
 
-Neither route invokes IVT, a Sturm chain, `realalg`, or native 63-bit
+Neither theorem invokes IVT, a Sturm chain, `realalg`, or native 63-bit
 integers — those denials hold for the whole development.
 
 ### 9.2 Positivity of `M_1` and the supremum / max equivalence
 
 Maynard's Lemma 8.3 is the analytic statement
 `M_k = k · sup_F J_k(F)/I_k(F)` for the quadratic forms `J_k`, `I_k`
-defined by `M_2`, `M_1` (paper). The strict Rayleigh-quotient bound
-at *any* fixed `a` is a lower bound on this supremum so long as
-`a^T M_1 a > 0`, which `CertRayleigh.rayleigh_witness_M1_positive`
-checks for `a = v_witness`. For **Route 1** the per-witness positivity
-is all that is needed — positivity of `M_1` as a whole is not used.
-**Route 2**, by contrast, *does* prove `M_1` positive-definite as a whole
-(`M1PosDef`, via the CRT-over-`Z` sign-alternating characteristic-polynomial
-certificate of §6½): full PD is what makes the spectral square-root factor
-`M1_rat_factor` available and turns the generalized pencil into a standard
-Hermitian eigenproblem.
+defined by `M_2`, `M_1` (paper). The headline theorem proves `M_1`
+positive-definite as a whole (`M1PosDef`, via the CRT-over-`Z`
+sign-alternating characteristic-polynomial certificate of §6½): full PD is
+what makes the spectral square-root factor `M1_rat_factor` available and
+turns the generalized pencil into a standard Hermitian eigenproblem.
+
+The standalone `maynard_M105_certified_rayleigh` needs less: the strict
+Rayleigh-quotient bound at the fixed witness `a = v_witness` is a lower bound
+on the supremum so long as `a^T M_1 a > 0`, which
+`CertRayleigh.rayleigh_witness_M1_positive` checks for that single witness —
+positivity of `M_1` as a whole is not used there.
 
 ### 9.3 The Beta-integral derivation `J_k(F)/I_k(F) → closed form`
 
@@ -867,14 +881,14 @@ are exactly the Maynard matrices.
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
 | `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_eq_int`) |
 | `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_eq_int`) |
-| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `CertRayleigh.maynard_M105_certified_rayleigh` |
-| `maynard_M105_certified_rayleigh` | `CertRayleigh.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus the strict Rayleigh-quotient bound `4 * quad_spec M1_spec_ij < 105 * quad_spec M2_spec_ij` at the shipped witness vector |
+| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — the two rat-level conjuncts of the standalone `CertRayleigh.maynard_M105_certified_rayleigh`, reused by the eigenvalue headline via `matches_closed_forms` |
+| `maynard_M105_certified_rayleigh` | `CertRayleigh.v:429` | standalone minimal-trust proof (3 conjuncts): `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus the strict Rayleigh-quotient bound `4 * quad_spec M1_spec_ij < 105 * quad_spec M2_spec_ij` at the shipped witness vector |
 | `rayleigh_witness_holds` | `CertRayleigh.v` | integer Rayleigh inequality `4 * D_M2 * v_num^T M1_int v_num < 105 * D_M1 * v_num^T M2_int v_num` at the shipped scaled-integer witness, `vm_compute` Qed, *Closed under the global context* |
 | `rayleigh_witness_M1_positive` | `CertRayleigh.v` | integer positivity `v_num^T M1_int v_num > 0`, `vm_compute` Qed, *Closed under the global context* |
 | `v_witness` | `Witness_Rayleigh.v` | 42-entry rational witness vector as `list (Z * Z)`; autogenerated by `python/build_quad_witness.py`; verified slack `≈ +2.07e-3` |
 | `M1_rat`, `M2_rat`, `A_rat`, `M105` | `EigenBridge.v` | `M{1,2}_int / D_M{1,2}` as `'M[rat]_42`; `A_rat = M_1^{-1} M_2`; `M105 = 105 *: A_rat = k · M_1^{-1} M_2` (Lemma 8.3) |
 | `matches_closed_forms` | `EigenBridge.v` | trust contract: `M = M105` and the paper-form spec entries equal the FLINT-shipped integer data (reuses `M{1,2}_spec_eq_int`) |
-| `maynard_M105_certified` | `MaynardEigen.v:372` | Route 2 headline (eigenvalue / target form): `matches_closed_forms M105 /\ exists lam : algC, eigenvalue (ratrM M105) lam /\ 4 < lam` — Maynard's `M_{105} = λ_max(M105) > 4`, `Qed`, *Closed under the global context* |
+| `maynard_M105_certified` | `MaynardEigen.v:372` | headline (eigenvalue / target form): `matches_closed_forms M105 /\ exists lam : C, eigenvalue (ratrM M105) lam /\ 4 < lam` — Maynard's `M_{105} = λ_max(M105) > 4`, `Qed`, *Closed under the global context* |
 | `M1_rat_factor` | `M1PosDef.v` | complex congruence factor `R` with `Rᵀ* *m R = ratrM M1_rat` (`M_1` PD spectral square root) |
 | `char_poly_int_M1_eq` | `M1CharPoly.v` | `char_poly_int M1_int = cp_M1_value` (sign-alternating ⟹ `M_1` PD), via CRT over 200 primes |
 | `herm_crux` | `SpectralCrux.v` | spectral crux: `A` Hermitian, `0 < wᵀAw` ⟹ `A` has a positive eigenvalue |
