@@ -6,4 +6,4 @@ From PrimeGapS1.MaynardVerify Require Import Def.
 
 Lemma M2_check_rows_0_6 :
   M2_check_rows (List.seq 0 7) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_cast_no_check (eq_refl true). Qed.

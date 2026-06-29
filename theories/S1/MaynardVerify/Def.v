@@ -9,7 +9,7 @@
    ================================================================ *)
 
 From Stdlib Require Import ZArith List Lia.
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import ssreflect ssrbool ssrnat.
 From PrimeGapS1 Require Import IntMat CharPoly Witness.
 From PrimeGapS1 Require Import MaynardFactQ MaynardBasis MaynardSpec.
 
@@ -18,9 +18,6 @@ Import ListNotations.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
-Import GRing.Theory.
-Local Open Scope ring_scope.
 
 (* ------------------------------------------------------------------
    Num / den projections for the Z-level specs in MaynardSpec.v.
@@ -36,13 +33,24 @@ Definition m2_den (i j : nat) : Z := snd (m2_num_den_at i j).
    Per-entry Z-level cross-multiplication checks.
    ------------------------------------------------------------------ *)
 
+(* `m{1,2}_num` and `m{1,2}_den` each project a field of the SAME
+   pair `m{1,2}_num_den_at i j`.  Because the VM is call-by-value it
+   evaluates *both* fields whenever one is forced, so referencing the
+   two projections separately recomputes every factorial twice.  We
+   bind the pair once with a `let` (which `vm_compute` evaluates a
+   single time, then projects) — this halves the M1 grid evaluation.
+   The `let`/`fst`/`snd` form is zeta-convertible to the projections,
+   so `M{1,2}_entry_matchZ_E` below still holds by `by []`. *)
+
 Definition M1_entry_matchZ (i j : nat) : bool :=
-  Z.eqb (BinInt.Z.mul (m1_num i j) D_M1)
-        (BinInt.Z.mul (mat_get M1_int i j) (m1_den i j)).
+  let p := m1_num_den_at i j in
+  Z.eqb (BinInt.Z.mul (fst p) D_M1)
+        (BinInt.Z.mul (mat_get M1_int i j) (snd p)).
 
 Definition M2_entry_matchZ (i j : nat) : bool :=
-  Z.eqb (BinInt.Z.mul (m2_num i j) D_M2)
-        (BinInt.Z.mul (mat_get M2_int i j) (m2_den i j)).
+  let p := m2_num_den_at i j in
+  Z.eqb (BinInt.Z.mul (fst p) D_M2)
+        (BinInt.Z.mul (mat_get M2_int i j) (snd p)).
 
 (* ------------------------------------------------------------------
    Row-restricted M2 check used by the chunked Qeds.

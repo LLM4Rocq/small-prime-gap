@@ -1,9 +1,15 @@
 -Q theories/S1 PrimeGapS1
+theories/S1/SpectralCrux.v
 theories/S1/Recompose.v
 theories/S1/Witness.v
 theories/S1/IntPoly.v
 theories/S1/IntMat.v
 theories/S1/CharPoly.v
+theories/S1/Fermat.v
+theories/S1/FLDiv.v
+theories/S1/PrimeCheck.v
+theories/S1/ModularFL.v
+theories/S1/ModularHess.v
 theories/S1/MaynardFactQ.v
 theories/S1/MaynardBasis.v
 theories/S1/MaynardSpec.v
@@ -19,3 +25,11 @@ theories/S1/MaynardSpecBridge.v
 theories/S1/Cert.v
 theories/S1/Witness_Rayleigh.v
 theories/S1/CertRayleigh.v
+theories/S1/EigenBridge.v
+theories/S1/CRTCheck.v
+theories/S1/Bound.v
+theories/S1/WitnessM1CharPoly.v
+theories/S1/CRTFrame.v
+theories/S1/M1CharPoly.v
+theories/S1/M1PosDef.v
+theories/S1/MaynardEigen.v
