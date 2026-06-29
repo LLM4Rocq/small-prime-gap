@@ -46,8 +46,9 @@ Rayleigh-quotient bound
 4 \cdot v^T \Mone\, v   \;<\;   105 \cdot v^T \Mtwo\, v
 \]
 at $v = v_{\mathrm{witness}}$ in pure integer arithmetic by a single
-\vmcompute{} reflexivity. Turning that quotient bound into a positive
-\emph{eigenvalue} requires two further axiom-free ingredients: that
+\vmcompute{} reflexivity --- the kernel-checked counterpart of the
+notebook's numerical evaluation. Turning that quotient bound into a
+positive \emph{eigenvalue} requires two further ingredients: that
 $\Mone$ is positive definite (a deterministic CRT-over-$\Z$
 characteristic-polynomial sign certificate) and a Hermitian spectral
 bridge supplying a positive eigenvalue from a strictly positive
@@ -81,27 +82,20 @@ not re-formalise this analytic step. The project's scope is exactly to
 replace the Mathematica computation, not to re-formalise Maynard's paper.
 
 \paragraph{Status.}
-The headline theorem and every intermediate lemma is \Qed{} and
-\texttt{Print Assumptions} reports \emph{Closed under the global
-context}. The proof chain is axiom-free end-to-end: no
-\texttt{Admitted}, no \texttt{Axiom}, no \texttt{Parameter}
-anywhere in \texttt{theories/S1/}. Because every reduction is in
-$\Z$ arithmetic (\vmcompute{} on \texttt{list (list Z)} matrices
-and \texttt{list (Z * Z)} vectors), the headline does not even pull
-in the native 63-bit primitive-integer interface: no
-\texttt{PrimInt63}, no \texttt{Uint63Axioms}, no \texttt{CarryType}
-appear in the reported assumptions.
+The headline theorem and every lemma it depends on is \Qed{} in the
+source tree, with no project-specific axioms (the reported assumptions
+are discussed in Chapter~\ref{ch:trust}).
 
-\paragraph{Minimal-trust anchor.}
-The same integer Rayleigh inequality is also packaged standalone as
-\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}: a proof
-of $\Mk[105] > 4$ (via Maynard's Lemma~8.3) whose only kernel
-obligations are the matrix transcription and one integer \vmcompute{},
-needing neither the spectral theorem nor the CRT positive-definiteness
-certificate. It is a minimal-trust audit anchor for a reviewer who
-wants the inequality without the eigenvalue machinery. Both it and the
-headline \rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified} are
-\Qed{} and report \emph{Closed under the global context}.
+\paragraph{The notebook's own conclusion, standalone.}
+The same integer Rayleigh inequality is also packaged on its own as
+\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}: $\Mk[105]
+> 4$ read directly off the Rayleigh quotient (via Maynard's Lemma~8.3),
+without the eigenvalue reformulation. This is the notebook's conclusion
+in its original shape; it uses neither the spectral theorem nor the CRT
+positive-definiteness certificate, depending only on the matrix
+transcription and the one integer \vmcompute{}. The headline
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified} goes one step
+further and recasts the bound as an eigenvalue.
 
 \paragraph{How to read this blueprint.}
 Each chapter mirrors a Rocq source file or a small group of related
@@ -381,8 +375,7 @@ The $1764$ Boolean cross-multiplication checks
 \texttt{M1\_entry\_matchZ}~$i\,j$ are aggregated into
 \texttt{all\_match\_M1Z}~$=$~\texttt{forallb}~over $42 \times 42$, and
 the Lemma is closed by a single \vmcompute{}. The check costs
-${\sim}90$~s wall-clock. \texttt{Print Assumptions} reports only the
-standard \Uintsf{} primitives.
+${\sim}90$~s wall-clock.
 \end{proof}
 
 \begin{theorem}[$M_2$ entries match Maynard's closed form]\label{thm:M2_match}
@@ -402,7 +395,6 @@ significant. The check is split into six 7-row chunks
 concurrently, and the assembly stitches them via \texttt{seq\_split\_42}
 plus \texttt{forallb\_app} — no per-entry recomputation in the
 \Qed{} of \texttt{all\_match\_M2Z\_true} itself.
-\texttt{Print Assumptions}: only the standard \Uintsf{} primitives.
 \end{proof}
 
 \begin{remark}
@@ -423,8 +415,7 @@ elaboration at concrete dimension $42$. The rat-level spec
 (\texttt{M1\_entry}, \texttt{M2\_entry}) is the
 documentation-shaped form a reviewer reads side by side with
 arXiv:1311.4600~\S8. The bridge below certifies in the kernel that the
-two forms encode the same closed forms: a single \Qed{} per matrix,
-with no axioms.
+two forms encode the same closed forms: a single \Qed{} per matrix.
 
 \begin{definition}[Reading a $\Z$-pair as a rational]\label{def:qfrac}
 \rocq{PrimeGapS1.MaynardSpecBridge.qfrac}
@@ -451,8 +442,6 @@ Layered structural induction in
 \texttt{dblratZ\_to\_rat}, \texttt{binZ\_to\_rat},
 \texttt{compositionsZ\_eq\_compositions}, \texttt{G2Z\_to\_rat}, and
 \texttt{m1\_num\_den\_to\_rat} compose into a single rewrite chain.
-\texttt{Print Assumptions} reports \emph{Closed under the global
-context}: no axioms, not even \Uintsf\ primitives.
 \end{proof}
 
 \begin{theorem}[$\Mtwo$ paper-form spec equals $\Z$-level spec]\label{thm:M2_spec_rat_eq}
@@ -470,8 +459,7 @@ $\texttt{qplus}$ accumulator: \texttt{qfrac\_qmul} and
 \texttt{qfrac\_qplus} bridge \texttt{qmul} / \texttt{qplus} on
 $\Z \times \Z$ pairs to $*$ / $+$ on $\rat$, and a generic
 $\texttt{fold\_left qplus} \to \sum$ lemma collects the double sum
-over $(c'_1, c'_2)$. \texttt{Print Assumptions}: \emph{Closed under
-the global context}.
+over $(c'_1, c'_2)$.
 \end{proof}
 
 \begin{remark}
@@ -492,29 +480,34 @@ Maynard's exact closed form.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The computational core: the integer Rayleigh inequality}\label{ch:rayleigh}
+\chapter{The Rayleigh inequality: the notebook computation, mechanised}\label{ch:rayleigh}
 
-This chapter is the computational core of the headline eigenvalue
-result (Chapter~\ref{ch:eigen}): the single strict inequality that, at
-one witness vector, both certifies $\Mk[105] > 4$ directly (via
-Maynard's Lemma~8.3, the minimal-trust anchor) and supplies the
-positivity input the spectral bridge consumes. Maynard's Lemma~8.3
-reduces $\Mk[k] > c$ to: exhibit a single coefficient vector
+This chapter is the mechanised form of Maynard's notebook computation.
+The notebook snaps the top eigenvector of $\Mone^{-1}\Mtwo$ to a
+small-denominator rational vector and evaluates the matrix's Rayleigh
+quotient there in exact rational arithmetic; we replay exactly that
+evaluation in the kernel. It is a single strict inequality that, at one
+witness vector, both certifies $\Mk[105] > 4$ directly (via Maynard's
+Lemma~8.3) and supplies the positivity input the spectral bridge of
+Chapter~\ref{ch:eigen} consumes. Maynard's Lemma~8.3 reduces
+$\Mk[k] > c$ to: exhibit a single coefficient vector
 $a \in \rat^{42}$ with $k \cdot a^T \Mtwo a / a^T \Mone a > c$,
 equivalently $c \cdot a^T \Mone a < k \cdot a^T \Mtwo a$ (and
 $a^T \Mone a > 0$ so the quotient is well-defined). The shipped
 rational vector $v_{\mathrm{witness}}$ in \texttt{Witness\_Rayleigh.v}
 is such an $a$ for $(k, c) = (105, 4)$. The kernel verifies the strict
 integer inequality at $v_{\mathrm{witness}}$ by a single \vmcompute{}
-reflexivity on $\Z$-arithmetic; the supplementary algebraic shim lifts
-that integer fact to the rat-level bigop
+reflexivity on $\Z$-arithmetic --- this is the step that stands in for
+the notebook's numerical evaluation; the supplementary algebraic shim
+lifts that integer fact to the rat-level bigop
 (Theorem~\ref{thm:rayleigh_lt_main}) the eigenvalue route consumes.
 
 The material lives in \texttt{Witness\_Rayleigh.v} (the witness vector
 itself) and \texttt{CertRayleigh.v} (the integer Rayleigh inequality,
 its positivity companion, the rat-level lift to the bigop on the
-paper-form spec matrices, and the standalone minimal-trust theorem
-\texttt{maynard\_M105\_certified\_rayleigh}).
+paper-form spec matrices, and the standalone theorem
+\texttt{maynard\_M105\_certified\_rayleigh}, the notebook's own
+conclusion read off the Rayleigh quotient).
 
 \section{The 42-entry rational witness vector}
 
@@ -595,15 +588,13 @@ $4 \cdot \DMtwo \cdot \texttt{num\_M1} < 105 \cdot \DMone \cdot \texttt{num\_M2}
 \end{definition}
 
 \begin{theorem}[Positivity of the integer numerator]\label{thm:rayleigh_pos}
-\rocq{PrimeGapS1.CertRayleigh.rayleigh_witness_M1_positive}
+\rocq{PrimeGapS1.CertRayleigh.rayleigh_witness_M1_gt0}
 \rocqok
 \uses{def:num_M1M2}
 $0 < \texttt{num\_M1}$ in $\Z$.
 \end{theorem}
 \begin{proof}\rocqok
 A single \vmcompute{} reflexivity in pure $\Z$-arithmetic.
-\texttt{Print Assumptions} reports \emph{Closed under the global
-context} — no $\Uintsf$ primitives.
 \end{proof}
 
 \begin{theorem}[Strict integer Rayleigh inequality]\label{thm:rayleigh_holds}
@@ -622,8 +613,7 @@ A single \vmcompute{} reflexivity on the integer comparison
 (${\sim}5$~s on a contemporary machine). Both sides are huge
 integers (the matrix denominators reach ${\sim}220$ decimal digits
 and the witness denominator $\vden$ has ${\sim}40$ digits), but
-the comparison itself is one BigZ subtraction. \texttt{Print
-Assumptions} reports \emph{Closed under the global context}.
+the comparison itself is one BigZ subtraction.
 \end{proof}
 
 \begin{remark}
@@ -730,8 +720,7 @@ keeps the bigop walk referring to it by name instead of inlining a
 fresh \texttt{field} proof term under each of the $42 \cdot 42 =
 1764$ binders, so the proof term stays small for kernel
 verification. The outer $\texttt{mulr\_sumr}$ rewrite is
-restricted to $[LHS]$ to keep unification cheap. \texttt{Print
-Assumptions} reports \emph{Closed under the global context}.
+restricted to $[LHS]$ to keep unification cheap.
 \end{proof}
 
 \begin{lemma}[Generic Rayleigh lift]\label{lem:rayleigh_lift_generic}
@@ -760,7 +749,6 @@ result is the integer comparison hypothesis. Abstracting over
 $q_1, q_2, v$ and the four $\Z$ scalars keeps the two \texttt{ring}
 calls operating on tiny abstract scalars rather than on the
 concrete \texttt{quad\_spec} bigops, so the proof term stays small.
-\texttt{Print Assumptions}: \emph{Closed under the global context}.
 \end{proof}
 
 \begin{theorem}[Strict Rayleigh-quotient bound at the witness]
@@ -785,11 +773,10 @@ M_{\mathrm{int}}, D_M) = (\texttt{M1\_spec\_ij}, M_1^{\mathrm{int}},
 Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int}),
 together with $\texttt{rayleigh\_witness\_holds\_rat}$ — the
 integer Rayleigh inequality of Theorem~\ref{thm:rayleigh_holds}
-lifted to $\rat$ by $\texttt{Z2rat\_lt}$. \texttt{Print
-Assumptions}: \emph{Closed under the global context}.
+lifted to $\rat$ by $\texttt{Z2rat\_lt}$.
 \end{proof}
 
-\section{The standalone minimal-trust theorem}
+\section{The standalone theorem: the notebook's conclusion}
 
 \begin{theorem}[End-to-end Rayleigh-quotient certification]\label{thm:M105}
 \rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}
@@ -821,8 +808,7 @@ and~\ref{lem:M2_spec_eq_int} (paper-form spec entry equals FLINT
 integer entry over the common denominator), and the third conjunct
 is Theorem~\ref{thm:rayleigh_lt_main} (the rat-level Rayleigh
 inequality). Modulo Maynard's Lemma~8.3 (paper-side), this entails
-$\Mk[105] > 4$. \texttt{Print Assumptions}: \emph{Closed under the
-global context}.
+$\Mk[105] > 4$.
 \end{proof}
 
 \begin{lemma}[$\Mone$ paper-form spec equals FLINT entry over $\DMone$]\label{lem:M1_spec_eq_int}
@@ -865,16 +851,15 @@ place of their $\Mone$ counterparts.
 \end{proof}
 
 \paragraph{Reading.}
-Theorem~\ref{thm:M105} is the \emph{minimal-trust anchor}: a reviewer
-who trusts \emph{only Rocq's kernel} obtains a certified strict
-Rayleigh-quotient bound on the paper-form spec matrices at the shipped
-42-entry rational witness vector, together with the closed-form match
-of those matrices to Maynard's specification --- with no eigenvalue, no
-characteristic polynomial, and no CRT lift in its dependency tree. A
-reviewer who additionally accepts Maynard's Lemma~8.3 (an
-Annals-published Rayleigh-quotient identity, paper-side) obtains
-$\Mk[105] > 4$ end-to-end. The headline theorem of
-Chapter~\ref{ch:eigen} reaches the same conclusion in Maynard's own
+Theorem~\ref{thm:M105} is the notebook's own conclusion, stated on its
+own: a certified strict Rayleigh-quotient bound on the paper-form spec
+matrices at the shipped 42-entry rational witness vector, together with
+the closed-form match of those matrices to Maynard's specification.
+Modulo Maynard's Lemma~8.3 (an Annals-published Rayleigh-quotient
+identity, paper-side) it gives $\Mk[105] > 4$. It has no eigenvalue, no
+characteristic polynomial, and no CRT lift in its dependency tree ---
+the Rayleigh quotient is all the notebook needed. The headline theorem
+of Chapter~\ref{ch:eigen} reaches the same conclusion in Maynard's own
 spectral form, built on top of this same inequality.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -893,8 +878,8 @@ $M_{105} = 105 \cdot \Mone^{-1}\Mtwo$. The headline is
 It is built \emph{on} the computational core of
 Chapter~\ref{ch:rayleigh}: the strict integer Rayleigh inequality of
 Theorem~\ref{thm:rayleigh_lt_main} is exactly the positivity input the
-spectral bridge consumes. Everything below is \Qed{} and axiom-free; in
-particular this development genuinely \emph{does} build a characteristic
+spectral bridge consumes. In contrast to the Rayleigh route, this
+development genuinely \emph{does} build a characteristic
 polynomial (modulo primes), perform a Chinese-remainder lift, and
 exhibit an eigenvalue, all over Stdlib's $\Z$ and $\Fp$ with no
 \texttt{native\_compute} and no real-algebra (IVT / Sturm / $\realalg$)
@@ -943,7 +928,7 @@ through a single spectral fact, proved over a \texttt{numClosedFieldType}
 (instantiated at $\algC$, MathComp's field of algebraic complex numbers)
 on top of the \emph{complex} spectral theorem shipped in MathComp~2.5.0
 (\texttt{orthomx\_spectralP}). No real spectral theorem (mathcomp
-PR~\#1611) and no project axiom is used.
+PR~\#1611) is needed.
 
 \begin{theorem}[Hermitian crux]\label{thm:herm_crux}
 \rocq{PrimeGapS1.SpectralCrux.herm_crux}
@@ -967,7 +952,7 @@ $\texttt{hermsymmx}$ (not $\texttt{realmx}$) is required, so a
 is needed.
 \end{proof}
 
-\section{Axiom-free positive definiteness of \texorpdfstring{$\Mone$}{M\_1}}
+\section{Positive definiteness of \texorpdfstring{$\Mone$}{M\_1}}
 
 The crux needs a Hermitian \emph{congruence factor} of $\Mone^{\rat}$ over
 $\algC$, i.e.\ $\Mone^{\rat}$ positive definite. The certificate is a
@@ -1013,8 +998,7 @@ needed.
 \end{theorem}
 \begin{proof}\rocqok
 The \texttt{None} branch reuses Theorem~\ref{thm:char_poly_modZ_sound}.
-The \texttt{Some} branch factors through two structural lemmas, both
-\emph{fully proven and axiom-free}:
+The \texttt{Some} branch factors through two structural lemmas:
 \rocq{PrimeGapS1.ModularHess.hess_recurrence_sound} (the upper-Hessenberg
 leading-principal-minor determinant recurrence computes $\charpolysym$, by
 Laplace expansion along the last row) and
@@ -1151,18 +1135,17 @@ second, the complex congruence factor of Theorem~\ref{thm:M1_rat_factor}
 and the Rayleigh positivity of Theorem~\ref{thm:rayleigh_lt_main} (pushed
 through \texttt{ratr}, where it becomes the positive Hermitian form
 feeding the crux) discharge the hypotheses of the bridge
-Lemma~\ref{lem:eigen_bridge}. \texttt{Print Assumptions}: \emph{Closed
-under the global context}.
+Lemma~\ref{lem:eigen_bridge}.
 \end{proof}
 
 \paragraph{Reading.}
 This is the headline result, stated in Maynard's own spectral language:
 $M_{105}$ has an eigenvalue exceeding $4$. Its only numerical input
-beyond the matrix data is the strict Rayleigh inequality of the
-computational core (Theorem~\ref{thm:rayleigh_lt_main}); the same
-inequality, packaged standalone as Theorem~\ref{thm:M105}, is the
-minimal-trust anchor that reaches $\Mk[105] > 4$ without the eigenvalue
-machinery.
+beyond the matrix data is the strict Rayleigh inequality of
+Chapter~\ref{ch:rayleigh} (Theorem~\ref{thm:rayleigh_lt_main}); the same
+inequality, packaged standalone as Theorem~\ref{thm:M105}, gives the
+notebook's conclusion $\Mk[105] > 4$ directly, without the eigenvalue
+reformulation.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Trust base}\label{ch:trust}
@@ -1173,11 +1156,8 @@ machinery.
 \item Every claim of the form $a = b$ in $\Z$ or $\Q$, $a < b$ in
   $\Z$ or $\Q$, or membership of a rational in an interval, that
   appears in the dependency tree of the headline
-  Theorem~\ref{thm:M105_eigen} (or of the minimal-trust anchor
-  Theorem~\ref{thm:M105}) is
-  \Qed{} in the source tree. There are no \texttt{Admitted}, no
-  \texttt{Axiom}, and no \texttt{Parameter} declarations anywhere
-  in \texttt{theories/S1/}.
+  Theorem~\ref{thm:M105_eigen} (or of the standalone
+  Theorem~\ref{thm:M105}) is \Qed{} in the source tree.
 \item The matrix entries themselves (Lemma~8.2 of Maynard) are
   \Qed{} via Theorems~\ref{thm:M1_match} and~\ref{thm:M2_match}:
   the $1764 + 1764$ kernel-checked cross-multiplications close the
@@ -1195,26 +1175,11 @@ machinery.
   the closed forms themselves are correct integrations.
 \end{itemize}
 
-\section{Reported assumptions}
-
-The headline theorem
-\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified}
-(Theorem~\ref{thm:M105_eigen}) and its standalone minimal-trust anchor
-\rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}
-(Theorem~\ref{thm:M105}) \emph{both} report a single line under
-\texttt{Print Assumptions} — \emph{Closed under the global context}.
-This is stronger than the typical \vmcompute{} footprint: because the
-matrices and the witness vector are encoded as \texttt{list (list Z)}
-and \texttt{list (Z * Z)} rather than as native 63-bit packed arrays,
-\vmcompute{} reduces through $\Z$ arithmetic — and, for the CRT
-positive-definiteness certificate behind the headline, through
-$\Fp = \Z/p\Z$ — instead of through the $\Uintsf$ kernel primitives.
-None of \texttt{PrimInt63}, \texttt{Uint63Axioms}, or \texttt{CarryType}
-appears in the reported assumptions of either theorem.
-
-The project does not invoke \texttt{native\_compute} anywhere — a
-\texttt{grep -n native\_compute theories/S1} returns zero hits in
-real proof code.
+\paragraph{Assumptions.}
+\texttt{Print Assumptions} on the headline
+\rocq{PrimeGapS1.MaynardEigen.maynard_M105_certified} and on the
+standalone \rocq{PrimeGapS1.CertRayleigh.maynard_M105_certified_rayleigh}
+reports \emph{Closed under the global context}: no project-specific axioms.
 
 \section{The FLINT layer is outside the trust base}
 
@@ -1329,8 +1294,8 @@ inequality Theorem~\ref{thm:rayleigh_lt_main}.
 
 The matrix-spec and Rayleigh-witness backbones merge at
 \texttt{CertRayleigh.v}, producing the computational-core inequality
-Theorem~\ref{thm:rayleigh_lt_main} and the standalone minimal-trust
-anchor Theorem~\ref{thm:M105} (\texttt{Require Import
+Theorem~\ref{thm:rayleigh_lt_main} and the standalone
+Theorem~\ref{thm:M105} (\texttt{Require Import
 PrimeGapS1.CertRayleigh.} loads them); the eigenvalue backbone builds on
 that inequality to produce the headline Theorem~\ref{thm:M105_eigen}
 (\texttt{Require Import PrimeGapS1.MaynardEigen.} loads the whole proof).
