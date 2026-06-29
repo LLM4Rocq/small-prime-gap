@@ -27,3 +27,11 @@ AUDIT.md
 audit_*.md
 PATH_A_FEASIBILITY.md
 survey_*.md
+
+# Generated build files (coq_makefile) and editor / MCP artefacts
+Makefile.coq
+Makefile.coq.conf
+.Makefile.coq.d
+.vscode/
+rocq_mcp_cache_*.v
+MCP_PET_ISOLATION_REPORT.md
