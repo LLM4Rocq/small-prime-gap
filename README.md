@@ -40,15 +40,25 @@ Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as def
 
 ```rocq
 Theorem maynard_M105_certified :
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
+  matches_closed_forms M105 /\
   exists lambda : realalg,
-    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1 *) Qed.
+    eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda
+    /\ (4 < lambda).
+Proof. (* matches_closed_forms + maynard_eigenvalue_S1, rescaled by 105 *) Qed.
 ```
+
+Here `M105 := 105%:Q *: A_rat` is the scaled pencil matrix `105 · M₁⁻¹·M₂`, and `matches_closed_forms` packages the closed-form match of the input matrices as a three-way conjunction:
+
+```rocq
+Definition matches_closed_forms (M : 'M[rat]_42) : Prop :=
+  [/\ M = M105,
+      forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+        M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1
+    & forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
+        M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2].
+```
+
+Up to working over `realalg` (the real algebraic closure of `ℚ`) instead of `algC`, this is the same shape as the headline on the `main` branch. The bound `4 < lambda` for `M105 = 105 · A_rat` is obtained from the `maynard_eigenvalue_S1` bound `ratr (4/105) < lambda'` for `A_rat` by rescaling the eigenvalue by `105`.
 
 A single `Print Assumptions maynard_M105_certified` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
 

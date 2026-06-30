@@ -121,9 +121,9 @@ Lemma M{1,2}_spec_eq_int i j :
 ```
 
 where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
-`maynard_M105_certified` exposes this composed identity directly (one
-conjunct per matrix), not the Z-level bool match and the rat<->Z bridge
-as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
+`maynard_M105_certified` exposes this composed identity directly inside
+its `matches_closed_forms M105` package (one conjunct per matrix), not
+the Z-level bool match and the rat<->Z bridge as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
 and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
 `Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
 individually `Print Assumptions`-able — they just no longer appear as
@@ -725,5 +725,5 @@ exactly the Maynard matrices.
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
 | `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_eq_int`) |
 | `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_eq_int`) |
-| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified` |
-| `maynard_M105_certified` | `Cert.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |
+| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level matrix conjuncts of the headline's `matches_closed_forms M105` package |
+| `maynard_M105_certified` | `Cert.v` | headline: `matches_closed_forms M105` (pinning `M105 = 105%:Q *: A_rat`, `M1_spec = M1_int / D_M1`, `M2_spec = M2_int / D_M2`) plus `∃ λ : realalg, eigenvalue(M105) λ ∧ 4 < λ`; same shape as `main` (over `realalg`, not `algC`) |

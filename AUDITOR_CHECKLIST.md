@@ -14,14 +14,18 @@ Annals **181** (2015), 383–413).
 | 1 | The 42-element basis is exactly the multiset `{(b, c) ∈ ℕ² : b + 2c ≤ 11}` | §8, paragraph defining `P_k` for `k = 11` | `MaynardBasis.maynard_basis_spec` (predicate match) + `maynard_basis_uniq` (no duplicates) + `maynard_basis_size = 42` |
 | 2 | The literal 42-pair list matches the FLINT-shipped enumeration ordering | — (implementation choice; rows/columns are read by integer index) | `MaynardBasis.maynard_basis_eq_witness` (`vm_compute` Qed) |
 | 3 | The closed-form `M_{i,j}` formulas transcribe Maynard's matrix entries | Lemma 8.2 + eq. 8.4 (the formula `b! · G_{c,2}(n) / (n+b+2c)!` is correct for all `b ≥ 0` with `0! = 1`; no separate `b = 0` case — see `SPEC_TO_PAPER.md` §8) | Read `MaynardSpec.{M1_entry, M2_entry, G_2, alpha, compositions, cff}` against the paper; line-level map in `SPEC_TO_PAPER.md` |
-| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced directly in the headline `Cert.maynard_M105_certified` |
+| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced in the headline `Cert.maynard_M105_certified` via the `matches_closed_forms M105` package |
 | 5 | The shipped char-poly equals `char_poly` of `A_int = M₁⁻¹·M₂·D_A` over ℤ | — (kernel cross-check) | `CRTLift.fl_eq_flint` + `CRTLift.matrix_identity_Z` (710-prime CRT lift, then Hadamard-style coefficient bound) |
-| 6 | There exists a real-algebraic eigenvalue `λ > 4/105` of `A_rat = M₁⁻¹·M₂` | Proposition 4.3 / eq. 8.15 (the project's headline claim) | `Cert.maynard_eigenvalue_S1` — IVT on `char_poly_int` (= `char_poly` of `A_int` after sign hygiene), using mathcomp-real-closed's `poly_ivtoo` |
+| 6 | There exists a real-algebraic eigenvalue `λ > 4/105` of `A_rat = M₁⁻¹·M₂` | Proposition 4.3 / eq. 8.15 (the project's core spectral claim) | `Cert.maynard_eigenvalue_S1` — IVT on `char_poly_int` (= `char_poly` of `A_int` after sign hygiene), using mathcomp-real-closed's `poly_ivtoo` |
 | 7 | `M_{105} = 105 · λ_max > 4` follows from the eigenvalue bound | **Lemma 8.3** (`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`) | **paper-side** — refereed in the Annals paper, not formalised |
 
-The headline `Cert.maynard_M105_certified` conjoins items (4) and (6)
-into a single Qed.  Items (1)–(3), (5), and (7) are read alongside
-the headline.
+The headline `Cert.maynard_M105_certified` packages item (4) — as the
+`matches_closed_forms M105` conjunction, which also pins
+`M105 = 105%:Q *: A_rat` — together with item (6) rescaled by `105`: an
+eigenvalue `λ > 4` of `M105 = 105·M₁⁻¹·M₂` over `realalg`, all in a
+single Qed.  Up to working over `realalg` instead of `algC`, this is the
+same shape as the `main` branch's headline.  Items (1)–(3), (5), and (7)
+are read alongside the headline.
 
 **Drill-down inside item (4).**  `M{1,2}_spec_eq_int` factors through
 two independently-`Print Assumptions`-able Qeds:
