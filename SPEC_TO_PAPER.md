@@ -122,8 +122,9 @@ Lemma M{1,2}_spec_eq_int i j :
 
 where `Z2rat (z : Z) : rat := (Z_to_int z)%:~R`. The headline theorem
 `CertPencil.maynard_M105_certified_pencil` exposes this composed
-identity directly (one conjunct per matrix), not the Z-level bool
-match and the rat<->Z bridge as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
+identity through its `matches_closed_forms M105` conjunct (one identity
+per matrix, alongside the definitional `M105 = 105 * A_rat`), not the
+Z-level bool match and the rat<->Z bridge as separate conjuncts. The Z-level bool checks `all_match_M{1,2}Z_true`
 and the rat<->Z bridges `M{1,2}_spec_rat_eq` still EXIST as standalone
 `Qed`s in `MaynardVerify.v` / `MaynardSpecBridge.v` — they are
 individually `Print Assumptions`-able — they just no longer appear as
@@ -726,5 +727,6 @@ are exactly the Maynard matrices.
 | `maynard_basis` (and `_size`, `_uniq`, `_spec`, `_eq_witness`) | `MaynardBasis.v` | p. 23, "for simplicity" |
 | `all_match_M1Z_true` | `MaynardVerify/Def.v` | 1764 Z-level cross-checks for `M_1`, single `vm_compute. reflexivity.` (standalone, used inside `M1_spec_eq_int`) |
 | `all_match_M2Z_true` | `MaynardVerify.v` (+ six chunks `MaynardVerify/M2_0..5.v`) | 1764 Z-level cross-checks for `M_2`, six 7-row chunks reassembled via `seq_split_42` (standalone, used inside `M2_spec_eq_int`) |
-| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two rat-level conjuncts of the headline `maynard_M105_certified_pencil` |
-| `maynard_M105_certified_pencil` | `CertPencil.v` | 3-conjunct headline: `M1_spec` = `M1_int / D_M1`, `M2_spec` = `M2_int / D_M2`, plus `∃ λ, eigenvalue(A_rat) λ ∧ λ > 4/105` |
+| `M1_spec_eq_int`, `M2_spec_eq_int` | `Cert.v` | composed identity `M{1,2}_spec_ij i j = Z2rat (mat_get M{1,2}_int i j) / Z2rat D_M{1,2}` — these are the two per-matrix conjuncts inside the headline's `matches_closed_forms M105` |
+| `M105`, `matches_closed_forms` | `CertPencil.v` | `M105 := 105 * A_rat`; `matches_closed_forms M := [/\ M = M105, M1_spec = M1_int/D_M1 & M2_spec = M2_int/D_M2]` |
+| `maynard_M105_certified_pencil` | `CertPencil.v` | headline in the main-branch shape (over `realalg`, where `main` uses `algC`): `matches_closed_forms M105 ∧ ∃ λ : realalg, eigenvalue(M105) λ ∧ 4 < λ` (the bound rescaled from `A_rat > 4/105` via `maynard_eigenvalue_S1_pencil_M105`) |

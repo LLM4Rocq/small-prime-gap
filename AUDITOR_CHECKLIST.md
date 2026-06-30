@@ -20,14 +20,30 @@ identity**.  The headline theorem is
 | 1 | The 42-element basis is exactly the multiset `{(b, c) ∈ ℕ² : b + 2c ≤ 11}` | §8, paragraph defining `P_k` for `k = 11` | `MaynardBasis.maynard_basis_spec` (predicate match) + `maynard_basis_uniq` (no duplicates) + `maynard_basis_size = 42` |
 | 2 | The literal 42-pair list matches the FLINT-shipped enumeration ordering | — (implementation choice; rows/columns are read by integer index) | `MaynardBasis.maynard_basis_eq_witness` (`vm_compute` Qed) |
 | 3 | The closed-form `M_{i,j}` formulas transcribe Maynard's matrix entries | Lemma 8.2 + eq. 8.4 (the formula `b! · G_{c,2}(n) / (n+b+2c)!` is correct for all `b ≥ 0` with `0! = 1`; no separate `b = 0` case — see `SPEC_TO_PAPER.md` §8) | Read `MaynardSpec.{M1_entry, M2_entry, G_2, alpha, compositions, cff}` against the paper; line-level map in `SPEC_TO_PAPER.md` |
-| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced directly in the headline `CertPencil.maynard_M105_certified_pencil` |
+| 4 | The shipped 42×42 integer matrices `M1_int` / `M2_int`, scaled by the common denominators `D_M1` / `D_M2`, agree with the paper-form spec entry-by-entry: `M_{i,j}_spec = Z2rat(M_int[i][j]) / Z2rat(D_M)` for `i, j < 42` | — (kernel cross-check + rat-level transcription equivalence, composed) | `Cert.M1_spec_eq_int`, `Cert.M2_spec_eq_int` — surfaced in the headline `CertPencil.maynard_M105_certified_pencil` via its `matches_closed_forms M105` conjunct |
 | 5 | The shipped determinant numerals match `det(M1_int)` and `det(pencil_mat_int)` (where `pencil_mat_int := pencil_int_clean = D_pencil_clean · (4·M1_rat − 105·M2_rat)` is the *clean* integer pencil; per-entry cross-check `D_M1·D_M2·pencil_int_clean[i,j] = D_pencil_clean·(4·D_M2·M1_int[i,j] − 105·D_M1·M2_int[i,j])` ties it to the FLINT data) over ℤ | — (kernel cross-check) | `CRTPencilCheck.det_M1_int_eq` and `CRTPencilCheck.D_pencil_int_eq` — both 710-prime CRT lifts on the SAME `crt_product_710` (the clean pencil's determinant is 2613 bits, well within the 710-prime product's ~21300-bit headroom), each composing per-prime modular agreement with a closed-form Hadamard coefficient bound; plus `PencilCleanGrid.all_pencil_clean_match_true` (1764-cell `vm_compute` Qed) for the per-entry cross-check |
 | 6 | There exists a real-algebraic eigenvalue `λ > 4/105` of `A_rat = M₁⁻¹·M₂` | Proposition 4.3 / eq. 8.15 (the project's headline claim) | `CertPencil.maynard_eigenvalue_S1_pencil` — `DetPencil.det_pencil` identity (`det(λ M₁ − M₂) = det M₁ · char_poly(M₁⁻¹M₂)(λ)`) combined with the integer-determinant signs of (5), then IVT on `char_poly A_rat` via mathcomp-real-closed's `poly_ivtoo` and Cauchy bound |
 | 7 | `M_{105} = 105 · λ_max > 4` follows from the eigenvalue bound | **Lemma 8.3** (`M_k = k · sup_F (J_k(F)/I_k(F)) = k · λ_max`) | **paper-side** — refereed in the Annals paper, not formalised |
 
-The headline `CertPencil.maynard_M105_certified_pencil` conjoins
-items (4) and (6) into a single Qed.  Items (1)–(3), (5), and (7)
-are read alongside the headline.
+The headline `CertPencil.maynard_M105_certified_pencil` reads, in the
+main-branch shape (`M105 := 105 * A_rat`),
+
+```rocq
+matches_closed_forms M105 /\
+exists lambda : realalg,
+  eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda /\ (4 < lambda).
+```
+
+Its `matches_closed_forms M105` conjunct packages item (4) (the two
+per-matrix closed-form identities) together with the definitional
+`M105 = 105 * A_rat`; its eigenvalue conjunct is item (6) rescaled from
+`(A_rat, 4/105)` to `(M105, 4)` — multiply through by 105 — via
+`CertPencil.maynard_eigenvalue_S1_pencil_M105`, which in turn invokes
+the standalone `CertPencil.maynard_eigenvalue_S1_pencil`. This is now
+the same shape as the `main` branch's `maynard_M105_certified`, except
+it is stated over `realalg` (the real algebraic closure of ℚ) where
+`main` uses `algC`. Items (1)–(3), (5), and (7) are read alongside the
+headline.
 
 **Drill-down inside item (4).**  `M{1,2}_spec_eq_int` factors through
 two independently-`Print Assumptions`-able Qeds:

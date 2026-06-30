@@ -40,16 +40,24 @@ The following variant conjoins the spectral bound with the closed-form match of 
 Note that Lemmas (8.1) and (8.2) are **not** mechanized, but rather taken as definitions for the coefficients of matrices `M1` and `M2` :
 
 ```rocq
+Definition M105 : 'M[rat]_42 := 105%:Q *: A_rat.
+
+Definition matches_closed_forms (M : 'M[rat]_42) : Prop :=
+  [/\ M = M105,
+      (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1)
+    & (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2)].
+
 Theorem maynard_M105_certified_pencil :
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
+  matches_closed_forms M105 /\
   exists lambda : realalg,
-    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
-Proof. (* M{1,2}_spec_eq_int + maynard_eigenvalue_S1_pencil *) Qed.
+    eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda
+    /\ (4 < lambda).
+Proof. (* matches_closed_forms_M105 + maynard_eigenvalue_S1_pencil_M105 *) Qed.
 ```
+
+Here `M105 := 105 * A_rat` (so `M105 = 105 * M1⁻¹·M2`), and the `matches_closed_forms M105` conjunct packages the definitional `M105 = 105 * A_rat` together with the two per-matrix closed-form identities (M1/M2 paper-form spec = FLINT integer entries over the common denominators). This headline is now the **same shape** as the `main` branch's `maynard_M105_certified` — `matches_closed_forms M105` plus a real eigenvalue of `M105` strictly above `4` — except it is stated over `realalg` (the real algebraic closure of ℚ) where `main` uses `algC`. The rescaled eigenvalue bound (`eigenvalue M105 > 4`) is obtained from `maynard_eigenvalue_S1_pencil` (`eigenvalue A_rat > 4/105`) by multiplying through by 105.
 
 A single `Print Assumptions maynard_M105_certified_pencil` therefore displays the axioms used for establishing both the correctness of the 1764+1764 input-matrix entries and the bound.
 

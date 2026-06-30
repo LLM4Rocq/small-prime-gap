@@ -29,19 +29,31 @@ algebraic claim inside the kernel.
 
 The end-to-end statement is
 \begin{verbatim}
+Definition M105 : 'M[rat]_42 := 105%:Q *: A_rat.
+
+Definition matches_closed_forms (M : 'M[rat]_42) : Prop :=
+  [/\ M = M105,
+      (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1)
+    & (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2)].
+
 Theorem maynard_M105_certified_pencil :
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
-  (forall i j : nat, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
+  matches_closed_forms M105 /\
   exists lambda : realalg,
-    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
+    eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda
+    /\ (4 < lambda).
 \end{verbatim}
 proven in \texttt{theories/S1/CertPencil.v}, where
+$M_{105} := 105\cdot\Arat$ (so $M_{105} = 105\cdot\Mone^{-1}\Mtwo$) and
 $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
-is the thin embedding of $\Z$ into $\rat$. The first two conjuncts are
-each a single composed identity per matrix: the $\rat$-level paper-form
+is the thin embedding of $\Z$ into $\rat$. This headline is now the same
+shape as the \texttt{main} branch's \texttt{maynard\_M105\_certified}
+($\texttt{matches\_closed\_forms}\,M_{105}$ plus a real eigenvalue of
+$M_{105}$ strictly above $4$), except it is stated over $\realalg$ where
+\texttt{main} uses \texttt{algC}. The $\texttt{matches\_closed\_forms}\,M_{105}$
+conjunct packages the definitional $M_{105} = 105\cdot\Arat$ together with
+two composed per-matrix identities: the $\rat$-level paper-form
 spec $\texttt{M\{1,2\}\_spec\_ij}$ (the readable transcription of
 Maynard's Lemma~8.2) is equal, as a rational, to the FLINT-shipped
 integer entry $\texttt{mat\_get}\,M_{1,2}^{\mathrm{int}}\,i\,j$ divided
@@ -1072,33 +1084,46 @@ inequality is preserved verbatim.  Combining gives the existential.
 \rocq{PrimeGapS1.CertPencil.maynard_M105_certified_pencil}
 \rocqok
 \uses{lem:M1_spec_eq_int, lem:M2_spec_eq_int, thm:headline}
-The conjunction
+The conjunction, in the main-branch shape ($M_{105} := 105\cdot\Arat$),
 \[
 \begin{aligned}
-&\bigl(\forall i, j < 42.\;
-  \texttt{M1\_spec\_ij}(i,j)
-    = \texttt{Z2rat}(M_1^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMone)\bigr)\\
-&\quad\wedge\;
-\bigl(\forall i, j < 42.\;
-  \texttt{M2\_spec\_ij}(i,j)
-    = \texttt{Z2rat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMtwo)\bigr)\\
+&\texttt{matches\_closed\_forms}(M_{105})\\
 &\quad\wedge\;
 \bigl(\exists \lambda \in \realalg.\;
-   \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,\Arat)\,\lambda
+   \texttt{eigenvalue}(\texttt{map\_mx}\,\texttt{ratr}\,M_{105})\,\lambda
    \;\wedge\;
-   \texttt{ratr}(4/105) < \lambda\bigr),
+   4 < \lambda\bigr),
 \end{aligned}
 \]
-where $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
-is the thin $\Z \to \rat$ embedding.
+where $\texttt{matches\_closed\_forms}(M)$ abbreviates the three-fold
+conjunction
+\[
+\begin{aligned}
+&M = M_{105},\\
+&\bigl(\forall i, j < 42.\;
+  \texttt{M1\_spec\_ij}(i,j)
+    = \texttt{Z2rat}(M_1^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMone)\bigr),\\
+&\bigl(\forall i, j < 42.\;
+  \texttt{M2\_spec\_ij}(i,j)
+    = \texttt{Z2rat}(M_2^{\mathrm{int}}[i][j]) \,/\, \texttt{Z2rat}(\DMtwo)\bigr),
+\end{aligned}
+\]
+and $\texttt{Z2rat}\,(z : \Z) : \rat := (\texttt{Z\_to\_int}\,z)\%\texttt{:\~{}R}$
+is the thin $\Z \to \rat$ embedding. This is the same shape as the
+\texttt{main} branch's \texttt{maynard\_M105\_certified}, stated over
+$\realalg$ instead of \texttt{algC}.
 \end{theorem}
 \begin{proof}\rocqok
-A three-way \texttt{split}: the two composed per-matrix identities are
-discharged by Lemmas~\ref{lem:M1_spec_eq_int}
-and~\ref{lem:M2_spec_eq_int} (each one identity per matrix,
-paper-form spec entry $=$ FLINT integer entry over the common
-denominator), and the eigenvalue existential by the spectral
-Theorem~\ref{thm:headline}. The two composed identities each fold
+A two-way \texttt{split}. The $\texttt{matches\_closed\_forms}(M_{105})$
+conjunct is itself a three-way split: the definitional
+$M_{105} = 105\cdot\Arat$ (by \texttt{reflexivity}), and the two
+composed per-matrix identities discharged by
+Lemmas~\ref{lem:M1_spec_eq_int} and~\ref{lem:M2_spec_eq_int} (each one
+identity per matrix, paper-form spec entry $=$ FLINT integer entry over
+the common denominator). The eigenvalue existential is the spectral
+Theorem~\ref{thm:headline} rescaled from $(\Arat, 4/105)$ to
+$(M_{105}, 4)$ — multiply both the matrix and the threshold through by
+$105$ — via \texttt{maynard\_eigenvalue\_S1\_pencil\_M105}. The two composed identities each fold
 together a $\Z$-level cross-multiplication
 (\texttt{all\_match\_M\{1,2\}Z\_true}) and a $\rat\leftrightarrow\Z$
 bridge (\texttt{MaynardSpecBridge.M\{1,2\}\_spec\_rat\_eq}) via a thin
@@ -1157,8 +1182,9 @@ factorials over the $\texttt{fold\_left qplus}$ accumulator).
 \paragraph{Reading.}
 A reviewer who trusts \emph{only Rocq's kernel} obtains, from
 Theorem~\ref{thm:M105}, a certified existence of a $\realalg$
-eigenvalue of a specific kernel-verified $42 \times 42$ $\Q$-matrix
-above $4/105$. A reviewer who additionally accepts Maynard's Lemma~8.3
+eigenvalue of the specific kernel-verified $42 \times 42$ $\Q$-matrix
+$M_{105} = 105\cdot\Mone^{-1}\Mtwo$ above $4$ (equivalently, an
+eigenvalue of $\Mone^{-1}\Mtwo$ above $4/105$). A reviewer who additionally accepts Maynard's Lemma~8.3
 (an Annals-published Rayleigh-quotient identity, paper-side) obtains
 $\Mk[105] > 4$ end-to-end.
 
