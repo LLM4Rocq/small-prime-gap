@@ -187,16 +187,59 @@ Qed.
    MaynardVerify and MaynardSpecBridge for auditors who want to
    trace the chain step-by-step.
    ------------------------------------------------------------------ *)
-Theorem maynard_M105_certified :
-  (forall i j, (i < 42)%nat -> (j < 42)%nat ->
-     M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1) /\
-  (forall i j, (i < 42)%nat -> (j < 42)%nat ->
-     M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2) /\
-  exists lambda : realalg,
-    eigenvalue (map_mx (ratr : rat -> realalg) A_rat) lambda
-    /\ (ratr (4%:Q / 105%:Q) : realalg) < lambda.
+(* Headline in the main-branch shape (over realalg); M105 = 105 *: A_rat. *)
+
+Definition M105 : 'M[rat]_42 := 105%:Q *: A_rat.
+
+Definition matches_closed_forms (M : 'M[rat]_42) : Prop :=
+  [/\ M = M105,
+      (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M1_spec_ij i j = Z2rat (mat_get M1_int i j) / Z2rat D_M1)
+    & (forall i j, (i < 42)%nat -> (j < 42)%nat ->
+         M2_spec_ij i j = Z2rat (mat_get M2_int i j) / Z2rat D_M2)].
+
+Lemma matches_closed_forms_M105 : matches_closed_forms M105.
 Proof.
-  split; first by move=> i j Hi Hj; apply: M1_spec_eq_int.
-  split; first by move=> i j Hi Hj; apply: M2_spec_eq_int.
-  exact: maynard_eigenvalue_S1.
+split; first by [].
+- by move=> i j Hi Hj; apply: M1_spec_eq_int.
+- by move=> i j Hi Hj; apply: M2_spec_eq_int.
+Qed.
+
+(* The S1 eigenvalue bound, rescaled from (A_rat, 4/105) to (M105, 4):
+   if mu is an eigenvalue of A_rat above 4/105, then 105*mu is an
+   eigenvalue of M105 = 105 *: A_rat above 4.  Pure realalg arithmetic. *)
+Lemma maynard_eigenvalue_S1_M105 :
+  exists lambda : realalg,
+    eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda /\ (4 < lambda).
+Proof.
+have [mu [Heig Hgt]] := maynard_eigenvalue_S1.
+have h105ne : (105%:Q : rat) != 0 by rewrite intr_eq0.
+exists (ratr (105%:Q) * mu); split.
+- have -> : map_mx (ratr : rat -> realalg) M105
+         = ratr (105%:Q) *: map_mx (ratr : rat -> realalg) A_rat.
+    by apply/matrixP=> i j; rewrite /M105 !mxE rmorphM.
+  have [v Hv vnz] := eigenvalueP Heig.
+  apply/eigenvalueP; exists v => //.
+  by rewrite -scalemxAr Hv scalerA.
+- have h105 : (0 : realalg) < ratr (105%:Q) by rewrite ltr0q.
+  have e4 : ratr (105%:Q) * ratr (4%:Q / 105%:Q) = 4 :> realalg.
+    rewrite -rmorphM.
+    have -> : (105%:Q * (4%:Q / 105%:Q) = 4%:Q :> rat).
+      by rewrite mulrC (mulfVK h105ne).
+    by rewrite rmorph_int.
+  by rewrite -e4 ltr_pM2l.
+Qed.
+
+(* ------------------------------------------------------------------
+   The headline theorem, in the main-branch shape: the closed-form
+   trust contract `matches_closed_forms M105` plus a real eigenvalue
+   of M105 strictly above 4.  Stated over realalg (the real-closed
+   field this IVT route lives in); the eigenvalue is genuinely real.
+   ------------------------------------------------------------------ *)
+Theorem maynard_M105_certified :
+  matches_closed_forms M105 /\
+  exists lambda : realalg,
+    eigenvalue (map_mx (ratr : rat -> realalg) M105) lambda /\ (4 < lambda).
+Proof.
+split; [exact: matches_closed_forms_M105 | exact: maynard_eigenvalue_S1_M105].
 Qed.
